@@ -1,0 +1,652 @@
+***
+*** file: eduction.maude
+*** author: Giorgos Fourtounis <gfour@softlab.ntua.gr>
+*** 
+*** The model of the parallel runtime ("parallel eduction") of the
+*** intensional transformation.
+*** The language NVIL is encoded and its evaluation rules are
+*** given.
+*** 
+*** Needs Full Maude 2.5b.
+*** 
+
+*** The stacks data type.
+(fmod STACKS is
+  protecting NAT .
+        
+  sorts NeStack Stack .
+  subsorts NeStack < Stack .
+
+  op snil : -> Stack [ctor] .
+  op _::_ : Nat Stack -> NeStack [ctor] .
+
+  op stackHead : NeStack ~> Nat .
+  op stackTail : NeStack ~> Stack .
+  op sz : Stack -> Nat .
+
+  *** IMPLEMENTATION
+  var I  : Nat .
+  var ST : Stack .
+
+  eq stackHead(I :: ST) = I .
+  eq stackTail(I :: ST) = ST .
+
+  eq sz(snil) = 0 .
+  eq sz(I :: ST) = 1 + sz(ST) .    
+endfm)
+
+(omod OIDS is
+  protecting NAT .
+  sort Oids .
+  subsort Oid < Oids .
+  op none : -> Oids [ctor] .
+  op __ : Oids Oids -> Oids [assoc comm ctor] .
+  var O : Oid .
+  *** "Collapse" rule to make Oids a set (instead of a multiset).
+  eq O O = O .
+endom)
+
+*** NVIL expressions.
+(fmod EXPR is
+  protecting STRING . protecting INT .
+  protecting NAT . protecting LIST{Nat} .
+
+  sorts Variable Expr ExprList .
+  subsort Variable < Expr < ExprList .
+
+  op enil : -> ExprList [ctor] .
+  op _:_  : Expr ExprList -> ExprList [ctor right id: enil] .
+
+  op $_      : String -> Variable [ctor] .
+  op #_      : Int -> Expr [ctor] .
+  op cOp     : String ExprList -> Expr [ctor] .
+  op call    : Nat Expr -> Expr [ctor] .
+  op actuals : ExprList -> Expr [ctor] .
+endfm)
+(fmod EXPR_IMPL is
+  including EXPR .
+
+  *** The #n-th expression of an ExprList .
+  op nthExpr : ExprList Nat -> [Expr] .
+
+  *** IMPLEMENTATION
+
+  var E : Expr . var EL : ExprList .
+  var I : Nat .
+
+  eq nthExpr(E : EL, 0) = E .
+  eq nthExpr(E : EL, s(I)) = nthExpr(EL, I) .
+endfm)
+(view Variable from TRIV to EXPR is
+  sort Elt to Variable .
+endv)
+
+*** A definition of NVIL.
+(fmod DEF is
+  protecting EXPR .
+  *** Filler.
+
+  sort Def .
+  op def : String Expr -> Def [ctor] .
+endfm)
+(view Def from TRIV to DEF is
+  sort Elt to Def .
+endv)
+
+*** The basic (expression, context) building blocks
+*** of the intensional language.
+(fmod EXPRCONTEXT is
+  protecting EXPR .
+  protecting STACKS .
+
+  sort ExprContext .
+  op <_;_> : Expr Stack -> ExprContext [ctor] .
+endfm)
+
+*** Programs are just read-only lists of Defs.
+(omod PROG is
+  protecting LIST{Def} . protecting STACKS .
+  protecting EXPRCONTEXT . protecting EXPR_IMPL .
+endom)
+(omod PROG_IMPL is
+  including PROG .
+
+  *** Returns a variable definition.
+  op lookup : String List{Def} -> Expr .
+
+  *** IMPLEMENTATION
+  vars I J   : Nat .
+  vars V0 V1 : String .
+  var CTXT   : Stack .
+  var E      : Expr .
+  var EXPRS  : ExprList .
+  var DEFS   : List{Def} .
+
+  *** traverses the NVIL structure to find the
+  *** definition of a variable.
+  eq lookup(V0, (def(V1, E) DEFS)) =
+    if (V0 == V1) then
+      E
+    else
+      lookup(V0, DEFS)
+    fi .
+endom)
+
+*** The nodes of parallel eduction, which function as the finest
+*** grains of computation.
+(omod NODE is
+  protecting EXPRCONTEXT . protecting INT .
+  protecting LIST{Def} . protecting OIDS .
+
+  sort NodeStatus .
+  ops running blocked : -> NodeStatus [ctor] .
+
+  class Node | status : NodeStatus,  expr   : ExprContext,
+               wp     : Oids,        whs    : Oids,
+               prog   : List{Def} .
+endom)
+(omod NODE_IMPL is
+  including NODE .
+  sort Branch .
+  op root        : -> Oid .
+  ops left right : -> Branch [ctor] .
+  op  _\_        : Oid Branch -> Oid [ctor] .
+
+endom)
+
+*** The messages of the system.
+*** The first parameter of a message is its
+*** recipient, the second is the sender,
+*** the rest are the arguments.
+(omod MESSAGES is
+  including INT .
+  including STACKS . including STRING .
+    
+  msg demand   : Oid Oid String Stack -> Msg .
+  msg notify   : Oid Oid Int -> Msg .
+  msg continue : Oid Oid -> Msg .
+  msg regVal   : Oid Oid Int -> Msg .
+endom)
+
+*** Warehouse: cached values representation.
+*** A cached value maps an expression and its
+*** stacks to some already computed data or a
+*** pending(node) flag
+*** Cache slot: <id, context, entry>.
+(omod SLOT is
+  protecting EXPRCONTEXT .
+  *** Filler.
+
+  sorts Slot CacheStatus Slots .
+  subsort Slot < Slots .
+
+  op data    : Int -> CacheStatus [ctor] .
+  op pending : Oid -> CacheStatus [ctor] .
+  op <_;_;_> : String Stack CacheStatus -> Slot [ctor] .
+endom)
+
+*** A node computation depending on another node.
+(omod PDEP is
+  *** Filler.
+  *** Filler.
+
+  sorts PendingDep PendingDeps .
+  subsort PendingDep < PendingDeps .
+  op pDep : Oid Oid -> PendingDep .
+endom)
+
+(omod SLOT_PDEP_IMPL is
+  including SLOT . including PDEP .
+
+  *** Updates an entry if it waits for
+  *** a node, with a value.
+  op updPending : Oid Int CacheStatus -> CacheStatus .
+
+  op none : -> PendingDeps [ctor] .
+  op __   : PendingDeps PendingDeps -> PendingDeps [assoc comm ctor id: none] .
+
+  op none : -> Slots [ctor] .
+  op __   : Slots Slots -> Slots [assoc comm ctor id: none] .
+
+  *** IMPLEMENTATION
+  vars VAL VAL0 : Int .
+  vars N N0 : Oid .
+
+  eq updPending(N, VAL, data(VAL0)) =
+    data(VAL0) .
+  eq updPending(N, VAL, pending(N0)) = 
+    if (N == N0) then
+      data(VAL)
+    else
+      pending(N0) 
+    fi .
+endom)
+(view Slot from TRIV to SLOT is
+  sort Elt to Slot .
+endv)
+
+(omod WAREHOUSE is
+  protecting EXPR . protecting SLOT_PDEP_IMPL .
+  protecting STACKS . including CONFIGURATION . protecting MESSAGES .
+
+  class WHouse | slots : Slots, pend : PendingDeps .
+endom)
+(omod WAREHOUSE_IMPL is
+  including WAREHOUSE .
+  including OIDS .
+
+  sort QueryResult .
+  op qFound   : Int -> QueryResult .
+  op qPending : Oid -> QueryResult .
+  op qMissing : -> QueryResult .
+
+  *** Queries the warehouse for an identifier
+  *** under a specific context.
+  op quVal : String Stack Slots -> QueryResult .
+  op not_;_in_ : String Stack Slots -> Bool .
+
+  *** Update all pending slots that wait for a node.
+  op updWH : Oid Int Slots -> Slots .
+  *** Sends a notification to some warehouses for
+  *** a node that finished its evaluation.
+  op regval-wh : Oids Oid Int -> Configuration .
+  *** Unblocks nodes that wait for a warehouse to
+  *** receive an answer from a node.
+  op notify-waiting : PendingDeps Oid Oid Int
+    -> Configuration .
+  *** Deletes nodes that wait for another node.
+  op delete-waiting : PendingDeps Oid -> PendingDeps .
+
+  *** IMPLEMENTATION
+  vars I J M N : Nat .
+  vars ID0 ID1 : String .
+  vars CTXT0 CTXT1 : Stack .
+  var CC : CacheStatus .
+  var SLOTS : Slots .
+  var DEPS : PendingDeps .
+  var V : Int .
+  var WHS : Oids .
+  vars WH EN EN1 EN2 : Oid .
+
+  *** The warehouse query operation.
+  *** Returns: "found"/"pending"/"missing".
+  eq quVal(ID0, CTXT0, none) = qMissing .
+  eq quVal(ID0, CTXT0,
+   (< ID1 ; CTXT1 ; pending(EN1) > SLOTS)) = 
+    if (ID0 == ID1) and (CTXT0 == CTXT1) then
+     qPending(EN1)
+    else
+     quVal(ID0, CTXT0, SLOTS)
+    fi .
+  eq quVal(ID0, CTXT0, < ID1 ; CTXT1 ; data(V) > SLOTS) = 
+    if (ID0 == ID1) and (CTXT0 == CTXT1) then
+      qFound(V)
+    else
+      quVal(ID0, CTXT0, SLOTS)
+    fi .
+
+  *** The elegant way to check for missing entries.
+  eq not ID0 ; CTXT0 in SLOTS = (quVal(ID0, CTXT0, SLOTS) == qMissing) .
+
+  *** The warehouse update operation.
+  eq updWH(EN, V, none) = none .
+  eq updWH(EN, V, < ID1 ; CTXT1 ; CC > SLOTS) = 
+    < ID1 ; CTXT1 ; updPending(EN, V, CC) >
+    updWH(EN, V, SLOTS) .
+
+  eq regval-wh(none, EN, V) = none .
+  eq regval-wh(WH WHS, EN, V) =
+    regVal(WH, EN, V) regval-wh(WHS, EN, V) .
+
+  *** The notifications sent out to the
+  *** blocked nodes.
+  *** Args:
+  *** - the node dependencies
+  *** - the warehouse <wh>
+  *** - the <node> that just finished (to filter the 1st argument)
+  *** - the value v to broadcast
+  eq notify-waiting(none, WH, EN, V) = none .
+  eq notify-waiting(pDep(EN1, EN2) DEPS, WH, EN, V) =
+    if (EN1 == EN) then
+      notify(EN2, WH, V) notify-waiting(DEPS, WH, EN, V)
+    else
+      notify-waiting(DEPS, WH, EN, V)
+    fi .
+
+  eq delete-waiting(none, EN) = none .
+  eq delete-waiting(pDep(EN1, EN2) DEPS, EN) =
+    if (EN1 == EN) then
+      delete-waiting(DEPS, EN)
+    else
+      pDep(EN1, EN2) delete-waiting(DEPS, EN)
+    fi .
+endom)
+
+*** The parallel runtime ("parallel eduction").
+***
+(omod EXECUTION is
+  protecting EXPRCONTEXT . protecting NODE_IMPL . protecting PROG_IMPL . protecting CONVERSION . protecting PROG_IMPL .
+  protecting WAREHOUSE_IMPL . protecting MESSAGES .
+
+  *** EXEC-VARS-BEGIN
+  vars VAR OP : String .        var CTXT : Stack .
+  var N : Nat .                 vars I I1 I2 : Int .
+  var SLOTS : Slots .           var PDEPS : PendingDeps .
+  var DEFS : List{Def} .        vars WPEND WS : Oids . 
+  vars E0 E1 E2 : Expr .        var EL : ExprList .
+  vars EN EN1 EN2 WH : Oid .    var BR : Branch .
+  *** EXEC-VARS-END
+
+  *** Warehouse constructor
+  op whouse : Nat -> Oid .
+
+  *** Choice function (not defined)
+  op choose : String Stack Oids -> Oid .
+
+  *** *** *** Evaluation rewrite rules. *** *** ***
+
+  rl [DEMAND_ID] :
+    < EN : Node | status : running,
+                  expr : < $ VAR ; CTXT >, whs : WS >
+  =>
+    < EN : Node | status : blocked >
+    demand(choose(VAR, CTXT, WS), EN, VAR, CTXT) .
+
+  rl [UPDATE_FROM_W] :
+    demand(WH, EN, VAR, CTXT)
+    < WH : WHouse | slots : < VAR ; CTXT ; data(I) > SLOTS >
+  =>
+    < WH : WHouse | >
+    notify(EN, WH, I) .
+
+  crl [CREATE_PENDING_SLOT] :
+    demand(WH, EN, VAR, CTXT)
+    < WH : WHouse | slots : SLOTS >
+  =>
+    < WH : WHouse | slots : < VAR ; CTXT ; pending(EN) >
+                            SLOTS >
+    continue(EN, WH)
+  if not VAR ; CTXT in SLOTS .
+
+  rl [TERMINATE_WITH_VALUE] :
+    notify(EN, WH, I)
+    < EN : Node | status : blocked,
+                  expr : < $ VAR ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # I ; snil > > .
+
+  rl [CREATE_BLOCKED_SLOT] :
+    demand(WH, EN, VAR, CTXT)
+    < WH : WHouse | slots : < VAR ; CTXT ; pending(EN1) >
+                            SLOTS,
+                    pend : PDEPS >
+  =>
+    < WH : WHouse | pend : pDep(EN1, EN) PDEPS > .
+
+  rl [NUM_FINISH] :
+    < EN \ BR : Node | status : running,
+                       expr : < # I ; CTXT >,
+                       wp : WPEND >
+  =>
+    regval-wh(WPEND, EN \ BR, I) notify(EN, EN \ BR, I) .
+
+  *** Extra rule that registers the final value of the root node [the
+  *** "result"] with the warehouse, without notifying its (non-existent) parent
+
+  rl [PROG_FINISH] :
+    < root : Node | status : running, expr : < # I ; CTXT >, wp : WPEND >
+  =>
+    regval-wh(WPEND, root, I) .
+
+  rl [UPD_PENDING] :
+    regVal(WH, EN, I)
+    < WH : WHouse | slots : SLOTS, pend : PDEPS >
+  => 
+    < WH : WHouse | slots : updWH(EN, I, SLOTS),
+                    pend : delete-waiting(PDEPS, EN) >
+    notify-waiting(PDEPS, WH, EN, I) .
+
+  rl [CONTINUE] :
+    continue(EN, WH)
+    < EN : Node | status : blocked, wp : WPEND,
+                  expr : < $ VAR ; CTXT >, prog : DEFS >
+  =>
+    < EN : Node | status : running,
+                  expr : < lookup(VAR, DEFS) ; CTXT >,
+                  wp : (WH WPEND) > .
+
+  rl [CALL] :
+    < EN : Node | status : running,
+                  expr : < call(N, E0) ; CTXT > >
+  =>
+    < EN : Node | expr : < E0 ; (N :: CTXT) > > .
+
+  rl [ACTUALS] :
+    < EN : Node | status : running,
+                  expr : < actuals(EL) ; (N :: CTXT) > >
+  =>
+    < EN : Node | expr : < nthExpr(EL, N) ; CTXT > > .
+
+  rl [SPAWN_PLUS] :
+    < EN : Node | status : running,
+                  expr : < cOp("+", E1 : E2) ; CTXT >,
+                  whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("+", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running, prog : DEFS,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS >
+    < (EN \ right) : Node | status : running, prog : DEFS,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS > .
+
+  rl [SPAWN_MINUS] :
+    < EN : Node | status : running,
+                  expr : < cOp("-", E1 : E2) ; CTXT >,
+                  whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("-", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS, prog : DEFS >
+    < (EN \ right) : Node | status : running,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS, prog : DEFS > .
+
+  rl [SPAWN_MULT] :
+    < EN : Node | status : running,
+                   expr : < cOp("*", E1 : E2) ; CTXT >,
+                   whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("*", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS,
+                           prog : DEFS >
+    < (EN \ right) : Node | status : running,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS,
+                            prog : DEFS > .
+
+  rl [SPAWN_EQ] :
+    < EN : Node | status : running,
+                  expr : < cOp("==", E1 : E2) ; CTXT >,
+                  wp : WPEND, whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("==", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS, prog : DEFS >
+    < (EN \ right) : Node | status : running,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS, prog : DEFS > .
+
+  rl [SPAWN_LEQ] :
+    < EN : Node | status : running,
+                  expr : < cOp("<=", E1 : E2) ; CTXT >,
+                  wp : WPEND, whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("<=", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS, prog : DEFS >
+    < (EN \ right) : Node | status : running,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS, prog : DEFS > .
+
+  rl [SPAWN_LT] :
+    < EN : Node | status : running,
+                  expr : < cOp("<", E1 : E2) ; CTXT >,
+                  wp : WPEND, whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("<", E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E1 ; CTXT >,
+                           wp : none, whs : WS, prog : DEFS >
+    < (EN \ right) : Node | status : running,
+                            expr : < E2 ; CTXT >,
+                            wp : none, whs : WS, prog : DEFS > .
+
+  rl [SPAWN_IF] :
+    < EN : Node | status : running,
+                  expr : < cOp("if", E0 : E1 : E2) ; CTXT >,
+                  whs : WS, prog : DEFS >
+  =>
+    < EN : Node | status : blocked,
+                  expr : < cOp("if", E0 : E1 : E2) ; CTXT > >
+    < (EN \ left) : Node | status : running,
+                           expr : < E0 ; CTXT >, wp : none,
+                           whs : WS, prog : DEFS > .
+
+  rl [MERGE_PLUS] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("+", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # (I1 + I2) ; snil > > .
+
+  rl [MERGE_MINUS] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("-", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # (I1 + (- I2)) ; snil > > .
+
+  rl [MERGE_MULT] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("*", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # (I1 * I2) ; snil > > .
+
+  *** The merge rules for "if" spawn a new node for the subexpression.
+  *** This takes care of condition memoization in nested "if"s (if both
+  *** "if"s had the same 'ID', their (possibly different) condition
+  *** values would correspond to the same 'ID \ left'.
+
+  rl [MERGE_IF_T] :
+    notify(EN, (EN \ left), 1)
+    < EN : Node | status : blocked,
+                  expr : < cOp("if", E0 : E1 : E2) ; CTXT >,
+                  whs : WS, prog : DEFS >
+  =>
+    < EN : Node | >
+    < EN \ right : Node | status : running, expr : < E1 ; CTXT >,
+                          wp : none, whs : WS, prog : DEFS > .
+
+  rl [MERGE_IF_F] :
+    notify(EN, (EN \ left), 0)
+    < EN : Node | status : blocked,
+                  expr : < cOp("if", E0 : E1 : E2) ; CTXT >,
+                  whs : WS, prog : DEFS >
+  =>
+    < EN : Node | >
+    < EN \ right : Node | status : running, expr : < E2 ; CTXT >,
+                          wp : none, whs : WS, prog : DEFS > .
+
+  rl [MERGE_IF_RES] :
+    notify(EN, (EN \ right), I)
+    < EN : Node | status : blocked,
+                  expr : < cOp("if", E0 : E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running, expr : < # I ; snil > > .
+
+  crl [MERGE_EQ_T] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("==", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 1 ; snil > >
+  if (I1 == I2) .
+
+  crl [MERGE_EQ_F] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("==", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 0 ; snil > >
+  if not (I1 == I2) .
+
+  crl [MERGE_LEQ_T] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("<=", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 1 ; snil > >
+  if (I1 <= I2) .
+
+  crl [MERGE_LEQ_F] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("<=", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 0 ; snil > >
+  if (I1 > I2) .
+
+  crl [MERGE_LT_T] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("<", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 1 ; snil > >
+  if (I1 < I2) .
+
+  crl [MERGE_LT_F] :
+    notify(EN, (EN \ left), I1)
+    notify(EN, (EN \ right), I2)
+    < EN : Node | status : blocked,
+                  expr : < cOp("<", E1 : E2) ; CTXT > >
+  =>
+    < EN : Node | status : running,
+                  expr : < # 0 ; snil > >
+  if (I1 >= I2) .
+
+endom)
+
+*** set trace on .
+set print color on .
+*** set profile on .
+*** set trace off .

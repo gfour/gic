@@ -1,0 +1,37 @@
+-- | Helper definitions for the LAR back-end.
+
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct) where
+
+import SLIC.Constants
+import SLIC.LAR.LARGraph
+import SLIC.LAR.SyntaxLAR
+import SLIC.State
+import SLIC.Types
+
+-- | The configuration needed for compilation.
+data ConfigLAR =
+  ConfigLAR
+  { getCBNVars   :: CBNVars    -- ^ table of call-by-name formals
+  , getStricts   :: Stricts    -- ^ table of strict variables
+  , getCIDs      :: CIDs       -- ^ numeric constructor id information
+  , getArities   :: Arities    -- ^ table of function arities    
+  , getOptions   :: Options    -- ^ the user options  
+  , getPMDepths  :: PMDepths   -- ^ the mapping between variables
+                               --   and pattern matching depth
+  , getCAFnmsids :: CAFDct     -- ^ dictionary from CAF names to indices
+  , getModName   :: MName      -- ^ the name of the module being compiled
+  }
+  
+-- | Label each argument with a number (index in the LAR).
+enumNames :: [QName] -> [(Int, QName)]
+enumNames names = zip [0..] names
+
+-- | Generates C code for an intensional operator (/ACTUAL/).
+mkAct :: IsActuals -> Options -> ShowS
+mkAct b opts =
+  if b then
+    ("ACTUAL;"++).nl
+  else
+    -- for functions, output a graphviz entry for the LAR entered,
+    -- if graphviz trace mode is enabled
+    logPrev opts

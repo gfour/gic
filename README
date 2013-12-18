@@ -1,0 +1,107 @@
+The generalized intensional compiler
+====================================
+
+A compiler for a subset of Haskell based on the intensional transformation and
+modular polymorphic defunctionalization. Under development, version 0.10.
+
+Features:
+
+* Separate module compilation.
+* Parametric polymorphicm, GADTs.
+* A dataflow interpreter.
+* A compiler to the rewriting logic of Maude.
+
+See the examples under /Examples for the language features supported.
+
+Requirements
+------------
+
+To build the compiler, you need:
+
+* GHC 7.6
+* haskell-src-exts (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
+* The Boehm-Demers-Weiser garbage collector from:
+    (http://www.hpl.hp.com/personal/Hans_Boehm/gc/)
+* Optional: the profiling libs of the above (if HPROFILE is set in the Makefile),
+  to support stack traces in the compiler.
+* Optional: ghc-paths (if `USE_GHC` is set in the Makefile), if GHC is used as a
+  front-end or for type checking.
+* Optional: libgmp (is the `HAS_GMP` macro is enabled) for big integers
+  (the Integer data type, see `run_lar.sh`).
+
+Building the compiler
+---------------------
+
+* Change the macros `GC_INCLUDE` and `GC_LIB` in `bench-libGC.sh` to point to the
+  location of the Boehm-Demers-Weiser garbage collector.
+
+* To disable type checking with the GHC API, comment out the `USE_GHC` flag in
+  the Makefile.
+
+* To build the compiler, run the following command at the top-level directory
+  (where Main.hs is located):
+
+    make
+
+
+Using the compiler
+------------------
+
+To compile and run an example `Main.hs`, run:
+
+    ./run_libgc.sh Main.hs
+
+The result binary will be in `./a.out`. To use the GHC-based type checker, run:
+
+    GICFLAGS="-ghc-tc" ./run_libgc.sh Main.hs
+
+To compile and run an example `Test.hs` using the type checker of the GHC API, run:
+
+    ./run_lar.sh -ghc-tc Test.hs
+
+The module must have all types filled in by the user with explicit type signatures.
+
+To display the options that can be used with `gic`, run:
+
+    ./gic -help
+
+Use the `newbench.sh` script to run all the benchmarks (NewBench/*.hs).
+
+Using the built-in interpreter
+------------------------------
+
+The built-in interpreter is invoked with `-e`, for example:
+
+    ./gic -e Examples/Data/addsx.hs
+
+This transforms the input program to a 0-order intensional one and runs it
+using a warehouse for laziness.
+
+Documentation
+-------------
+
+To generate the code documentation using haddock, run:
+
+    make haddock
+
+The resulting documentation is in `doc/haddock`.
+
+Contributors
+------------
+
+* Angelos Charalambidis <a.charalambidis@di.uoa.gr>
+* Georgios Fourtounis <gfour@softlab.ntua.gr>
+* Nikolaos Papaspyrou <nickie@softlab.ntua.gr>
+* Panos Rondogiannis <prondo@di.uoa.gr>
+* Panagiotis Theofilopoulos
+
+License
+-------
+
+The compiler is licensed under the terms of the GNU LGPL.
+
+If the compiler is linked with libgmp or the GHC API, the restrictions of their
+respective licenses apply.
+
+Copyright 2009-2013, Georgios Fourtounis, Software Engineering Laboratory,
+National Technical University of Athens.
