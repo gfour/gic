@@ -7,7 +7,7 @@ modular polymorphic defunctionalization. Under development, version 0.10.
 Features:
 
 * Separate module compilation.
-* Parametric polymorphicm, GADTs.
+* Parametric polymorphism, GADTs.
 * A dataflow interpreter.
 * A compiler to the rewriting logic of Maude.
 
