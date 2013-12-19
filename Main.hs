@@ -35,7 +35,7 @@ import DynFlags (ExtensionFlag(..), defaultFatalMessager, defaultFlushOut, xopt_
 import DynFlags (ExtensionFlag(..), defaultLogAction, xopt_set)
 #endif
 import Outputable (Outputable, ppr)
-import SLIC.Front.GHCBackEnd (coreGHC, showPPr, tcGHC, transfCore)
+import SLIC.Front.GHCBackEnd (coreGHC, getVTypes, showPPr, tcGHC, transfCore)
 #endif
 
 import Data.List (isPrefixOf, map)
@@ -98,7 +98,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -cm     : transform and compile the 0-order program to Maude"
            putStrLn("             -wh N    : use N warehouses (default="++(show defaultWhs)++")")
            putStrLn "* Built-in testing interpreters:"
---           putStrLn "  -fl     : evaluate the FL program (call-by-name) (BROKEN)"
            putStrLn "  -ecbn   : transform and evaluate the 0-order program (call-by-name)"
            putStrLn "             -v : trace the evaluation"
            putStrLn "* Tagged-Token Dataflow back-end: (EXPERIMENTAL)"
@@ -280,6 +279,9 @@ runThroughGHC mNames fPath mg opts =
         NoGHC -> ierr "runThroughGHC: the GHC API is not selected"
         GHCTc ->
           do (dflags, tMod) <- wrapper tcGHC
+             -- putStrLn "---------------------------"
+             -- putStr   (pprintE (getVTypes dflags (tm_typechecked_source tMod)) "")
+             -- putStrLn "---------------------------"
              -- force the result (and therefore type checking)
              return $ (length (showPPr dflags tMod)) >= 42
         GHCCore ->

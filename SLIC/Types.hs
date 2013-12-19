@@ -374,10 +374,7 @@ type Env a = Map.Map a EInfo
 pprintE :: (PPrint a) => Env a -> ShowS
 pprintE ve =
   let pprintE0 []      = nl
-      pprintE0 (vb:rs) = pprintE0_aux vb.nl.pprintE0 rs
-      pprintE0_aux (v, (t, ar)) = pprint v.s ar.(" :: "++).pprint t
-      s (Just ar)       = ("() / "++).shows ar
-      s Nothing         = id
+      pprintE0 (vb:rs) = pprintTenvI vb.nl.pprintE0 rs
   in  pprintE0 $ Map.toList ve
 
 -- | A typing environment (Yaghi-style transformation).
@@ -385,6 +382,12 @@ type TEnv = Env QName
 
 -- | One entry in a typing environment.
 type TEnvI = (QName, EInfo)
+
+pprintTenvI :: (PPrint a) => (a, EInfo) -> ShowS
+pprintTenvI (v, (t, ar)) =
+  let s (Just ar') = ("() / "++).shows ar'
+      s Nothing    = id
+  in  pprint v.s ar.(" :: "++).pprint t
 
 -- | A typing environment represented as a list.
 type TEnvL = [TEnvI]

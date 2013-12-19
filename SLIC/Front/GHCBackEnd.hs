@@ -2,8 +2,9 @@
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.Front.GHCBackEnd (coreGHC, showPPr, tcGHC, transfCore) where
+module SLIC.Front.GHCBackEnd (coreGHC, getVTypes, showPPr, tcGHC, transfCore) where
 
+import Bag (bagToList)
 import BasicTypes (isBanged)
 import CorePrep (corePrepPgm)
 import CoreSyn (Alt, Bind(..), CoreBind, CoreBndr, CoreExpr, CoreProgram, 
@@ -13,15 +14,15 @@ import FastString (unpackFS)
 import GHC 
 import Id (idName)
 import Literal
-import Name (nameOccName)
+import Name (nameOccName, occNameString)
 import Outputable (Outputable, SDoc, ppr, showSDoc)
 import TyCon (tyConName)
 import Type (Type, isTyVar, pprType, splitFunTys)
-import Var (varName)
+import Var (varName, varType)
 import System.Exit (ExitCode(ExitSuccess), exitWith)
 
 import Data.List ((\\))
-import Data.Map (empty, elems)
+import Data.Map (empty, elems, fromList)
 import SLIC.AuxFun (ierr, pathOf, trace2)
 import SLIC.Constants
 import SLIC.Driver (processFL)
@@ -202,20 +203,21 @@ transTyCon dfs tyCon =
             -- dtName = showPPr dfs resultType
             dCName = stringToQName $ showPPr dfs $ dataConName con
             dCArgs =
-              map (\(fs, s)->DT fs s Nothing) $ zip (map (transDT dfs) typeArgs) stricts
+              map (\(fs, s)->DT fs s Nothing) $ zip (map (transT dfs) typeArgs) stricts
         in  if or stricts then 
               ierr $ "TODO: found strict components for data type: " ++ (qName dCName)
             else DConstr dCName dCArgs Nothing
   in  Data dtName as dcons
 
-transDT :: DynFlags -> Type.Type -> SLIC.Types.Type
-transDT dfs ty =
+-- | Translates a GHC type to a GIC type.
+transT :: DynFlags -> Type.Type -> SLIC.Types.Type
+transT dfs ty =
   let (tArgs, tRes) = splitFunTys ty
       ftRes = Tg (T (stringToQName $ showPPr dfs tRes))     -- TODO: does this work with h.o. types?
   in  case tArgs of
         [] -> ftRes
         _  -> let aux [] = ftRes
-                  aux (t:ts) = Tf (transDT dfs t) (aux ts)
+                  aux (t:ts) = Tf (transT dfs t) (aux ts)
               in  aux tArgs
 
       -- case (\a-> FTypeS (showPPr dfs a)) (\a-> FTypeS (showPPr dfs a))
@@ -358,3 +360,23 @@ coreGHC dflags file _ _ =
 #endif       
        dflagsFinal <- getSessionDynFlags
        return $ (dflagsFinal, corePrep)
+
+-- | Reads type information contained in source typechecked by GHC.
+getVTypes :: DynFlags -> TypecheckedSource -> TEnv
+getVTypes dflags prog =
+  let progBinds = map unLoc $ bagToList prog
+      vt ab@(AbsBinds {}) =
+        let binds = map unLoc $ bagToList $ abs_binds ab
+        in  concatMap vtBind binds
+      vt fb@(FunBind {}) = vtBind fb
+      vt _ = error "vt: unknown binding"          
+      vtBind fb@(FunBind {}) =
+        let -- function name
+            f    = unLoc $ fun_id fb
+            f_vn = varName f
+            f_qn = QN Nothing (occNameString (nameOccName f_vn))
+            f_t  = transT dflags (varType f)
+            fI   = (f_qn, (f_t, Just 0))
+        in  [fI]
+      vtBind _ = ierr "vtBind: unknown binding"
+  in  fromList $ concatMap vt progBinds
