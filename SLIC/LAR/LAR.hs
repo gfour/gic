@@ -438,7 +438,10 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
         --        -- ("NESTED("++).(shows d).(", T0) = 0; "++)
         --      else id). 
         --      -}
-        ("Res = "++).(mkCExp env config ePB)
+        (case ePB of
+            CaseL _ _ _ -> id
+            _           -> ("Res = "++)).
+        mkCExp env config ePB
   in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
       -- TODO: eliminate this when all patterns are nullary constructors
       -- (or are used as such, see 'bindsVars')
