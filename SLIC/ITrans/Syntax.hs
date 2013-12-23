@@ -55,29 +55,29 @@ type ImportsI = FuncSigs
 type ModH = Mod ProgH
 
 instance PPrint QOp where
-   pprintPrec _ (Call i) = ("call[" ++).pprintIdx i.("]"++)
-   pprintPrec _ NOp      = id
+   pprint (Call i) = ("call[" ++).pprintIdx i.("]"++)
+   pprint NOp      = id
       
 instance PPrint ExprH where
-   pprintPrec _ (XH vn)          = pprintVar vn
-   pprintPrec p (ConH cn el)     = prettyConst p cn el
-   pprintPrec _ (ConstrH c)      = pprintTH c
-   pprintPrec _ (FH NOp vn ps)   = pprint vn.pprintList space ps
-   pprintPrec p (FH qOp vn ps)   =
-       pprintPrec p qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
-   pprintPrec p (CaseH (d, _) e pats) =
+   pprint (XH vn)          = pprintVar vn
+   pprint (ConH cn el)     = prettyConst 0 cn el
+   pprint (ConstrH c)      = pprintTH c
+   pprint (FH NOp vn ps)   = pprint vn.pprintList space ps
+   pprint (FH qOp vn ps)   =
+       pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
+   pprint (CaseH (d, _) e pats) =
       let pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatH c0 e0 b0) =
-            ("\n  "++).spacing d.("| "++).pprint c0.(" -> "++).pprintPrec p e0.
+            ("\n  "++).spacing d.("| "++).pprint c0.(" -> "++).pprint e0.
             pprintBinds b0
-      in  ("case "++).pprintPrec p e.(" of{"++).shows d.("}"++).
+      in  ("case "++).pprint e.(" of{"++).shows d.("}"++).
           pprintPats pats
                 
 instance PPrint DefH where
-    pprintPrec p (DefH vn ps e) =
-        pprint vn.spaces 1.showStrings " " (map qName ps).(" = " ++).pprintPrec p e
-    pprintPrec _ (ActualsH vn m es) =
+    pprint (DefH vn ps e) =
+        pprint vn.spaces 1.showStrings " " (map qName ps).(" = " ++).pprint e
+    pprint (ActualsH vn m es) =
         pprint vn.("{"++).(m++).("}"++).
         (" = actuals["++).(pprintList (", "++) es).("]" ++)
 
@@ -106,32 +106,28 @@ data PatZ = PatZ CstrName ExprZ BindsVars deriving (Eq, Read)
 type ModZ = Mod ProgZ
 
 instance PPrint ExprZ where
-   pprintPrec _ (XZ vn) = pprintVar vn
-   pprintPrec p (ConZ cn el) = prettyConst p cn el
-   pprintPrec p (FZ NOp e) = pprintPrec p e
-   pprintPrec p (FZ qOp e) =
-      pprintPrec p qOp . (" (" ++) . pprint e . (")" ++)
-   pprintPrec p (CaseZ (d, _) e pats) =
+   pprint (XZ vn) = pprintVar vn
+   pprint (ConZ cn el) = prettyConst 0 cn el
+   pprint (FZ NOp e) = pprint e
+   pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
+   pprint (CaseZ (d, _) e pats) =
       let pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatZ c0 e0 b0) =
             nl.(" "++).spacing d.(" | "++).pprint c0.(" -> "++).
-            pprintPrec p e0.pprintBinds b0
-      in  ("case "++).pprintPrec p e.(" of{"++).shows d.("}"++).
+            pprint e0.pprintBinds b0
+      in  ("case "++).pprint e.(" of{"++).shows d.("}"++).
           pprintPats pats
-   pprintPrec _ (ConstrZ c) = pprintTH c
+   pprint (ConstrZ c) = pprintTH c
 
 instance PPrint DefZ where
-   pprintPrec p (DefZ vn e) =
-     pprint vn.(" = " ++).pprintPrec p e
-   pprintPrec _ (ActualsZ vn m es) =
+   pprint (DefZ vn e) = pprint vn.(" = " ++).pprint e
+   pprint (ActualsZ vn m es) =
      pprint vn.("{"++).(m++).("}"++).
      (" = actuals["++).pprintList (", "++) es.("]" ++)
 
 instance PPrint PatZ where
-   pprintPrec p (PatZ c e b) =
-      (" | "++).pprint c.(" -> "++).pprintPrec p e.
-      pprintBinds b
+   pprint (PatZ c e b) = (" | "++).pprint c.(" -> "++).pprint e.pprintBinds b
 
 -- | Searches for a function definition in ZOIL.
 searchDefZ :: QName -> ProgZ -> Maybe DefZ

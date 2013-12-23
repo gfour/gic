@@ -22,8 +22,8 @@ type SName = String
 -- | Variable names, maybe qualified.
 data QName = QN (Maybe MName) SName deriving (Eq, Ord, Read, Show)
 instance PPrint QName where
-  pprintPrec _ (QN (Just m) v) = (m++).([delim]++).(v++)
-  pprintPrec _ (QN  Nothing v) = (v++)
+  pprint (QN (Just m) v) = (m++).([delim]++).(v++)
+  pprint (QN  Nothing v) = (v++)
 
 -- | Converts a qualified variable name to a string using the pretty printer.
 qName :: QName -> String
@@ -41,9 +41,9 @@ mName (QN m _) = m
 procLName :: (SName -> SName) -> QName -> QName
 procLName f (QN m x) = QN m (f x)
 
-instance (Show a) => PPrint (Maybe a) where
-  pprintPrec _ (Just m) = shows m
-  pprintPrec _ (Nothing) = id
+instance (PPrint a) => PPrint (Maybe a) where
+  pprint (Just m) = pprint m
+  pprint (Nothing) = id
 
 -- | The "const" name used during the intensional transformation.
 constV :: QName
@@ -250,8 +250,8 @@ data V = V QName           -- ^ normal (free or local) variable
        deriving (Eq, Ord, Read, Show)
              
 instance PPrint V where
-  pprintPrec _ (V v) = pprint v
-  pprintPrec _ (BV v (d, f)) = pprint v.("{"++).pprint f.(":"++).shows d.("}"++)
+  pprint (V v) = pprint v
+  pprint (BV v (d, f)) = pprint v.("{"++).pprint f.(":"++).shows d.("}"++)
   
 -- | Modifies the name of a variable.
 modifyV :: (QName -> QName) -> V -> V
@@ -274,8 +274,8 @@ dtOfGround (T dt)     = dt
 dtOfGround (TDF dt _) = dt
 
 instance PPrint Ground where
-   pprintPrec _ (T g) = pprint g
-   pprintPrec _ (TDF _ t) = ("Closure{"++).pprint t.("}"++)
+   pprint (T g) = pprint g
+   pprint (TDF _ t) = ("Closure{"++).pprint t.("}"++)
 
 -- * Types
 
@@ -675,9 +675,9 @@ data Value a = VI !Int                -- ^ integer
              deriving (Eq, Read, Show)
 
 instance PPrint (Value a) where
-   pprintPrec _ (VI int)    = shows int
-   pprintPrec _ (VB bool)   = shows bool
-   pprintPrec _ (VT (c, _)) = pprint c
+   pprint (VI int)    = shows int
+   pprint (VB bool)   = shows bool
+   pprint (VT (c, _)) = pprint c
 
 -- | Gets an integer value.
 intFrom :: (Value a) -> Int

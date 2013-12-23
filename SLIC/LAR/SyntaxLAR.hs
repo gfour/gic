@@ -48,21 +48,21 @@ data ExprL  = LARCall QName [QName]    -- ^ call variable with a LAR of variable
 data PatL   = PatL CCstrName ExprL Bool
 
 instance PPrint CCstrName where
-  pprintPrec _ (CC c cid ar) = pprintTH c.("{"++).shows cid.("}/"++).shows ar
+  pprint (CC c cid ar) = pprintTH c.("{"++).shows cid.("}/"++).shows ar
 
 instance PPrint BlockL where
-    pprintPrec _ (DefL v e bind) =
+    pprint (DefL v e bind) =
         pprint v.spaces 1.showStrings " " (map qName bind).
         (" = "++).pprint e
-    pprintPrec _ (ActualL v act e) =
+    pprint (ActualL v act e) =
         pprint v.(" = "++).(if act then ("ACTUAL."++) else id).pprint e
         
 instance PPrint ExprL where
-    pprintPrec _ (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
-    pprintPrec p (LARC cn el) = prettyConst p cn el
-    pprintPrec _ (ConstrL c) = pprint c
-    pprintPrec _ (BVL v (d, f)) = pprintBVD v d.("{"++).pprint f.("}"++)
-    pprintPrec _ (CaseL (d, _) e pats) =
+    pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
+    pprint (LARC cn el) = prettyConst 0 cn el
+    pprint (ConstrL c) = pprint c
+    pprint (BVL v (d, f)) = pprintBVD v d.("{"++).pprint f.("}"++)
+    pprint (CaseL (d, _) e pats) =
         let pprintPats []             = id
             pprintPats (pat : ps)     = showPat pat.pprintPats ps
             showPat (PatL c0 e0 b)= 

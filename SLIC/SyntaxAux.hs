@@ -303,8 +303,8 @@ data Const = CN COp            -- ^ named built-in constant
            deriving (Eq, Ord, Read, Show)
 
 instance PPrint Const where
-  pprintPrec _ (CN cn)    = pprint cn
-  pprintPrec _ (LitInt i) = shows i
+  pprint (CN cn)    = pprint cn
+  pprint (LitInt i) = shows i
 
 -- | Pretty printing for constant operators and literals,
 --   used by all languages.

@@ -58,7 +58,7 @@ data DfInfo = DfInfo { diDfcs :: DfConstrs, diEApps :: ExtAppFuns }
               deriving (Read, Show)
 
 instance PPrint DfInfo where
-  pprintPrec _ (DfInfo dfcs extApps) =
+  pprint (DfInfo dfcs extApps) =
     ("** Closure constructors:"++).nl.
     foldDot pprint (Data.Set.toList dfcs).
     ("** Uses closure dispatchers of arities: "++).pprintExtAppFuns extApps
@@ -99,7 +99,7 @@ data LARInfo =
   deriving (Read, Show)
 
 instance PPrint LARInfo where
-  pprintPrec _ (LARInfo cafs cids pmDepths rdep) =
+  pprint (LARInfo cafs cids pmDepths rdep) =
     ("** CAFs:"++).nl.pprintCAFs cafs.
     ("** Compiled constructors:"++).nl.pprintCIDs cids.
     ("** Pattern matching depths:"++).nl.pprintPD pmDepths.

@@ -280,8 +280,8 @@ data WHSlot = Pending           -- ^ pending computation
             deriving (Eq)
                        
 instance PPrint WHSlot where
-  pprintPrec _ Pending    = ("{pending}"++)
-  pprintPrec _ (Memo val) = ("{value="++).shows val.("}"++)
+  pprint Pending    = ("{pending}"++)
+  pprint (Memo val) = ("{value="++).shows val.("}"++)
 
 -- | The warehouse is a pair of a size counter and a table from contexts to
 --   computed values.

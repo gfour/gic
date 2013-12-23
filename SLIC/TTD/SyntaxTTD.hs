@@ -61,29 +61,29 @@ type MOpDef = (QName, MOp)
 data ProgT = ProgT [DefT] [MOpDef]
 
 instance PPrint NodeLink where
-  pprintPrec _ (VarEdge v e)   = pprint v.("~"++).shows e
-  pprintPrec _ (VarCall v e i) = ("call_"++).shows i.lparen.pprint v.rparen.("~"++).shows e
+  pprint (VarEdge v e)   = pprint v.("~"++).shows e
+  pprint (VarCall v e i) = ("call_"++).shows i.lparen.pprint v.rparen.("~"++).shows e
 
 instance PPrint BoxT where
-  pprintPrec _ (OpT c nls)   = ("[["++).pprint c.("| "++).pprintList (", "++) nls.("]]"++)
-  pprintPrec _ (IfT b b1 b2) = ("if "++).pprint b.(" then "++).pprint b1.(" else "++).pprint b2
+  pprint (OpT c nls)   = ("[["++).pprint c.("| "++).pprintList (", "++) nls.("]]"++)
+  pprint (IfT b b1 b2) = ("if "++).pprint b.(" then "++).pprint b1.(" else "++).pprint b2
 
 instance PPrint DefT where
-  pprintPrec _ (DefT v b)      =
+  pprint (DefT v b)      =
     pprint v.(" = "++).pprint b
-  pprintPrec _ (ActualsT v m bl) = 
+  pprint (ActualsT v m bl) = 
     pprint v.("{"++).(m++).("}"++).(" = actuals["++).pprintList (", "++) bl.("]"++)
 
 instance PPrint MOp where
-  pprintPrec p (MOp c mops) = prettyConst p c mops -- (c++).lparen.pprintList (", "++) mops.rparen
-  pprintPrec _ (MNL nlink)  = pprint nlink
+  pprint (MOp c mops) = prettyConst 0 c mops -- (c++).lparen.pprintList (", "++) mops.rparen
+  pprint (MNL nlink)  = pprint nlink
   
 -- | Pretty printer for merged operator definitions.
 pprintMOpDef :: MOpDef -> ShowS
 pprintMOpDef (v, mop) = ("Operator "++).pprint v.(": "++).pprint mop
 
 instance PPrint ProgT where
-  pprintPrec _ (ProgT ds ops) =
+  pprint (ProgT ds ops) =
     foldl (\f -> \d -> f . pprint d . nl) id ds.
     foldl (\f -> \d -> f . pprintMOpDef d . nl) id ops
   

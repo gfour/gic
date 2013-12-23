@@ -52,7 +52,7 @@ data Frm =
     deriving (Eq, Read, Show)
 
 instance PPrint Frm where
-    pprintPrec _ (Frm f s) = (if s then ("!"++) else id).pprint f
+    pprint (Frm f s) = (if s then ("!"++) else id).pprint f
 
 -- | Gets the name of a formal.
 fstFrm :: Frm -> QName
@@ -90,7 +90,7 @@ data SimplePat = SPat CstrName [QName]
 
 -- | Pretty printer for simple patterns.
 instance PPrint SimplePat where
-  pprintPrec _ (SPat c bvs) =
+  pprint (SPat c bvs) =
     pprint c.spaces (if bvs == [] then 0 else 1).showStrings " " (map qName bvs)
 
 -- | Full FL patterns.
@@ -104,8 +104,8 @@ isFPV (FPatC _ _) = False
               
 -- | Pretty printer for full patterns.
 instance PPrint FullPat where
-  pprintPrec _ (FPatV v) = pprint v
-  pprintPrec _ (FPatC c ps) = pprint c.(" "++).pprint ps
+  pprint (FPatV v) = pprint v
+  pprint (FPatC c ps) = pprint c.(" "++).pprint ps
 
 -- | Pattern branch (containing full patterns).
 type PatFH  = PatFL  FullPat
