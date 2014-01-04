@@ -32,17 +32,18 @@ To build the compiler, you need:
 Building the compiler
 ---------------------
 
-* Change the macros `GC_INCLUDE` and `GC_LIB` in `bench-libGC.sh` to point to the
+* Change the macros `GC_INCLUDE` and `GC_LIB` in `run_libgc.sh` to point to the
   location of the Boehm-Demers-Weiser garbage collector.
 
 * To disable type checking with the GHC API, comment out the `USE_GHC` flag in
   the Makefile.
 
-* To build the compiler, run the following command at the top-level directory
-  (where Main.hs is located):
+* To build the compiler on Linux or Windows with Cygwin, run the following command
+  at the top-level directory (where Main.hs is located):
 
     make
 
+  To build gic in Windows without Cygwin, use buildwin.bat.
 
 Using the compiler
 ------------------
