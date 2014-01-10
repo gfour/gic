@@ -59,6 +59,7 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -penv   : preprocess and print the typing environment"
            putStrLn "  -df     : defunctionalize and print resulting HIL program"
            putStrLn "             -v : print defunctionalized types"
+           putStrLn "  -fl     : evaluate the FL program with the non-strict FL interpreter"
            putStrLn "  -enum   : optimize enumeration datatypes (can do FL->FOFL without new data types)"
 #ifdef USE_GHC
            putStrLn "  -ghc-core   : use GHC as a front-end until Core"
@@ -130,6 +131,7 @@ processArgs cmdArgs =
         aux ("-cl"    : args) opts = aux args opts{optAction = ACompileLAR}
         aux ("-ecbn"  : args) opts = aux args opts{optAction = AEvalZOILCBN}
         aux ("-e"     : args) opts = aux args opts{optAction = AEvalZOILLazy}
+        aux ("-fl"    : args) opts = aux args opts{optAction = AEvalFL}
         aux ("-cm"    : args) opts = aux args opts{optAction = ACompileMaude}
         aux ("-ttd"   : args) opts = aux args opts{optAction = ACompileTTD}
         aux ("-erl"   : args) opts = aux args opts{optAction = AEvalErl}

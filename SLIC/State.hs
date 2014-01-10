@@ -29,6 +29,7 @@ data Action =
    | ACompileErl    -- ^ transform and compile to Erlang
    | ACompileTTD    -- ^ transform and compile for tagged-token dataflow
    | AEvalErl       -- ^ transform and translate for the Erlang interpreter
+   | AEvalFL        -- ^ evaluate the FL program using the non-strict FL semantics
    | AEvalZOILCBN   -- ^ transform and print the 0-order program (call-by-name)
    | AEvalZOILLazy  -- ^ transform and print the 0-order program (call-by-need)
    | AGenerateDFG   -- ^ generate the dataflow graph

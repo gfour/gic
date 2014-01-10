@@ -28,6 +28,7 @@ import Data.Maybe (catMaybes)
 import SLIC.AuxFun (ierr)
 import SLIC.DFI
 import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfiAppSigs, genModDFI, linkF)
+import SLIC.Front.EvalFL (evalFL)
 import SLIC.Front.Preprocessor
 import SLIC.Front.Renamer
 import SLIC.Front.Typeclass (builtinTcInfo, inlineTcMethods)
@@ -163,6 +164,14 @@ processFL opts dfis inputModule =
                   let wholeProgFinal = linkF opts p0Final p0Dfi
                   in  putStrLn "== Whole defunctionalized program ==" >>
                       printLn wholeProgFinal
+          AEvalFL ->
+            case optCMode opts of
+                CompileModule ->
+                  error "The non-strict FL interpreter does not support separate compilation."
+                Whole ->
+                  let wholeProgFinal = linkF opts p0Final p0Dfi
+                  in  do evalFL wholeProgFinal
+                         return Nothing
           APrintHIL1 -> printLn p1
           -- environment printer
           APrintEnv ->

@@ -42,6 +42,17 @@ do
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
 
+############# Tests the non-strict FL interpreter
+
+echo -- Non-strict FL interpreter --
+for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/records.hs Examples/Data/unit.hs Examples/Data/addsx.hs
+do
+  echo -n ${file}, non-strict FL interpreter:\ 
+  ./gic -fl ${file}
+  echo -n ${file}, GHCi:\ 
+  echo "result" | ghci ${GHCI_FLAGS} ${file}
+done
+
 ############# Tests the lazy eduction interpreter
 
 echo -- Lazy eduction --
