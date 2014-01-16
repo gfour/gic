@@ -1,5 +1,6 @@
 module SLIC.Front.LLifter.Equations (EqE(..), EqnSys, solveEqs) where
 
+import SLIC.AuxFun (ierr)
 import Data.List as List
 import Data.Set as Set
 import Data.Map as Map
@@ -8,8 +9,10 @@ import Data.Map as Map
 data EqE a b = 
     EqV a | EqU b
     deriving (Eq, Ord, Read, Show)
+
 -- | The equation type
 type Eqn a b = (a, Set b)
+
 -- | The equation system type
 type EqnSys a b = Map a (Set b)
 
@@ -30,7 +33,7 @@ getRhsS e =
 -- | Take an equation `eqn' and an equation system in which *all unknowns 
 --   of `eqn' are defined* and substitute the rhs of every equation in the
 --   system for their lhs-s in the rhs of `eqn'.
---
+-- 
 --   All unknowns appearing in `eqn' but not defined in the equation
 --   system are considered to have an empty rhs
 subEqsFlLub ::  Ord a => Ord b => Ord c =>
@@ -39,6 +42,7 @@ subEqsFlLub eqn@(n, _) eqnSys =
   let (rhsK, rhsU)    = getRhsS eqn
       unwrapU :: EqE j c -> c
       unwrapU (EqU u) = u
+      unwrapU (EqV _) = ierr "unwrapU: found EqV"
       unknowns        = List.map unwrapU rhsU
       f rhs n'        = Set.union 
                           (findWithDefault (Set.empty) n' eqnSys)
@@ -51,7 +55,7 @@ subEqsFlLub eqn@(n, _) eqnSys =
       else subEqsFlLub (n, Set.union rhs' (Set.fromList rhsK)) eqnSys'
 
 -- | Take an equation system and return the corresponding solved
---   equation system
+--   equation system.
 solveEqs :: Ord a => Ord b =>  
             EqnSys a (EqE b a) -> EqnSys a (EqE b a)
 solveEqs eqnSys = 
