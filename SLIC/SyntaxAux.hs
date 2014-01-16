@@ -9,7 +9,7 @@ import qualified Data.Map as Map (Map, empty, filter, fromList, keys, lookup,
                                   null, toList, unions)
 import Data.Maybe (isJust)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
-import SLIC.Constants (lparen, rparen, nl)
+import SLIC.Constants (lparen, rparen, nl, semi)
 import SLIC.Types
 
 -- * User-defined data types
@@ -114,6 +114,24 @@ concatProgs progs =
 --   boundaries.
 concatCode :: [Mod (Prog a)] -> (Prog a)
 concatCode mods = concatProgs (map modProg mods)
+
+-- | Pretty printer that takes a "depth" arg to insert whitespace.
+pprint_tab :: (PPrint a) => Depth -> a -> ShowS
+pprint_tab d pat = (case d of Just i -> spaces (2*i); _ -> id).pprint pat
+
+-- | Pretty printer of semicolon-terminated tabbed lists. Used for patterns.
+pprint_tab_l :: (PPrint a) => Depth -> [a] -> ShowS
+pprint_tab_l _ []         = ("{- nothing -}"++).nl
+pprint_tab_l d [pat]      = pprint_tab d pat.nl
+pprint_tab_l d (pat : ps) = pprint_tab d pat.semi.nl.pprint_tab_l d ps
+
+-- | Shows a bound variable name.
+pprintBV :: QName -> ShowS
+pprintBV v = ("@"++).pprint v
+
+-- | Shows a constructor name.
+pprintTH :: CstrName -> ShowS
+pprintTH c = pprint c
 
 -- * Import declarations
 

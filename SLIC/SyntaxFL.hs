@@ -139,15 +139,9 @@ type ModF = Mod ProgF
 pprintVar :: V -> ShowS
 pprintVar (V v) = pprint v
 pprintVar (BV v (d, _)) = pprint v.if comments then comment (pprintBVD v d) else id
--- | Shows a bound variable name.
-pprintBV :: QName -> ShowS
-pprintBV v = ("@"++).pprint v
 -- | Shows a bound variable name at a given pattern matching nesting depth.
 pprintBVD :: QName -> Depth -> ShowS
 pprintBVD v d = pprintBV v.("{"++).shows d.("}"++)
--- | Shows a constructor name.
-pprintTH :: CstrName -> ShowS
-pprintTH c = pprint c
 
 -- | Shows the enumerated depth of an expression.
 showsDep :: Depth -> ShowS
@@ -166,17 +160,12 @@ instance PPrint a => PPrint (ExprFL a) where
      showParen (p>0) (pprint vn.spaces 1.pprintList space ps)
    pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprintList space el
    pprintPrec p (CaseF (d, _) e bind pats) =
-      let pprintPats []        = ("{- no patterns -}"++).nl
-          pprintPats [pat] = pprintPat_aux pat.nl
-          pprintPats (pat : ps)  = pprintPat_aux pat.semi.nl.pprintPats ps
-          pprintPat_aux pat =
-            (case d of Just i -> spaces (2*i); _ -> id).pprint pat
-      in  ("case "++).pprintPrec p e.
-          (if bind==underscoreVar then id else (" as '"++).pprint bind.("'"++)).
-          (" of "++).
-          comment (("Depth="++).showsDep d.(", Bind="++).pprint bind.spaces 1).
-          lbracket.nl.
-          pprintPats pats.rbracket
+     ("case "++).pprintPrec p e.
+     (if bind==underscoreVar then id else (" as '"++).pprint bind.("'"++)).
+     (" of "++).
+     comment (("Depth="++).showsDep d.(", Bind="++).pprint bind.spaces 1).
+     lbracket.nl.
+     pprint_tab_l d pats.rbracket
    pprintPrec p (LetF d bs e) =
      let -- if the let is not enumerated, don't do indentation
          (d', spc) = (case d of Nothing -> (0, 0); Just i -> (i, d'+p))
