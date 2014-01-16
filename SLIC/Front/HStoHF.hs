@@ -9,6 +9,7 @@ import Data.Map (empty, filterWithKey, fromList)
 import Data.Maybe (catMaybes)
 import qualified Language.Haskell.Exts.Syntax as S
 import SLIC.AuxFun (errM, ierr)
+import SLIC.Constants (tcMod)
 import SLIC.Front.PatternCompiler (patComp, patCompMatches)
 import SLIC.Front.Preprocessor (dummyCName, projCName, updCName)
 import SLIC.Front.Renamer (renInvNames)
@@ -204,9 +205,8 @@ transl_imp fm imp = errM fm $ "The Haskell-to-FL translation does not support im
 -- | The type class declarations of the program become explicit 'import'
 --   declarations for the defunctionalized type class handlers.
 tcImport :: TcDecl -> IDecl
-tcImport (TcDecl tcn _ methods) =
-  let tcMod = genTcMName tcn
-      mkQN x = QN (Just tcMod) x
+tcImport (TcDecl _ _ methods) =
+  let mkQN x = QN (Just tcMod) x
       auxII ((methodName, args), t) =
         let qn  = mkQN methodName
             qns = map mkQN args

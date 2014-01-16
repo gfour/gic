@@ -2,8 +2,7 @@
 
 module SLIC.Front.Typeclass (TcInst(..), TcInstF, TcInstFH, addTcInsts,
                              builtinTcDecls, builtinTcInsts, builtinTcInfo,
-                             inlineTcMethods, genTcMName, tcISig,
-                             tc_Monad, tc_Num, tc_Show,
+                             inlineTcMethods, tcISig, tc_Monad, tc_Num, tc_Show,
                              tc_Num_Int, tc_Show_Int) where
 
 import Data.List (findIndex)
@@ -14,10 +13,6 @@ import SLIC.Constants
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
 import SLIC.Types
-
--- | For some type class 'm', generate the module its methods belong to.
-genTcMName :: TcName -> MName
-genTcMName tcn = "TC$"++tcn
 
 -- | A type class instance declaration.
 data TcInst a = TcInst TcName Type [DefFL a]

@@ -27,6 +27,7 @@ module SLIC.Front.Preprocessor (checkMod, constrToFuncs, convertFromGHC,
 import qualified Data.Map as Map (Map, fromList, keys, lookup, map, mapKeys, union)
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (errM, ierr, toLowerFirst)
+import SLIC.Constants (tcMod)
 import SLIC.Front.Typeclass
 import SLIC.State
 import SLIC.SyntaxAux
@@ -405,10 +406,8 @@ genQInfo modF =
                     zip (map lName $ Map.keys is) (repeat (Just mN)))
                   fImports
       tcMethods_nm = 
-        concatMap (\(TcDecl tcn _ methods)->
-                    concatMap (\((f, fs), _)->
-                          zip (f:fs)
-                              (repeat $ Just $ genTcMName tcn))
+        concatMap (\(TcDecl _ _ methods)->
+                    concatMap (\((f, fs), _)-> zip (f:fs) (repeat $ Just tcMod))
                     methods) tcs
       nm = Map.fromList $ builtin_nm ++ imported_nm ++ tcMethods_nm
   in  (nm, modNameF modF)

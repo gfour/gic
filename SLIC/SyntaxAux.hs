@@ -9,7 +9,7 @@ import qualified Data.Map as Map (Map, empty, filter, fromList, keys, lookup,
                                   member, null, toList, unions)
 import Data.Maybe (isJust)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
-import SLIC.Constants (mControlParallelN, lparen, rparen, nl, semi)
+import SLIC.Constants (mControlParallelN, tcMod, lparen, rparen, nl, semi)
 import SLIC.Types
 
 -- * User-defined data types
@@ -214,7 +214,8 @@ importControlParallel =
 
 -- | Built-in (pseudo-)modules.
 builtinModules :: Map.Map MName IDecl
-builtinModules = Map.fromList [ (mControlParallelN, importControlParallel) ]
+builtinModules = Map.fromList [ (mControlParallelN, importControlParallel) 
+                              , (tcMod, error "!")]
 
 -- * Modules
 

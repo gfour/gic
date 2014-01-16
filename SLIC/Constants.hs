@@ -137,6 +137,10 @@ mControlParallelN = "Control.Parallel"
 mControlParallel :: Maybe String
 mControlParallel = Just mControlParallelN
 
+-- | The type classes pseudo-module that contains method dispatchers.
+tcMod :: String
+tcMod = "$Typeclasses$"
+
 -- | The default working path.
 defaultPath :: String
 defaultPath = "."
