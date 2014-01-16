@@ -20,14 +20,18 @@ To build the compiler, you need:
 
 * GHC 7.6
 * haskell-src-exts (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
-* The Boehm-Demers-Weiser garbage collector from:
-    (http://www.hpl.hp.com/personal/Hans_Boehm/gc/)
-* Optional: the profiling libs of the above (if HPROFILE is set in the Makefile),
-  to support stack traces in the compiler.
+* For the C back-end:
+    * GCC
+    * the Boehm-Demers-Weiser garbage collector from:
+      (http://www.hpl.hp.com/personal/Hans_Boehm/gc/)
+    * Optional: libgmp (is the `HAS_GMP` macro is enabled) for big integers
+      (the Integer data type, see `run_lar.sh`).
+* For the Erlang back-end: Erlang/OTP R16 or greater.
+* For the Maude back-end: Maude 2.6 and Full Maude.
+* Optional: the GHC profiling libs (if HPROFILE is set in the Makefile),
+  to support stack traces in the compiler executable.
 * Optional: ghc-paths (if `USE_GHC` is set in the Makefile), if GHC is used as a
   front-end or for type checking.
-* Optional: libgmp (is the `HAS_GMP` macro is enabled) for big integers
-  (the Integer data type, see `run_lar.sh`).
 
 Building the compiler
 ---------------------
