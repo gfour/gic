@@ -679,6 +679,7 @@ builtinPmDepths = Map.fromList $
                   [ (bf_toInteger, 0), (bf_printIntIO, 0)
                   , (bf_readIntIO, 0)
                   , (bf_putStr, 0), (bf_putStrLn, 0), (bf_show, 0)
+                  , (bf_par, 0), (bf_pseq, 0)
                   , (bf_error, 0), (bf_runMainIO, 0)
                   , (bf_Cons, 0), (bf_Nil, 0), (bf_Unit, 0)
                   ] ++ (map (\i->(bf_Tuple i, 0)) b_tupleSizes)
