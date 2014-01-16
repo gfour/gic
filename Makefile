@@ -17,8 +17,8 @@ EXTRA=-package ghc -fwarn-unused-binds -Wall
 #EXTRA=-auto -prof
 
 # enable use of the GHC API
-# USE_GHC=-DUSE_GHC -XRankNTypes
-USE_GHC=
+USE_GHC=-DUSE_GHC -XRankNTypes
+# USE_GHC=
 
 HADDOCK=haddock
 
