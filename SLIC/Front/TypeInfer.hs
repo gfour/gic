@@ -357,12 +357,6 @@ inferE cs an e =
 		theta CTrue   = return (STground gBool, [])
 		theta CFalse  = return (STground gBool, [])
                 theta CMulI   = return (STground gInteger, [STground gInteger, STground gInteger])
-                theta CPar    = freshST >>= \t1 ->
-                                freshST >>= \t2 ->
-                                return (t2, [t1, t2])
-                theta CPSeq   = freshST >>= \t1 ->
-                                freshST >>= \t2 ->
-                                return (t2, [t1, t2])
                 theta (CMOp _)= ierr "theta encountered merged operator"
 	    in  theta c >>= \(t, tl) ->
 	        inferEL cs an el >>= \tl' ->

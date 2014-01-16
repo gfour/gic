@@ -397,8 +397,6 @@ mkCExp env config (LARC (CN c) exps) =
           mkBinOp c' exps env config
         CNeg -> ("((Susp) { -("++).(mkCExp env config (exps !! 0)).
                 (").constr, "++).intTag opts.("NULL})"++)
-        CPar -> ierr "'par' is not supported in the LAR back-end"
-        CPSeq-> ierr "'pseq' is not supported in the LAR back-end"
         CTrue-> intSusp "True"  opts
         CFalse->intSusp "False" opts
         _     -> error $ "mkCExp: unknown built-in constant "++(pprint c "")

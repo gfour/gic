@@ -9,7 +9,7 @@ import qualified Data.Map as Map (Map, filterWithKey, fromList, lookup,
                                   map, null, toList)
 import qualified Data.Sequence as Sequence (elemIndexR, fromList)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces, toLowerFirst)
-import SLIC.Constants (bMod, delim, dfMod, lparen, rparen, nl)
+import SLIC.Constants (bMod, dfMod, mControlParallel, delim, lparen, rparen, nl)
 
 -- * Names
 
@@ -22,7 +22,9 @@ type SName = String
 -- | Variable names, maybe qualified.
 data QName = QN (Maybe MName) SName deriving (Eq, Ord, Read, Show)
 instance PPrint QName where
-  pprint (QN (Just m) v) = (m++).([delim]++).(v++)
+  pprint (QN (Just m) v) =
+    let m' = map (\ch->if ch=='.' then delim else ch) m
+    in  (m'++).([delim]++).(v++)
   pprint (QN  Nothing v) = (v++)
 
 -- | Converts a qualified variable name to a string using the pretty printer.
@@ -526,26 +528,34 @@ take' n list =
 
 -- built-in functions
 
-bf_toInteger       :: QName          ; bf_toInteger       = QN bMod "toInteger"
-bf_toInteger_arg0  :: QName          ; bf_toInteger_arg0  = QN bMod "toInteger_x"
+bf_toInteger       :: QName  ; bf_toInteger       = QN bMod "toInteger"
+bf_toInteger_arg0  :: QName  ; bf_toInteger_arg0  = QN bMod "toInteger_x"
 
-bf_printIntIO      :: QName          ; bf_printIntIO      = QN bMod "printIntIO"
-bf_printIntIO_arg0 :: QName          ; bf_printIntIO_arg0 = QN bMod "printIntIOi"
+bf_printIntIO      :: QName  ; bf_printIntIO      = QN bMod "printIntIO"
+bf_printIntIO_arg0 :: QName  ; bf_printIntIO_arg0 = QN bMod "printIntIOi"
 
-bf_readIntIO       :: QName          ; bf_readIntIO       = QN bMod "readIntIO"
+bf_readIntIO       :: QName  ; bf_readIntIO       = QN bMod "readIntIO"
 
-bf_putStr          :: QName          ; bf_putStr          = QN bMod "putStr"
-bf_putStr_arg0     :: QName          ; bf_putStr_arg0     = QN bMod "putStr_arg"
-bf_putStrLn        :: QName          ; bf_putStrLn        = QN bMod "putStrLn"
-bf_putStrLn_arg0   :: QName          ; bf_putStrLn_arg0   = QN bMod "putStrLn_arg"
-bf_error           :: QName          ; bf_error           = QN bMod "error"
-bf_error_arg0      :: QName          ; bf_error_arg0      = QN bMod "error_arg"
+bf_putStr          :: QName  ; bf_putStr          = QN bMod "putStr"
+bf_putStr_arg0     :: QName  ; bf_putStr_arg0     = QN bMod "putStr_arg"
+bf_putStrLn        :: QName  ; bf_putStrLn        = QN bMod "putStrLn"
+bf_putStrLn_arg0   :: QName  ; bf_putStrLn_arg0   = QN bMod "putStrLn_arg"
+bf_error           :: QName  ; bf_error           = QN bMod "error"
+bf_error_arg0      :: QName  ; bf_error_arg0      = QN bMod "error_arg"
 
-bf_runMainIO       :: QName          ; bf_runMainIO       = QN bMod "runMainIO"
-bf_runMainIO_arg0  :: QName          ; bf_runMainIO_arg0  = QN bMod "runMainIO_a"
+bf_runMainIO       :: QName  ; bf_runMainIO       = QN bMod "runMainIO"
+bf_runMainIO_arg0  :: QName  ; bf_runMainIO_arg0  = QN bMod "runMainIO_a"
 
-bf_show            :: QName          ; bf_show            = QN bMod "show"
-bf_show_arg0       :: QName          ; bf_show_arg0       = QN bMod "showArgument"
+bf_show            :: QName  ; bf_show            = QN bMod "show"
+bf_show_arg0       :: QName  ; bf_show_arg0       = QN bMod "showArgument"
+
+bf_par             :: QName  ; bf_par             = QN mControlParallel "par"
+bf_par_0           :: QName  ; bf_par_0           = QN mControlParallel "par_0"
+bf_par_1           :: QName  ; bf_par_1           = QN mControlParallel "par_1"
+
+bf_pseq            :: QName  ; bf_pseq            = QN mControlParallel "pseq"
+bf_pseq_0          :: QName  ; bf_pseq_0          = QN mControlParallel "pseq_0"
+bf_pseq_1          :: QName  ; bf_pseq_1          = QN mControlParallel "pseq_1"
 
 -- built-in constructors ('$' is inserted to avoid clashing with user-defined
 -- constructors)
@@ -587,6 +597,12 @@ builtinTEnv =
   , (bf_putStr_arg0, (Ta tList tv_a, Nothing))
   , (bf_error, (Tf (Ta tList tInt) tv_a, Just 1))
   , (bf_error_arg0, (Ta tList tv_a, Nothing))
+  , (bf_par, (Tf tv_a (Tf tv_b tv_a), Just 2))
+  , (bf_par_0, (tv_a, Nothing))
+  , (bf_par_1, (tv_b, Nothing))
+  , (bf_pseq, (Tf tv_a (Tf tv_b tv_a), Just 2))
+  , (bf_pseq_0, (tv_a, Nothing))
+  , (bf_pseq_1, (tv_b, Nothing))
   , (bf_show, (Tf tv_a (Ta tList tInt), Just 1))
   , (bf_show_arg0, (tInt, Nothing))
   , (bf_runMainIO, (Tf (Ta tList tv_a) tUnit, Just 1))
@@ -636,6 +652,8 @@ builtinFuncSigs = Map.fromList $
                   , (bf_putStr, [bf_putStr_arg0])
                   , (bf_putStrLn, [bf_putStrLn_arg0])
                   , (bf_show, [bf_show_arg0])
+                  , (bf_par, [bf_par_0, bf_par_1])
+                  , (bf_pseq, [bf_pseq_0, bf_pseq_1])
                   , (bf_error, [bf_error_arg0])
                   , (bf_runMainIO, [bf_runMainIO_arg0])
                   , (bf_Cons, [bf_cons_0, bf_cons_1])

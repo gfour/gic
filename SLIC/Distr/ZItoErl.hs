@@ -247,8 +247,6 @@ makeErlE conf@(_, _, opts, _) (ConZ (CN op) [e1, e2]) c parent branch dep ident 
         CNEq    -> strictBinOpPar receiveNEquMerge
         CMod    -> strictBinOpPar receiveModMerge
         CDiv    -> strictBinOpPar receiveDivMerge
-        CPar    -> error "The 'par' combinator is not supported in the implicitly parallel mode."
-        CPSeq   -> error "The 'pseq' combinator is not supported in the implicitly parallel mode."
         _     -> error $ "Erlang generator doesn't support binary op: " ++ (show op)
 
 makeErlE _ e@(ConZ _ _) _ _ _ _ _ _ =

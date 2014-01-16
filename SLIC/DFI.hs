@@ -187,11 +187,11 @@ parseDFIs v (f:fs) = do (opt v $ putStrLn $ "Reading: "++f)
                         return (dfi : dfis)
 
 -- | Updates an import declaration using the defunctionalization interface file
---   of the imported module. The 
+--   of the imported module.
 updExtTypesDFI :: Verb -> MNameF -> FPath -> [DFI] -> [IDecl] -> IO [IDecl]
 updExtTypesDFI _ _ _ _ [] = return []
 -- For import declarations that have Empty information, load it.
-updExtTypesDFI v mThis fPath dfis (imp@(IDecl mn imns Nothing):imps) =
+updExtTypesDFI v mThis fPath dfis ((IDecl mn imns Nothing):imps) =
   do rest <- updExtTypesDFI v mThis fPath dfis imps
      (case Data.Map.lookup mn builtinModules of
          -- If built-in module, use the built-in information.

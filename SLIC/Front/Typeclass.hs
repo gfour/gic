@@ -134,10 +134,10 @@ builtinTcInsts :: [TcInstSig]
 builtinTcInsts = [ tc_Num_Int, tc_Show_Int ]
 
 -- | Built-in instance of 'Num' for 'Int'.
-tc_Num_Int :: TcInstSig       ; tc_Num_Int = (("Num", tInt), bModName)
+tc_Num_Int :: TcInstSig       ; tc_Num_Int = (("Num", tInt), bModN)
 
 -- | Built-in instance of 'Show' for 'Int'.
-tc_Show_Int :: TcInstSig      ; tc_Show_Int = (("Show", tInt), bModName)
+tc_Show_Int :: TcInstSig      ; tc_Show_Int = (("Show", tInt), bModN)
 
 -- | Built-in type class information.
 builtinTcInfo :: TcInfo
@@ -191,8 +191,6 @@ inlineTcMethods tcInfo env modF =
                       ConF (CN CDivide) _ -> Just tInt
                       ConF (CN CMod) _    -> Just tInt
                       ConF (CN CDiv) _    -> Just tInt
-                      ConF (CN CPar) _    -> Nothing
-                      ConF (CN CPSeq) _   -> Nothing
                       ConF (CN CAnd) _    -> Just tBool
                       ConF (CN COr) _     -> Just tBool
                       ConF (CN CEqu) _    -> Just tBool

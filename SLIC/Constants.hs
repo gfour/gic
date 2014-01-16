@@ -122,12 +122,20 @@ defaultMod :: String
 defaultMod = "Main"
 
 -- | The name of the built-in pseudo-module.
-bModName :: String
-bModName = "GIC"
+bModN :: String
+bModN = "GIC"
 
 -- | The name of the built-in pseudo-module ('Maybe' version).
 bMod :: Maybe String
-bMod = Just bModName
+bMod = Just bModN
+
+-- | The name of the built-in \"Control.Parallel\" module.
+mControlParallelN :: String
+mControlParallelN = "Control.Parallel"
+
+-- | The name of the built-in \"Control.Parallel\" module ('Maybe' version).
+mControlParallel :: Maybe String
+mControlParallel = Just mControlParallelN
 
 -- | The default working path.
 defaultPath :: String

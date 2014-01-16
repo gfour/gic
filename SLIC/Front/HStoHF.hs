@@ -11,7 +11,7 @@ import qualified Language.Haskell.Exts.Syntax as S
 import SLIC.AuxFun (errM, ierr)
 import SLIC.Front.PatternCompiler (patComp, patCompMatches)
 import SLIC.Front.Preprocessor (dummyCName, projCName, updCName)
-import SLIC.Front.Renamer (renInvFLdata, renInvFLdefs, renInvFLtcInsts)
+import SLIC.Front.Renamer (renInvNames)
 import SLIC.Front.Typeclass
 import SLIC.State (Options(optStrict))
 import SLIC.SyntaxAux
@@ -52,12 +52,12 @@ fromHStoHF opts fp (S.Module _ (S.ModuleName m) _ _ exports imports decls) =
         dataDecls (d@(S.GDataDecl _ _ _ _ _ _ _ _) : ds) =
             (transl_dt fm d) : (dataDecls ds)
         dataDecls (_ : ds) = dataDecls ds
-        dtsFL  = renInvFLdata $ dataDecls decls
         (st1, fDecls) = funDecls opts fm decls (0)
         (_  , tcInsts) = tcInstDecls opts fm decls st1
-        defsFH    = renInvFLdefs fDecls
-        tcInstsFH = renInvFLtcInsts tcInsts
         fImports = (map (transl_imp fm) imports) ++ (map tcImport $ tcIDecls tcs)
+        -- rename invalid names
+        (fImportsFL, dtsFL, defsFH, tcInstsFH) =
+          renInvNames (fImports, dataDecls decls, fDecls, tcInsts)
         -- the signatures of all module functions
         allSigs = fromList $ (map defSig defsFH)++(concatMap dtSigs dtsFL)
         fExports =
@@ -71,7 +71,7 @@ fromHStoHF opts fp (S.Module _ (S.ModuleName m) _ _ exports imports decls) =
         (progFL, tcInstsFL) = patComp progFH tcInstsFH
         tcs = TcInfo (tcDecls fm decls) (map (tcISig m) tcInstsFL)
         tAnnot = fromList $ typeSigs fm decls
-    in  (Mod fm fExports fImports progFL tAnnot tcs, tcInstsFL)
+    in  (Mod fm fExports fImportsFL progFL tAnnot tcs, tcInstsFL)
 
 funDecls :: Options -> MNameF -> [S.Decl] -> TState -> TInfo [DefFH]
 funDecls opts fm decls stI =

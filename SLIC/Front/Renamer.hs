@@ -5,10 +5,10 @@
 -- * The binder names for pattern matching expressions are assumed to be unique.
 -- 
 
-module SLIC.Front.Renamer (renInvFLdefs, renInvFLdata, renInvFLtcInsts,
-                           uniqueNames) where
+module SLIC.Front.Renamer (renInvNames, uniqueNames) where
 
-import Data.Map (Map, empty, fromList, lookup, mapWithKey, toList, unions)
+import qualified Data.Map as M (Map, empty, fromList, lookup, map, mapKeys,
+                                mapWithKey, toList, unions)
 import SLIC.AuxFun (ierr, mergeM)
 import SLIC.Front.Typeclass
 import SLIC.SyntaxAux
@@ -18,7 +18,7 @@ import SLIC.Types
 -- * Renaming information
 
 -- | A map of renaming pairs for unique variable name generation.
-type Renamings = Map QName QName
+type Renamings = M.Map QName QName
 
 -- | Renaming information is two mappings, those of module-scope renamings
 --   (e.g. rename an imported function with its fully qualified name), or
@@ -49,11 +49,12 @@ gatherFuncMap modF =
       funcRenamer m' (QN Nothing v) = QN (Just m') v
       funcRenamer m' (QN (Just m'') v) =
         if m'==m then QN (Just m') v else ierr $ "Renaming from module "++m''++" to "++m'
-  in  mergeM (Data.Map.fromList localFuncsMap) (mergeImportFunsRens imports)
+  in  mergeM (M.fromList localFuncsMap) (mergeImportFunsRens imports)
 
 mergeImportFunsRens :: [IDecl] -> Renamings
 mergeImportFunsRens imports =
-  fromList $ map (\(v, _) -> (v, v)) $ toList$unions (map ideclINames imports)
+  M.fromList $ map (\(v, _) -> (v, v)) $ M.toList $ 
+  M.unions (map ideclINames imports)
   
 -- * Renaming functions
 
@@ -61,7 +62,7 @@ mergeImportFunsRens imports =
 --   Takes the enclosing function name and the formal name.
 renV :: MName -> QName -> QName -> QName
 renV m (QN _ f) (QN _ v) = QN (Just m) (f++"_"++v)
-  -- if Data.Map.null is then m++"_"++f++"_"++v
+  -- if M.null is then m++"_"++f++"_"++v
   -- else ierr "renV: what to do with the imports?"
 
 -- | The renaming function for binding names.
@@ -136,13 +137,13 @@ uniqueNames modf@(Mod mInfo@(m, _) es is (Prog cs defs) an tcs) =
   let defs' = enumLetLam defs
       -- as initial renamings, use the function renamings based on the module name
       -- or the imports
-      fRens = RenModLoc (gatherFuncMap modf) empty
-      es' = Data.Map.mapWithKey (renameFormals m) es
+      fRens = RenModLoc (gatherFuncMap modf) M.empty
+      es' = M.mapWithKey (renameFormals m) es
       renIDecl idecl =
         case ideclInfo idecl of
           Just (sigs, cids) ->
             let mn = ideclMName idecl
-                info' = Just (Data.Map.mapWithKey (renameFormals mn) sigs, cids)
+                info' = Just (M.mapWithKey (renameFormals mn) sigs, cids)
             in  idecl{ideclInfo=info'}
           Nothing -> idecl
       is' = map renIDecl is
@@ -159,7 +160,7 @@ uniqueNamesD m ren (DefF f fs expr) =
         origFrmNames = frmsToNames fs
         renamedFrms = renameFormals m f origFrmNames
         -- generate renamings for the formal variables
-        newLocalRens = Data.Map.fromList (zip origFrmNames renamedFrms)
+        newLocalRens = M.fromList (zip origFrmNames renamedFrms)
         localRens' = mergeM (localRen ren) newLocalRens
         -- TODO: delete: add the new renamings, checking for possible clashes
         -- renamings    = mergeM ren newRenamings
@@ -174,9 +175,9 @@ uniqueNamesE :: MName -> QName -> RenInfo -> ExprF -> ExprF
 uniqueNamesE _ _ ren nvar@(XF (V v)) =
   -- first check for a name from the local renamings, then for one 
   -- from the module-scope renamings
-  case Data.Map.lookup v (localRen ren) of
+  case M.lookup v (localRen ren) of
     Just v' -> XF (V v')
-    Nothing -> case Data.Map.lookup v (moduleRen ren) of
+    Nothing -> case M.lookup v (moduleRen ren) of
       Just v' -> XF (V v')
       Nothing -> nvar
 uniqueNamesE _ _ _ (XF (BV _ _)) =
@@ -189,10 +190,10 @@ uniqueNamesE m f ren (FF func el) =
         V func' -> 
           -- first check for a name from the local renamings, then for one
           -- from the module-scope renamings
-          case Data.Map.lookup func' (localRen ren) of  
+          case M.lookup func' (localRen ren) of  
             Just f' -> FF (V f') el'
             Nothing ->
-              case Data.Map.lookup func' (moduleRen ren) of  
+              case M.lookup func' (moduleRen ren) of  
                 Just f' -> FF (V f') el'
                 Nothing -> FF func el'
         -- do not process bound variable applications
@@ -209,25 +210,25 @@ uniqueNamesE m f ren (LetF d defs e) =
       defs0 = map (\(DefF f0 fs e0)->DefF (renB f d f0) fs e0) defs
       -- add the binding renamings to the local ones
       localRens' = mergeM (localRen ren) 
-                   (Data.Map.fromList (map (\(DefF f0 _ _)->(f0, QN (Just m) $ lName $ renB f d f0)) defs))
+                   (M.fromList (map (\(DefF f0 _ _)->(f0, QN (Just m) $ lName $ renB f d f0)) defs))
       ren'  = RenModLoc (moduleRen ren) localRens'
       defs' = map (uniqueNamesD m ren') defs0
   in  LetF d defs' (uniqueNamesE m f ren' e)
 uniqueNamesE m f ren (LamF d v e) =
   let v' = renV m f v
-      localRens' = mergeM (localRen ren) (Data.Map.fromList [(v, v')])
+      localRens' = mergeM (localRen ren) (M.fromList [(v, v')])
   in  LamF d v' (uniqueNamesE m f (RenModLoc (moduleRen ren) localRens') e)
 
 -- | Helper function for constructor renaming.
 renameConstr :: MName -> RenInfo -> CstrName -> CstrName
 renameConstr m ren c =
   -- if the constructor is built-in, leave it unchanged
-  case Data.Map.lookup c builtinTEnv of
+  case M.lookup c builtinTEnv of
     Just _ -> c
     Nothing ->
       -- if the constructor is local, prefix it with module name, if it
       -- is imported, use fully qualified name from imports
-      case Data.Map.lookup c (moduleRen ren) of
+      case M.lookup c (moduleRen ren) of
         Nothing -> QN (Just m) (lName c)
         Just cc -> cc
 
@@ -241,14 +242,30 @@ procWithState func i0 (e:es) =
   in  (iEL, e' : el')
 
 prepQN :: QName -> QName
-prepQN qn = procLName prepStr qn
+prepQN (QN (Just mn) n) = QN (Just (prepStr mn)) (prepStr n)
+prepQN (QN Nothing   n) = QN Nothing (prepStr n)
 
 prepStr :: String -> String
 prepStr s = map (\c->if c=='\'' then '_' else c) s
 
+type FLNames a = ([IDecl], [Data], [DefFL a], [TcInstFH])
+
+renInvNames :: RenameInvPat a => FLNames a -> FLNames a
+renInvNames (idecls, dts, defs, tcInsts) =
+  (renInvImps idecls, renInvData dts, renInvDefs defs, renInvTcInsts tcInsts)
+
+renInvImps :: [IDecl] -> [IDecl]
+renInvImps idecls =
+  let renIns ins = M.mapKeys prepQN ins
+      renInfo Nothing = Nothing
+      renInfo (Just (fsigs, cids)) =
+        Just (M.mapKeys prepQN (M.map (map prepQN) fsigs),
+              M.mapKeys prepQN cids)
+  in  map (\(IDecl mn ins ii)->IDecl (prepStr mn) (renIns ins) (renInfo ii)) idecls
+
 -- | Renames invalid characters in names in data declarations.
-renInvFLdata :: [Data] -> [Data]
-renInvFLdata dts =
+renInvData :: [Data] -> [Data]
+renInvData dts =
   let prepData (Data dt as dcs) = Data (prepDT dt) as (map prepDC dcs)
       prepDT dtName = prepQN dtName
       prepDC (DConstr c dtcs rt) =
@@ -265,14 +282,14 @@ renInvFLdata dts =
   in  map prepData dts
                       
 -- | Renames invalid characters in names in function definitions.
-renInvFLdefs :: RenameInvPat a => [DefFL a] -> [DefFL a]
-renInvFLdefs defs = map prepDef defs
+renInvDefs :: RenameInvPat a => [DefFL a] -> [DefFL a]
+renInvDefs defs = map prepDef defs
 
 -- | Renames invalid characters in names in type class instance method definitions.
-renInvFLtcInsts :: [TcInstFH] -> [TcInstFH]
-renInvFLtcInsts insts =
+renInvTcInsts :: [TcInstFH] -> [TcInstFH]
+renInvTcInsts insts =
   let aux (TcInst tcn tv methods) =
-        TcInst (prepStr tcn) tv (renInvFLdefs methods)
+        TcInst (prepStr tcn) tv (renInvDefs methods)
   in  map aux insts
 
 prepDef :: RenameInvPat a => DefFL a -> DefFL a

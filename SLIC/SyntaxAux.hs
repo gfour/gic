@@ -9,7 +9,7 @@ import qualified Data.Map as Map (Map, empty, filter, fromList, keys, lookup,
                                   member, null, toList, unions)
 import Data.Maybe (isJust)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
-import SLIC.Constants (lparen, rparen, nl, semi)
+import SLIC.Constants (mControlParallelN, lparen, rparen, nl, semi)
 import SLIC.Types
 
 -- * User-defined data types
@@ -199,7 +199,7 @@ mergeINames idms = Map.unions $ map (\(IDecl _ ins _)->ins) idms
 -- | The \'import\' for the built-in Control.Parallel module.
 importControlParallel :: IDecl
 importControlParallel =
-  let mn = mControlParallel
+  let mn = mControlParallelN
       qn_par = QN (Just mn) "par"
       qn_pseq = QN (Just mn) "pseq"
       in_ControlPar =
@@ -212,13 +212,9 @@ importControlParallel =
       cids = Map.empty
   in  IDecl mn (Map.fromList in_ControlPar) (Just (fSigs, cids))
 
--- | The name of the built-in \"Control.Parallel\" module.
-mControlParallel :: MName
-mControlParallel = "Control.Parallel"
-
 -- | Built-in (pseudo-)modules.
 builtinModules :: Map.Map MName IDecl
-builtinModules = Map.fromList [ (mControlParallel, importControlParallel) ]
+builtinModules = Map.fromList [ (mControlParallelN, importControlParallel) ]
 
 -- * Modules
 
@@ -269,7 +265,7 @@ procModSources f ms = map (procModSource f) ms
 
 -- | Built-in operators.
 data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
-         | CPar      | CPSeq     | CAnd     | COr      | CEqu     | CNEq
+         | CAnd      | COr       | CEqu     | CNEq
          | CLt       | CGt       | CLe      | CGe      | CMulI    | CIf
          | CNeg      | CTrue     | CFalse   
          | CMOp String -- ^ a "merged operator" in TTD
@@ -279,7 +275,7 @@ data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
 cOps :: Map.Map COp String
 cOps = Map.fromList $
        [ (CPlus, "+"), (CMinus, "-"), (CMult, "*"), (CDivide, "/")
-       , (CMod, "mod"), (CDiv, "div"), (CPar, "par"), (CPSeq, "pseq")
+       , (CMod, "mod"), (CDiv, "div")
        , (CAnd, "&&"), (COr, "||"), (CEqu, "=="), (CNEq, "/=")
        , (CLt, "<"), (CGt, ">"), (CLe, "<="), (CGe, ">="), (CMulI, "mulI")
        , (CIf, "if"), (CNeg, "-"), (CTrue, "True"), (CFalse, "CFalse")
@@ -334,7 +330,7 @@ prettyConst p (CN cn) el =
       showParen (p > 6) (
         pprintPrec 7 (el !! 0) .
         (" * " ++).pprintPrec 6 (el !! 1))
-    c | (c `elem` [CMod, CPar, CPSeq]) ->
+    c | (c `elem` [CMod, CDiv]) ->
       showParen (p > 6) (
         pprintPrec 7 (el !! 0) .
         ((" `" ++ (pprint c "") ++ "` ") ++).pprintPrec 6 (el !! 1))

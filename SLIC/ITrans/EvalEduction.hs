@@ -223,10 +223,6 @@ evalE eOpts p (ConZ (CN CMod) [e1, e2]) ctxt st =
   let (val1, st1) = evalE eOpts p e1 ctxt st
       (val2, st2) = evalE eOpts p e2 ctxt st1
   in  (VI ((intFrom val1) `mod` (intFrom val2)), st2)
-evalE _ _ (ConZ (CN CPSeq) [_, _]) _ _ =
-  error "The `pseq` combinator is not supported by the lazy eduction interpreter."
-evalE _ _ (ConZ (CN CPar) [_, _]) _ _ =
-  ierr "'par' is not allowed without locking in the warehouse"  
 evalE _ _ (ConZ (CN c) [_, _]) _ _ =
   ierr $ "lazy eduction: unhandled binary operator "++(show c)
 evalE eOpts p (ConZ (CN CIf) [e0, e1, e2]) ctxt st =

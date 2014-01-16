@@ -38,10 +38,6 @@ evalZ _ _ _ (ConZ (CN CFalse) []) _ _ _ =
     return (VB False)
 -- the "par" and "pseq" combinators are ignored, only the second argument
 -- is evaluated
-evalZ trace prog d (ConZ (CN CPar) [_, e2]) ls dict pc =
-    evalZ trace prog (d+1) e2 ls dict pc
-evalZ trace prog d (ConZ (CN CPSeq) [_, e2]) ls dict pc =
-    evalZ trace prog (d+1) e2 ls dict pc
 evalZ _ _ _ (ConZ (LitInt i) []) _ _ _ = return (VI (fromIntegral i))
 evalZ _ _ _ (ConZ cn []) _ _ _ = ierr $ "unknown nullary constant: "++(show cn)
 evalZ trace prog d (ConZ (CN CIf) [e, e1, e2]) ls dict pc = 
