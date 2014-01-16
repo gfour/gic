@@ -1,7 +1,8 @@
 -- | The compilation manager.
 -- 
 
-module SLIC.CompManager (ImpMode(..), ModFPre, contProcFL, prepareFL, rearrangeMods, readMGraphForL) where
+module SLIC.CompManager (ModFPre, contProcFL, prepareFL, rearrangeMods,
+                         readMGraphForL) where
 
 import Data.Graph (SCC(..), stronglyConnComp)
 import Data.List ((\\))
@@ -13,7 +14,6 @@ import SLIC.DFI
 import SLIC.Driver (processFL)
 import SLIC.Front.Preprocessor (qual)
 import SLIC.Front.Typeclass
-import SLIC.ITrans.II (updExtTypesII)
 import SLIC.State
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -89,29 +89,24 @@ rearrangeMods showMsg modsFL =
 -- | Processes each parsed input module: it prepares it using 'prepareFL', then
 --   it feeds it to the driver ("SLIC.Driver") and finally uses the generated
 --   DFI to continue (if more than one files were given).
-contProcFL :: Options -> ImpMode -> FPath -> [ModFPre] -> [DFI] -> IO ()
-contProcFL opts iMode path (modF:modsF) dfis =
-  do modF' <- prepareFL (optVerbose opts) iMode path dfis modF
+contProcFL :: Options -> FPath -> [ModFPre] -> [DFI] -> IO ()
+contProcFL opts path (modF:modsF) dfis =
+  do modF' <- prepareFL (optVerbose opts) path dfis modF
      mDfi  <- processFL opts dfis modF'
      case mDfi of
-       Just dfi -> contProcFL opts iMode path modsF (dfi:dfis)
+       Just dfi -> contProcFL opts path modsF (dfi:dfis)
        Nothing -> return ()
-contProcFL _ _ _ [] _ = return ()
-
--- | The imports update mode (DFI or intensional, depending on the back-end).
-data ImpMode = ImpDFI        -- ^ Read imports info from defunctionalization 
-                             --   interfaces.
-             | ImpII         -- ^ Read imports info from intensional interfaces.
+contProcFL _ _ [] _ = return ()
 
 -- | Prepares FL modules after parsing: reads interface files to fill in
 --   imported symbol information, does name qualification and adds the
 --   type class instance methods as top-level definitions.
-prepareFL :: Bool -> ImpMode -> FPath -> [DFI] -> ModFPre -> IO ModF
-prepareFL verb iMode path dfis (modF, tcInsts) =
+prepareFL :: Bool -> FPath -> [DFI] -> ModFPre -> IO ModF
+prepareFL verb path dfis (modF, tcInsts) =
   let mThis = modNameF modF
       imports = modImports modF
   in  do -- read interface files to update imported symbol information
-         imports' <- updExtTypes verb mThis iMode path dfis imports
+         imports' <- updExtTypes verb mThis path dfis imports
          let modFI = modF{modImports=imports'}
          -- qualify all names
          let (modFQ, tcInstsQ) = qual (modFI, tcInsts)
@@ -121,9 +116,7 @@ prepareFL verb iMode path dfis (modF, tcInsts) =
 
 -- | Read referenced interfaces to type the imported functions and find the
 --   imported names information.
-updExtTypes :: Verb -> MNameF -> ImpMode -> FPath -> [DFI] -> [IDecl] -> 
+updExtTypes :: Verb -> MNameF -> FPath -> [DFI] -> [IDecl] -> 
                IO [IDecl]
-updExtTypes _ _ _ _ _ [] = return []
-updExtTypes v mThis ImpDFI fPath dfis idecl =
-  updExtTypesDFI v mThis fPath dfis idecl
-updExtTypes _ _ ImpII _ _ idecl = updExtTypesII idecl
+updExtTypes _ _ _ _ [] = return []
+updExtTypes v mThis fPath dfis idecl = updExtTypesDFI v mThis fPath dfis idecl

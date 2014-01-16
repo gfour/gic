@@ -206,7 +206,7 @@ processFL opts dfis inputModule =
                     do evalZOILCBN opts p0Dfi p3
                        return Nothing
                   AEvalZOILLazy ->
-                    do evalZOILLazy opts p0Dfi env p3
+                    do evalZOILLazy opts p0Dfi p3
                        return Nothing
                   AEvalErl ->
                     case optCMode opts of

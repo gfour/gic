@@ -18,7 +18,6 @@ import SLIC.AuxFun (ierr, pathOf, showNum)
 import SLIC.CompManager
 import SLIC.Constants
 import SLIC.DFI (parseDFI)
-import SLIC.ITrans.II (parseII)
 import SLIC.Front.HStoHF (fromHStoHF)
 import SLIC.LAR.LARLinker (linkLAR)
 import SLIC.State
@@ -85,7 +84,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "* Eduction back-end:"
            putStrLn "  -e      : transform and evaluate the 0-order program (lazy eduction)"
            putStrLn("             -maxwh N : maximum warehouse entries before GC (default="++(showNum defaultMaxWHSize)++")")
-           putStrLn("             -pii     : print information about a "++iiSuffix++" file")
            putStrLn "             -v       : show debugging trace during evaluation"           
            putStrLn "* Erlang back-ends:"
            putStrLn "  -erl    : transform and pretty print the 0-order program for the Erlang intepreter"
@@ -125,7 +123,6 @@ processArgs cmdArgs =
         aux ("-plar"  : args) opts = aux args opts{optAction = APrintLAR}
         aux ("-pttd"  : args) opts = aux args opts{optAction = APrintTTD}
         aux ("-pdfi"  : args) opts = aux args opts{optAction = APrintDFI}
-        aux ("-pii"   : args) opts = aux args opts{optAction = APrintII}
         aux ("-cl"    : args) opts = aux args opts{optAction = ACompileLAR}
         aux ("-ecbn"  : args) opts = aux args opts{optAction = AEvalZOILCBN}
         aux ("-e"     : args) opts = aux args opts{optAction = AEvalZOILLazy}
@@ -204,14 +201,6 @@ main =
                do dfis <- mapM parseDFI files
                   _ <- mapM putStrLn $ Data.List.map (\dfi->pprint dfi "") dfis
                   return ()
-         APrintII ->
-           case optInput opts of
-             Nothing ->
-               error $ "You must give one or more "++iiSuffix++" files."
-             Just files ->
-               do dfis <- mapM parseII files
-                  _ <- mapM putStrLn $ Data.List.map (\ii->pprint ii "") dfis
-                  return ()               
          _ -> case optInput opts of
                 Nothing    -> error "No source file was given."
                 Just files -> parseAndProcessFL files opts
@@ -219,21 +208,18 @@ main =
 -- | Processes a source file containg FL.
 parseAndProcessFL :: [FileName] -> Options -> IO ()                    
 parseAndProcessFL files opts =
-  let iMode = case optAction opts of
-        s | s==AEvalZOILLazy -> ImpII
-        _                    -> ImpDFI
-      parseFiles :: [FileName] -> IO [ModFPre]
+  let parseFiles :: [FileName] -> IO [ModFPre]
       parseFiles [] = return []
-      parseFiles (f:fs) = do text <- readFile f
+      parseFiles (f:fs) = do text   <- readFile f
                              modftc <- parseFL opts f text
-                             progs <- parseFiles fs 
+                             progs  <- parseFiles fs 
                              return (modftc : progs)
       useGHC (modsFL, mg) =
         do let mNames = map (fst.modNameF.fst) modsFL
            let fPath = (snd.modNameF.fst) (modsFL !! 0)   -- 1st directory is used
            s <- runThroughGHC mNames fPath mg opts
            (if s then
-              contProcFL opts iMode path modsFL []
+              contProcFL opts path modsFL []
             else
               putStrLn "The GHC front-end failed.")
       path = pathOf (files !! 0)
@@ -252,7 +238,7 @@ parseAndProcessFL files opts =
            case optGHC opts of
              GHCCore -> useGHC modsFLGraph
              GHCTc   -> useGHC modsFLGraph
-             NoGHC   -> contProcFL opts iMode path (fst modsFLGraph) []
+             NoGHC   -> contProcFL opts path (fst modsFLGraph) []
 
 -- | Runs source modules through the GHC front-end.
 runThroughGHC :: [MName] -> FPath -> [MName] -> Options -> IO Bool

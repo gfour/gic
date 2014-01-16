@@ -23,7 +23,6 @@ data Action =
    | APrintTTD      -- ^ transform and print the TTD program
    | APrintLAR      -- ^ transform and print the 0-order (LAR) program
    | APrintDFI      -- ^ pretty-print a defunctionalization interface file
-   | APrintII       -- ^ pretty-print an intensional interface file
    | ACompileLAR    -- ^ transform and compile the 0-order program to C (LAR)
    | ACompileMaude  -- ^ transform and compile to Maude
    | ACompileErl    -- ^ transform and compile to Erlang

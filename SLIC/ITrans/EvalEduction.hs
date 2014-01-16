@@ -23,8 +23,7 @@ import Data.Map (Map, empty, elems, filter, filterWithKey, fromList,
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
 import SLIC.Constants
-import SLIC.DFI (DFI(dfiDfInfo))
-import SLIC.ITrans.II (writeIIForMod)
+import SLIC.DFI (DFI)
 import SLIC.ITrans.Syntax
 import SLIC.ITrans.ZLinker
 import SLIC.State
@@ -316,13 +315,14 @@ lookupWH eOpts@(t, _) p v ctxt state@((cmap, cid), whtbl) =
 -- | Takes a single DFI that is all module DFIs merged (using "DFI.mergeDFIs"),
 --   the typing environment of the current module, and a list of 0-order modules
 --   to run.
-evalZOILLazy :: Options -> DFI -> TEnv -> ModZ -> IO ()
-evalZOILLazy opts dfi env p3 =
+evalZOILLazy :: Options -> DFI -> ModZ -> IO ()
+evalZOILLazy opts dfi p3 =
   if optLink opts then
-    error "TODO: lazy eduction linker"
+    error "The lazy eduction interpreter does not support linking."
   else
     case optCMode opts of
-      CompileModule -> writeIIForMod env (dfiDfInfo dfi) p3
+      CompileModule ->
+        error"The lazy eduction interpreter does not support separate compilation."
       Whole ->
         let eOpts  = (optVerbose opts, optWhSize opts)
             p3'    = mergeAndLinkZ opts dfi [p3]
