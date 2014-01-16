@@ -91,7 +91,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -erl    : transform and pretty print the 0-order program for the Erlang intepreter"
            putStrLn "  -cerl   : transform and compile the 0-order program to Erlang"
            putStrLn("             -ctxts N : each warehouse can hold at most N contexts (default="++(showNum defaultMaxCtxts)++")")
-           putStrLn "             -auto|par: parallelize all built-in operators/only par and seq"
            putStrLn "             -redis   : use the Redis-based warehouse"
            putStrLn "             -v       : show debugging trace during evaluation"
            putStrLn("             -wh N    : use N warehouses (default="++(show defaultWhs)++")")
@@ -111,7 +110,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "             -v : verbose compilation mode"
            putStrLn "  -link   : link a set of compiled modules and module interfaces to generate an executable"
            putStrLn "             -v : verbose linking mode"
-           -- putStrLn "  -make   : automatic mode, compile and link all given modules"
 
 -- | Processes the command line args given.
 processArgs :: [String] -> IO Options
