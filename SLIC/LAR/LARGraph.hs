@@ -11,23 +11,24 @@
 module SLIC.LAR.LARGraph (logConstr, logDict, logGraphStart, logGraphEnd,
                           logPrev) where
 
-import SLIC.Constants
-import SLIC.State
-import SLIC.Types
+import SLIC.AuxFun (ierr)
+import SLIC.Constants (nl, tab)
+import SLIC.State (Options(optVerbose))
+import SLIC.Types (CstrName, Depth, PPrint(pprint))
 
 -- | Logs a dictionary connection.
 logDict :: Options -> Depth -> ShowS
-logDict opts depth =
+logDict opts (Just depth) =
   if optVerbose opts then
-    tab.("fprintf(p, \"LAR_%x -> LAR_%x [style=dashed] ; \\n\", T0, cl["++).
-        shows depth.("].ctxt); "++)
+    tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, cl["++).shows depth.("].ctxt); "++)
   else id
+logDict _ Nothing = ierr "logDict: no depth found"
 
 -- | Logs a constructor evaluation hit.
 logConstr :: Options -> CstrName -> ShowS
 logConstr opts c =
   if optVerbose opts then
-    tab.("fprintf(p, \"LAR_%x [style=dashed] [label=\\\"LAR_%x   [:"++).pprint c.("]\\\"];\\n\", T0, T0);"++).nl
+    tab.("fprintf(p, \"LAR_%p [style=dashed] [label=\\\"LAR_%p   [:"++).pprint c.("]\\\"];\\n\", T0, T0);"++).nl
   else id
 
 -- | Opens the output file and creates its header.
@@ -37,9 +38,9 @@ logGraphStart opts =
     tab.("counter = 0;"++).nl. 
     tab.("p = fopen(\"graph.dot\", \"w\");"++).nl.
     tab.("if (p== NULL) { printf(\"Error in opening graph file.\"); exit(-1); } ; "++).nl.
-    tab.("printf(\"Initial LAR:%x\\n\", t0);"++).nl.
+    tab.("printf(\"Initial LAR:%p\\n\", t0);"++).nl.
     tab.("fprintf(p, \"digraph G {\\n\");"++).nl.
-    tab.("fprintf(p, \"LAR_%x [shape=house];\\n\", t0);"++).nl
+    tab.("fprintf(p, \"LAR_%p [shape=house];\\n\", t0);"++).nl
   else id
 
 -- | Closes the graph file.
@@ -54,6 +55,6 @@ logGraphEnd opts =
 logPrev :: Options -> ShowS
 logPrev opts =
   (if optVerbose opts then
-     ("fprintf(p, \"LAR_%x -> LAR_%x [color=black] [label=\\\"%d\\\"] ; \\n\", T0->prev, T0, counter++); "++).nl 
+     ("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [color=black] [label=\\\"%d\\\"] ; \\n\", T0->prev, T0, counter++); "++).nl 
    else id)
   

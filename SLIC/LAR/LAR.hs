@@ -327,6 +327,7 @@ mkCBlock (DefL f e bind) env config =
       Just strictFrms ->                
         let gc = optGC $ getOptions config
         in  forceStricts gc strictFrms (length bind)).
+  logPrev (getOptions config).
   (mkCFuncBody config env f e).
   ("}"++).nl
 mkCBlock (ActualL v act e) env config =
