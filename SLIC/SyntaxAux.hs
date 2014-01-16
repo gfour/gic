@@ -263,7 +263,7 @@ data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
          | CPar      | CPSeq     | CAnd     | COr      | CEqu     | CNEq
          | CLt       | CGt       | CLe      | CGe      | CMulI    | CIf
          | CNeg      | CTrue     | CFalse   
-         | CIdBox     -- ^ the "id" box that connects variables, used in TTD
+         | CMOp String -- ^ a "merged operator" in TTD
          deriving (Eq, Ord, Read, Show)
 
 -- | The mapping between the built-in operators and their string representation.
@@ -274,7 +274,6 @@ cOps = Map.fromList $
        , (CAnd, "&&"), (COr, "||"), (CEqu, "=="), (CNEq, "/=")
        , (CLt, "<"), (CGt, ">"), (CLe, "<="), (CGe, ">="), (CMulI, "mulI")
        , (CIf, "if"), (CNeg, "-"), (CTrue, "True"), (CFalse, "CFalse")
-       , (CIdBox, "$id$")
        ]
 
 -- | The built-in boolean operators.
@@ -283,10 +282,12 @@ cOpsBool = [CEqu, CNEq, CGt, CLt, CLe, CGe, CAnd, COr]
               
 instance PPrint COp where
   pprintPrec _ c =
-    case Map.lookup c cOps of
-      Just s  -> (s++)
-      Nothing ->
-        ierr $ "String representation of constant "++(show c)++" not found."
+    case c of
+      CMOp cm -> (cm++)
+      _ -> case Map.lookup c cOps of
+             Just s  -> (s++)
+             Nothing ->
+               ierr $ "String representation of constant "++(show c)++" not found."
 
 -- | Given a string representation, returns the corresponding 'COp'. If more
 --   than one operators correspond to the same representation (such as '-'),
@@ -355,11 +356,6 @@ prettyConst _ (LitInt n) [] = shows n
 prettyConst _ c _ =
   ierr $ "prettyConst: Unhandled built-in constant or literal with arity: "++
          (show c)
-
--- | Checks if an operator is a merged one (i.e. has the prefix).
-isMOp :: a -> Bool
-isMOp _ = error "TODO: isMOp"
--- isMOp cn = take (length mopPre) cn == mopPre
 
 -- * Type classes
 

@@ -4,16 +4,17 @@
 --   The execution model follows closely the ideas of tagged-token dataflow
 --   architectures (where contexts are tags), aided by a distributed warehouse 
 --   to do value memoization.
+-- 
 --   Each variable becomes a dataflow variable node with a local warehouse and 
 --   connections to the nodes of the variables it uses.
 -- 
---   A new intermediate language (TTD, first-order tagged-token dataflow) is 
+--   A new first-order intermediate language (TTD, tagged-token dataflow) is 
 --   used, with two new features:
 -- 
 --   * 'Ports', numbered connections between the dataflow nodes (connecting 
 --     each v or call(v) to the corresponding node).
 -- 
---   * 'Boxes', which represent pieces of the graph that depend on the values 
+--   * 'Nodes', which represent pieces of the graph that depend on the values 
 --     of other nodes and must be activated to compute values.
 -- 
 
@@ -34,20 +35,24 @@ import SLIC.Types
 --   connects port 8 of node 'v1' to port 8 of node 'v2').
 type Edge = Maybe Int
 
+pprintEdge :: Edge -> ShowS
+pprintEdge (Just eIdx) = shows eIdx
+pprintEdge Nothing = ("?"++)
+
 -- | A link to a node that is either a simple variable read, or an
 --   intensional 'call' operator with some index.
 data NodeLink = VarEdge QName Edge                 -- ^ variable
               | VarCall QName Edge (Maybe IIndex)  -- ^ call(i) intensional operator
                 deriving (Ord, Eq)
                          
--- | A ''box'' encapsulates an expression with input ports (the single
+-- | A ''node'' encapsulates an expression with input ports (the single
 --   value port is omitted).
-data BoxT = OpT Const [NodeLink]           -- ^ strict operator
-          | IfT BoxT BoxT BoxT             -- ^ conditional
+data NodeT = OpT Const [NodeLink]           -- ^ strict operator
+           | IfT NodeT NodeT NodeT          -- ^ conditional
 
 -- | Variable definitions.
-data DefT = DefT QName BoxT                -- ^ function/CAF definition
-          | ActualsT QName MName [BoxT]    -- ^ actuals(...) definitions
+data DefT = DefT QName NodeT               -- ^ function/CAF definition
+          | ActualsT QName MName [NodeT]   -- ^ actuals(...) definitions
 
 -- | A merged operator is a piece of code that only depends on other node links.
 data MOp = MOp Const [MOp]            -- ^ merged operator
@@ -61,10 +66,12 @@ type MOpDef = (QName, MOp)
 data ProgT = ProgT [DefT] [MOpDef]
 
 instance PPrint NodeLink where
-  pprint (VarEdge v e)   = pprint v.("~"++).shows e
-  pprint (VarCall v e i) = ("call_"++).shows i.lparen.pprint v.rparen.("~"++).shows e
+  pprint (VarEdge v e)   = pprint v.("~"++).pprintEdge e
+  pprint (VarCall v e i) =
+    let iS = case i of Just iidx -> pprintIdx iidx ; Nothing -> ("?"++)
+    in  ("call_"++).iS.lparen.pprint v.rparen.("~"++).pprintEdge e
 
-instance PPrint BoxT where
+instance PPrint NodeT where
   pprint (OpT c nls)   = ("[["++).pprint c.("| "++).pprintList (", "++) nls.("]]"++)
   pprint (IfT b b1 b2) = ("if "++).pprint b.(" then "++).pprint b1.(" else "++).pprint b2
 
@@ -89,27 +96,32 @@ instance PPrint ProgT where
   
 -- * The translator from ZOIL to TTD
 
+-- | The identity merged operator.
+cMOpId :: COp
+cMOpId = CMOp "$id$"
+
 -- | The translation from ZOIL to the tagged-token dataflow language.
 fromZItoTTD :: ProgZ -> ProgT
 fromZItoTTD (Prog _ defs) =
   let fromZItoTTDd :: DefZ -> DefT
       -- TODO: thread the counters
-      fromZItoTTDd (DefZ v e)        = DefT v (fromZItoTTDe_box e)
-      fromZItoTTDd (ActualsZ v m el)   = ActualsT v m (map fromZItoTTDe_box el)
-      -- Converts the ZOIL expression to a box.
-      fromZItoTTDe_box :: ExprZ -> BoxT
-      fromZItoTTDe_box e@(XZ (V _))      = OpT (CN CIdBox) [fromZItoTTDe_nlink e]
-      fromZItoTTDe_box e@(FZ (Call _) _) = OpT (CN CIdBox) [fromZItoTTDe_nlink e]
-      fromZItoTTDe_box (ConZ (CN CIf) [e0, e1, e2])   =
-        let b0 = fromZItoTTDe_box e0
-            b1 = fromZItoTTDe_box e1
-            b2 = fromZItoTTDe_box e2
+      fromZItoTTDd (DefZ v e)        = DefT v (fromZItoTTDe_node e)
+      fromZItoTTDd (ActualsZ v m el)   = ActualsT v m (map fromZItoTTDe_node el)
+      -- Converts the ZOIL expression to a node.
+      fromZItoTTDe_node :: ExprZ -> NodeT
+      fromZItoTTDe_node e@(XZ (V _))      = OpT (CN cMOpId) [fromZItoTTDe_nlink e]
+      fromZItoTTDe_node e@(FZ (Call _) _) = OpT (CN cMOpId) [fromZItoTTDe_nlink e]
+      fromZItoTTDe_node (ConZ (CN CIf) [e0, e1, e2])   =
+        let b0 = fromZItoTTDe_node e0
+            b1 = fromZItoTTDe_node e1
+            b2 = fromZItoTTDe_node e2
         in  IfT b0 b1 b2
       -- eliminate the parameters of merged operators
-      fromZItoTTDe_box (ConZ cn el)               = 
-        if isMOp cn then OpT cn []
-        else OpT cn (map fromZItoTTDe_nlink el)
-      fromZItoTTDe_box e                          = error $ "ZOIL->TTD, unsupported expression: "++(pprint e "")
+      fromZItoTTDe_node (ConZ cn el)               = 
+        case cn of
+          CN (CMOp _) -> OpT cn []
+          _           -> OpT cn (map fromZItoTTDe_nlink el)
+      fromZItoTTDe_node e                          = error $ "ZOIL->TTD, unsupported expression: "++(pprint e "")
   in  ProgT (map fromZItoTTDd defs) []
 
 -- | Represents an expression (that is a variable or a 'call') as a node link.
@@ -118,10 +130,11 @@ fromZItoTTDe_nlink (XZ (V v)) = VarEdge v Nothing
 fromZItoTTDe_nlink (FZ (Call i) v) = VarCall v Nothing (Just i)
 fromZItoTTDe_nlink e = error $ "cannot convert to edge, arg of non-merged op? "++(pprint e "")
 
--- | Merges the operators in a ZOIL program.
+-- | Merges the operators in a ZOIL program to form merged operator blocks that only depend on variables and function calls.
 mergeOpsZI :: ProgZ -> (ProgZ, [MOpDef])
 mergeOpsZI (Prog ds defs) =
   let makeMOp :: ExprZ -> MOp
+      makeMOp (ConZ cn@(LitInt _) []) = MOp cn []
       makeMOp (ConZ (CN c) el) = 
         if c==CIf then 
           error "makeMOp does not support nested ifs"
@@ -166,7 +179,7 @@ mergeOpsZI (Prog ds defs) =
               gatherVars e1 = error $ "gatherVars: cannot process expression: "++(pprint e1 "")
               newOp = (newOpName, makeMOp e)
               vArgs = nub (concatMap gatherVars el)
-          in  (ConZ (CN $ error $ "TODO: mergeOpsE for "++(lName newOpName)) vArgs, i+1, newOp:ops)
+          in  (ConZ (CN $ CMOp $ lName newOpName) vArgs, i+1, newOp:ops)
       mergeOpsE _ _ e = error $ "TODO: mergeOpsE for expression "++(pprint e "")
       mergeOpsE_el :: Int -> [MOpDef] -> [ExprZ] -> ([ExprZ], Int, [MOpDef])
       mergeOpsE_el i ops [] = ([], i, ops)
@@ -186,20 +199,20 @@ isV _ = False
 enumPorts :: ProgT -> [MOpDef] -> ProgT
 enumPorts (ProgT defs []) mops =
   let enumPortsD :: Int -> DefT -> (DefT, Int)
-      enumPortsD i (DefT v box) =
-        let (box', i') = enumPortsB i box
-        in  (DefT v box', i')
+      enumPortsD i (DefT v node) =
+        let (node', i') = enumPortsN i node
+        in  (DefT v node', i')
       enumPortsD i (ActualsT v m bl) =
-        let (bl', i') = threadfunc_l i bl enumPortsB
+        let (bl', i') = threadfunc_l i bl enumPortsN
         in  (ActualsT v m bl', i')
-      enumPortsB :: Int -> BoxT -> (BoxT, Int)
-      enumPortsB i (OpT c nls) =
+      enumPortsN :: Int -> NodeT -> (NodeT, Int)
+      enumPortsN i (OpT c nls) =
         let (nls', i') = threadfunc_l i nls enumPortsNL
         in  (OpT c nls', i')
-      enumPortsB i (IfT b0 b1 b2) =
-        let (b0', i0') = enumPortsB i   b0
-            (b1', i1') = enumPortsB i0' b1
-            (b2', i2') = enumPortsB i1' b2
+      enumPortsN i (IfT b0 b1 b2) =
+        let (b0', i0') = enumPortsN i   b0
+            (b1', i1') = enumPortsN i0' b1
+            (b2', i2') = enumPortsN i1' b2
         in  (IfT b0' b1' b2', i2')
       enumPortsNL :: Int -> NodeLink -> (NodeLink, Int)
       enumPortsNL j ve@(VarEdge v edge) =

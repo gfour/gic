@@ -206,8 +206,7 @@ inlineTcMethods tcInfo env modF =
                       ConF (CN CTrue) _   -> Just tBool
                       ConF (CN CFalse) _  -> Just tBool
                       ConF (CN CMulI) _   -> Just tInteger
-                      ConF (CN CIdBox) _  ->
-                        ierr "inlineTcE: found unexpected argument"
+                      ConF (CN (CMOp _)) _ -> ierr "inlineTcE: found merged op"
                       ConF (LitInt _) _   -> Just tInt
                       CaseF _ _ _ []      -> Nothing
                       CaseF _ _ _ ((PatF _ eP):_) -> argT eP -- use 1st pattern

@@ -363,7 +363,7 @@ inferE cs an e =
                 theta CPSeq   = freshST >>= \t1 ->
                                 freshST >>= \t2 ->
                                 return (t2, [t1, t2])
-                theta CIdBox  = ierr "theta encountered id box"
+                theta (CMOp _)= ierr "theta encountered merged operator"
 	    in  theta c >>= \(t, tl) ->
 	        inferEL cs an el >>= \tl' ->
 	        unifyL tl tl' >>
