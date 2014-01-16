@@ -402,7 +402,7 @@ genQInfo modF =
       builtin_nm = map (\(QN mn vn)->(vn, mn)) (cBuiltinFuncs++builtinDTypes)
       imported_nm =
         concatMap (\(IDecl mN is _)->
-                    zip (map lName $ Map.keys is) (repeat (Just $ imToM mN)))
+                    zip (map lName $ Map.keys is) (repeat (Just mN)))
                   fImports
       tcMethods_nm = 
         concatMap (\(TcDecl tcn _ methods)->

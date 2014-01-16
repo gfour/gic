@@ -6,7 +6,7 @@ module SLIC.SyntaxAux where
 import Prelude hiding (lookup, null)
 import Data.List (intersperse)
 import qualified Data.Map as Map (Map, empty, filter, fromList, keys, lookup, 
-                                  null, toList, unions)
+                                  member, null, toList, unions)
 import Data.Maybe (isJust)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
 import SLIC.Constants (lparen, rparen, nl, semi)
@@ -172,34 +172,21 @@ pprintINames impNames =
       -- showsNesting (Just n) = ("[nesting="++).shows n.("]"++)
   in  foldDot id $ intersperse (", "++) $ map pprintIN $ Map.toList impNames
 
--- | Imported module names.
-data IMName = IMB MName    -- ^ built-in imported module
-            | IMN MName    -- ^ user-defined imported module
-
-instance PPrint IMName where
-  pprint imn = ((imToM imn)++)
-
--- | Return the module name from an \"imported module name\" box.
-imToM :: IMName -> MName
-imToM (IMB mn) = mn
-imToM (IMN mn) = mn
-
 -- | An import declaration.
 data IDecl =
-  IDecl { ideclMName  :: IMName        -- ^ imported module name
+  IDecl { ideclMName  :: MName         -- ^ imported module name
         , ideclINames :: ImportedNames -- ^ import names (typed symbol table)
-        , ideclInfo   :: (Maybe (FuncSigs, CIDs)) -- ^ signatures/CIDs table
+        , ideclInfo   :: Maybe (FuncSigs, CIDs) -- ^ signatures/CIDs table
         }
 
--- | Returns the module name in an 'import' declaration, if it is not a built-in.
---   Used to filter out built-in modules when constructing the module graph.
-ideclRealMName :: IDecl -> Maybe MName
-ideclRealMName idecl =
-  case ideclMName idecl of IMB _ -> Nothing ; IMN mn -> Just mn
+-- | Used to filter out built-in modules, leaving only user-defined module names.
+filterRealMods :: [IDecl] -> [MName]
+filterRealMods idecls = map ideclMName $ 
+  filter (\(IDecl mn _ _)->not $ Map.member mn builtinModules) idecls
 
 instance PPrint IDecl where
-  pprintPrec _ (IDecl m impNames info) =
-    ("import "++).pprint m.(" ("++).pprintINames impNames.(")"++).
+  pprintPrec _ (IDecl mn impNames info) =
+    ("import "++).(mn++).(" ("++).pprintINames impNames.(")"++).
     (case info of
         Just (fsigs, _) -> (" ["++).pprFSigs fsigs.("]"++)
         Nothing         -> id
@@ -212,9 +199,9 @@ mergeINames idms = Map.unions $ map (\(IDecl _ ins _)->ins) idms
 -- | The \'import\' for the built-in Control.Parallel module.
 importControlParallel :: IDecl
 importControlParallel =
-  let m = mControlParallel
-      qn_par = QN (Just m) "par"
-      qn_pseq = QN (Just m) "pseq"
+  let mn = mControlParallel
+      qn_par = QN (Just mn) "par"
+      qn_pseq = QN (Just mn) "pseq"
       in_ControlPar =
         [ (qn_par , IInfo (Just (Tf tInt tInt)) (Just 1) NFunc Nothing (Just 0))
         , (qn_pseq, IInfo (Just (Tf tInt tInt)) (Just 1) NFunc Nothing (Just 0))
@@ -223,11 +210,15 @@ importControlParallel =
               [ (qn_par, [procLName (++"_$0") qn_par])
               , (qn_pseq, [procLName (++"_$0") qn_pseq]) ]
       cids = Map.empty
-  in  IDecl (IMB m) (Map.fromList in_ControlPar) (Just (fSigs, cids))
+  in  IDecl mn (Map.fromList in_ControlPar) (Just (fSigs, cids))
 
 -- | The name of the built-in \"Control.Parallel\" module.
 mControlParallel :: MName
 mControlParallel = "Control.Parallel"
+
+-- | Built-in (pseudo-)modules.
+builtinModules :: Map.Map MName IDecl
+builtinModules = Map.fromList [ (mControlParallel, importControlParallel) ]
 
 -- * Modules
 

@@ -103,7 +103,7 @@ defuncMod opts ve' m'@(Mod fm@(mN, _) exportsR importsR (Prog dts defs) an tcs) 
       -- calculate the constructor ids (to put them in the DFI)
       cids = calcCIDs dfData
       -- generate the module graph info
-      mg = (mN, catMaybes $ List.map ideclRealMName importsR)
+      mg = (mN, filterRealMods importsR)
       -- generate the DFI for the current module (CAFs/PMDepths are empty here)
       larInfo = LARInfo [] cids Map.empty Nothing
       tcInfo = TcInfo tcs' (tcISigs tcs)
@@ -130,7 +130,7 @@ dfImports dfEnv dfClosDT dfSigs =
       -- the CIDs table is empty; closure constructors are compiled during linking, 
       -- so this information is useless
       dfCids = Map.empty   
-  in  IDecl (IMB dfMod) iDfNames (Just (dfSigs, dfCids))
+  in  IDecl dfMod iDfNames (Just (dfSigs, dfCids))
 
 defuncTcDecl :: TcDecl -> TcDecl
 defuncTcDecl (TcDecl tcn tv methods) =
@@ -494,7 +494,7 @@ genDfMod opts (DFI _ env fsigs (DfInfo dfcs extApps) larInfo _) =
       iSigs m = Map.fromList $ List.map (\n->(n, paramsOf n fsigs)) (allINames m)
       -- the full 'import' declaration for module m (no CIDs are used, since no
       -- constructors are imported)
-      iMod m = IDecl (IMN m) (iNames m) (Just (iSigs m, Map.empty))
+      iMod m = IDecl m (iNames m) (Just (iSigs m, Map.empty))
       -- all imports
       dfImps = List.map iMod (Set.toList iModNames)
   in  Mod (dfMod, modNoPath) dfExps dfImps dfCode Map.empty (TcInfo [] [])

@@ -141,7 +141,7 @@ uniqueNames modf@(Mod mInfo@(m, _) es is (Prog cs defs) an tcs) =
       renIDecl idecl =
         case ideclInfo idecl of
           Just (sigs, cids) ->
-            let mn = imToM $ ideclMName idecl
+            let mn = ideclMName idecl
                 info' = Just (Data.Map.mapWithKey (renameFormals mn) sigs, cids)
             in  idecl{ideclInfo=info'}
           Nothing -> idecl

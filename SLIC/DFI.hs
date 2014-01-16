@@ -190,26 +190,27 @@ parseDFIs v (f:fs) = do (opt v $ putStrLn $ "Reading: "++f)
 --   of the imported module. The 
 updExtTypesDFI :: Verb -> MNameF -> FPath -> [DFI] -> [IDecl] -> IO [IDecl]
 updExtTypesDFI _ _ _ _ [] = return []
-updExtTypesDFI v mThis fPath dfis (imp@(IDecl (IMB m) _ _):is) =
-  do rest <- updExtTypesDFI v mThis fPath dfis is
-     if m == mControlParallel then
-       return (importControlParallel : rest)
-     else
-       return (imp : rest)
-updExtTypesDFI v mThis fPath dfis ((IDecl imn@(IMN m) mn Nothing):is) = 
-  let f = dfiFor fPath m
-  in  do (case filter (\d->(fst.dfiMInfo) d==m) dfis of
-             [] -> return ()
-             (dfi':_) -> putStrLn "Found an interface..."
-           )
-         (opt v $ putStrLn $ "Reading: "++f)
-         (DFI _ fTypes fSigs _ larInfo _) <- parseDFI f
-         let mn' = concatMap (updIInfo mThis larInfo fSigs m fTypes)
-                   (Data.Map.toList mn)
-         let cids = liCIDs larInfo
-         let import' = IDecl imn (Data.Map.fromList mn') (Just (fSigs, cids))
-         rest <- updExtTypesDFI v mThis fPath dfis is
-         return (import' : rest)
+-- For import declarations that have Empty information, load it.
+updExtTypesDFI v mThis fPath dfis (imp@(IDecl mn imns Nothing):imps) =
+  do rest <- updExtTypesDFI v mThis fPath dfis imps
+     (case Data.Map.lookup mn builtinModules of
+         -- If built-in module, use the built-in information.
+         Just builtinIDecl -> return (builtinIDecl : rest)
+         -- Otherwise, load the DFI file.
+         Nothing ->
+           do (case filter (\d->(fst.dfiMInfo) d==mn) dfis of
+                  [] -> return ()
+                  (dfi':_) -> putStrLn "Found an interface..."
+                )
+              let f = dfiFor fPath mn
+              (opt v $ putStrLn $ "Reading: "++f)
+              (DFI _ fTypes fSigs _ larInfo _) <- parseDFI f
+              let mn' = concatMap (updIInfo mThis larInfo fSigs mn fTypes)
+                        (Data.Map.toList imns)
+              let cids = liCIDs larInfo
+              let import' = IDecl mn (Data.Map.fromList mn') (Just (fSigs, cids))
+              return (import' : rest))
+-- Don't touch import declarations that have filled-in information.
 updExtTypesDFI v mThis fPath dfis (i:is) = 
   do rest <- updExtTypesDFI v mThis fPath dfis is
      return (i : rest)

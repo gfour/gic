@@ -74,13 +74,15 @@ iiFile m = m++iiSuffix
 -- | Updates an import declaration using the intensional interface file of the
 --   imported module.
 updExtTypesII :: [IDecl] -> IO [IDecl]
+updExtTypesII _ = error "TODO: remove the II interfaces"
+{-
 updExtTypesII [] = return []
-updExtTypesII (imp@(IDecl (IMB m) _ _):is) =
+updExtTypesII (imp@(IDecl m _ _):is) =
   do rest <- updExtTypesII is
      if m == mControlParallel then
        return (importControlParallel : rest)
      else
-        return (imp : rest)
+       return (imp : rest)
 updExtTypesII ((IDecl imn@(IMN m) _ Nothing):is) = 
   do (II mEnv fsigs _ cids) <- parseII $ iiFile m
      let iinfos ve = Data.Map.fromList $ map 
@@ -90,3 +92,4 @@ updExtTypesII ((IDecl imn@(IMN m) _ Nothing):is) =
      rest <- updExtTypesII is
      return (import' : rest)
 updExtTypesII _ = ierr "updExtTypesII called with wrong argument"
+-}

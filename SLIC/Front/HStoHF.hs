@@ -198,7 +198,7 @@ transl_imp fm (S.ImportDecl _ (S.ModuleName mn) False False Nothing Nothing (Jus
         in  (dtName, IInfo Nothing Nothing NDType Nothing Nothing) :
             (map transl_itw names)
       transl_ispec imp = error $ "This import statement is not supported: "++(show imp)
-  in  IDecl (IMN mn) (Data.Map.fromList $ concatMap transl_ispec specs) Nothing
+  in  IDecl mn (Data.Map.fromList $ concatMap transl_ispec specs) Nothing
 transl_imp fm imp = errM fm $ "The Haskell-to-FL translation does not support import statement: "++(show imp)
 
 -- | The type class declarations of the program become explicit 'import'
@@ -219,7 +219,7 @@ tcImport (TcDecl tcn _ methods) =
       (iNames0, iSigs0) = unzip $ map auxII methods
       iNames = fromList iNames0
       iSigs  = fromList iSigs0
-  in  IDecl (IMB tcMod) iNames (Just (iSigs, empty))
+  in  IDecl tcMod iNames (Just (iSigs, empty))
 
 -- * Data types
 

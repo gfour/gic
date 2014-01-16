@@ -27,7 +27,7 @@ type MGNodes = Map MName [MName]
 -- | Given a module, generates the full graph of all imported modules.
 createMGraph :: (MNameF, [IDecl]) -> IO MGNodes
 createMGraph ((mn, file), imports) =
-  do let imods = catMaybes $ map ideclRealMName imports
+  do let imods = filterRealMods imports
      readMGraphForL (mn, pathOf file) imods (singleton mn imods)
 
 -- | For a given module/file, read the interface of some other module and
