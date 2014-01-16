@@ -21,7 +21,7 @@ genLink v (VarEdge v' _) =
   tab.tab.pprint v.(" -> "++).pprint v'.semi.nl
 genLink v (VarCall v' _ i) =
   tab.tab.pprint v.(" -> "++).pprint v'.
-  (" [ label=\""++).shows i.("\" ]"++).semi.nl
+  (" [ label=\""++).pprintMIdx i.("\" ]"++).semi.nl
 
 genNode :: QName -> NodeT -> ShowS
 genNode v (OpT c nls) =
@@ -54,8 +54,13 @@ genNode v (IfT b0 b1 b2) =
       -- tab.tab.(v++).(" -> \""++).(v2++).("\";"++).nl.
       tab.("}"++).nl
    
+-- | Generates the representation of a TTD definition. If it is a function node,
+--   generates directly its node representation. If it is an actuals definition,
+--   generates a cluster subgraph with all the nodes.
 genDef :: DefT -> ShowS
 genDef (DefT v node) = genNode v node
+-- Omit empty actuals definitions (i.e. formals that are never used).
+genDef (ActualsT _ _ []) = id
 genDef (ActualsT v m nodes) =
   let vName = qName v
       -- use procLName to create new variables with the same module info as v

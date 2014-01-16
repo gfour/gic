@@ -65,11 +65,14 @@ type MOpDef = (QName, MOp)
 -- | The dataflow program is a collection of definitions and merged operators.
 data ProgT = ProgT [DefT] [MOpDef]
 
+pprintMIdx :: Maybe IIndex -> ShowS
+pprintMIdx (Just iidx) = pprintIdx iidx 
+pprintMIdx Nothing = ierr "intensional index not filled in the TTD graph"
+
 instance PPrint NodeLink where
   pprint (VarEdge v e)   = pprint v.("~"++).pprintEdge e
   pprint (VarCall v e i) =
-    let iS = case i of Just iidx -> pprintIdx iidx ; Nothing -> ("?"++)
-    in  ("call_"++).iS.lparen.pprint v.rparen.("~"++).pprintEdge e
+    ("call_"++).pprintMIdx i.lparen.pprint v.rparen.("~"++).pprintEdge e
 
 instance PPrint NodeT where
   pprint (OpT c nls)   = ("[["++).pprint c.("| "++).pprintList (", "++) nls.("]]"++)
@@ -82,7 +85,7 @@ instance PPrint DefT where
     pprint v.("{"++).(m++).("}"++).(" = actuals["++).pprintList (", "++) bl.("]"++)
 
 instance PPrint MOp where
-  pprint (MOp c mops) = prettyConst 0 c mops -- (c++).lparen.pprintList (", "++) mops.rparen
+  pprint (MOp c mops) = prettyConst 0 c mops
   pprint (MNL nlink)  = pprint nlink
   
 -- | Pretty printer for merged operator definitions.

@@ -344,8 +344,9 @@ prettyConst p (CN cn) el =
         (" || " ++).pprintPrec 2 (el !! 1))
     CNeg ->
       showParen (p > 3) (("-"++).pprintPrec 4 (el !! 0))
-    CTrue -> ("True"++)
-    CFalse -> ("False"++)
+    CTrue   -> ("True"++)
+    CFalse  -> ("False"++)
+    CMOp cm -> (cm++)
     _    ->
       -- if isMOp cn then
       --   (cn ++).lparen.pprintList (", "++) el.rparen
