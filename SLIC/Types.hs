@@ -402,8 +402,8 @@ typeArity t = length (types t) - 1
 findInfo :: (Ord a, PPrint a) => a -> Env a -> EInfo
 findInfo qn env =
   case Map.lookup qn env of
-    Just info  -> info
-    Nothing ->
+    Just info -> info
+    Nothing   ->
       ierr ("name not found: " ++ (pprint qn "") ++ " in " ++ (pprintE env ""))
   
 -- | Finds the type of a name in an environment.
@@ -597,10 +597,10 @@ builtinTEnv =
   , (bf_putStr_arg0, (Ta tList tv_a, Nothing))
   , (bf_error, (Tf (Ta tList tInt) tv_a, Just 1))
   , (bf_error_arg0, (Ta tList tv_a, Nothing))
-  , (bf_par, (Tf tv_a (Tf tv_b tv_a), Just 2))
+  , (bf_par, (Tf tv_a (Tf tv_b tv_b), Just 2))
   , (bf_par_0, (tv_a, Nothing))
   , (bf_par_1, (tv_b, Nothing))
-  , (bf_pseq, (Tf tv_a (Tf tv_b tv_a), Just 2))
+  , (bf_pseq, (Tf tv_a (Tf tv_b tv_b), Just 2))
   , (bf_pseq_0, (tv_a, Nothing))
   , (bf_pseq_1, (tv_b, Nothing))
   , (bf_show, (Tf tv_a (Ta tList tInt), Just 1))
