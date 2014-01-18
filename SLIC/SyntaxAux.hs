@@ -5,8 +5,8 @@ module SLIC.SyntaxAux where
 
 import Prelude hiding (lookup, null)
 import Data.List (intersperse)
-import qualified Data.Map as Map (Map, empty, filter, fromList, keys, lookup, 
-                                  member, null, toList, unions)
+import qualified Data.Map as Map (Map, filter, filterWithKey, fromList,
+                                  keys, lookup, member, null, toList, unions)
 import Data.Maybe (isJust)
 import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
 import SLIC.Constants (mControlParallelN, tcMod, lparen, rparen, nl, semi)
@@ -196,21 +196,31 @@ instance PPrint IDecl where
 mergeINames :: [IDecl] -> ImportedNames
 mergeINames idms = Map.unions $ map (\(IDecl _ ins _)->ins) idms
 
+-- * Built-in \'import\' declarations
+
 -- | The \'import\' for the built-in Control.Parallel module.
 importControlParallel :: IDecl
-importControlParallel =
-  let mn = mControlParallelN
-      qn_par = QN (Just mn) "par"
-      qn_pseq = QN (Just mn) "pseq"
-      in_ControlPar =
-        [ (qn_par , IInfo (Just (Tf tInt tInt)) (Just 1) NFunc Nothing (Just 0))
-        , (qn_pseq, IInfo (Just (Tf tInt tInt)) (Just 1) NFunc Nothing (Just 0))
-        ]
-      fSigs = Map.fromList
-              [ (qn_par, [procLName (++"_$0") qn_par])
-              , (qn_pseq, [procLName (++"_$0") qn_pseq]) ]
-      cids = Map.empty
-  in  IDecl mn (Map.fromList in_ControlPar) (Just (fSigs, cids))
+importControlParallel = genBuiltinIDecl mControlParallelN
+
+-- | Given a built-in module name, generate its import declaration.
+genBuiltinIDecl :: MName -> IDecl
+genBuiltinIDecl mn =
+  let filtModNames bf _ = (lName bf)==mn
+      modSigs    = Map.filterWithKey filtModNames builtinFuncSigs
+      modTEnv    = Map.filterWithKey filtModNames builtinTEnv
+      modCIDs    = Map.filterWithKey filtModNames builtinCIDs
+      modConstrs = Map.keys modCIDs
+      modFuncs   = filter (\qn->not (qn `elem` modConstrs)) $ Map.keys modSigs
+      names      = (map (mkImp NFunc) modConstrs)++
+                   (map (mkImp NConstr) modFuncs)
+      mkImp ni n =
+        let (nT, Just nAr) = findInfo n modTEnv
+            cid = case Map.lookup n builtinCIDs of
+                    Just (_, cId) -> Just cId
+                    Nothing       -> Nothing
+            pmDepth = Map.lookup n builtinPmDepths
+        in  (n, IInfo (Just nT) (Just nAr) ni cid pmDepth)
+  in  IDecl mn (Map.fromList names) (Just (modSigs, modCIDs))
 
 -- | Built-in (pseudo-)modules.
 builtinModules :: Map.Map MName IDecl
