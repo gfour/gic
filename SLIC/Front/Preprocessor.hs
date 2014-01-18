@@ -532,7 +532,7 @@ checkNames modF =
       definedFuncs  = defVNames defs
       globalNames = importedNames ++ definedConstrs ++ definedFuncs ++
                     cBuiltinFuncs
-      checkD names (DefF _ fs e) = checkE (names++(map fstFrm fs)) e
+      checkD names (DefF _ fs e) = checkE (names++(frmsToNames fs)) e
       checkE names (XF v) =
         let vName = nameOfV v
         in  if vName `elem` names then

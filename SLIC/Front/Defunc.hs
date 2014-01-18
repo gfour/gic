@@ -256,7 +256,7 @@ defuncD _ _ def@(DefF _ _ (ConstrF c el)) =
       else
         ierr $ "defuncD: malformed constructor function for "++(qName c)
 defuncD ve vfs (DefF f vs e) =
-  let frmNames = List.map fstFrm vs
+  let frmNames = frmsToNames vs
       lvs :: LVars
       lvs      = Map.filterWithKey (\v _ ->v `elem` frmNames) ve
       (e', info') = defuncE ve vfs lvs e
