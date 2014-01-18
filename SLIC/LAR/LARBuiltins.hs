@@ -29,7 +29,7 @@ builtins :: Options -> ShowS
 builtins opts =
   let gc = optGC opts
   in  b_readIntIO opts.nl.
-      b_printIntIO gc.nl.
+      b_printIntIO gc.nl.      
       b_putStr gc.nl.
       b_putStrLn.nl.
       b_toInteger opts.nl.
@@ -38,7 +38,9 @@ builtins opts =
       b_mulI opts.nl.
       builtinConstrsC opts.
       b_runMainIO opts.nl.
-      b_error.nl
+      b_error.nl.
+      b_par gc.nl.
+      b_pseq gc.nl
 
 -- | The memory allocation function for arbitrary precision numbers.
 gmpMalloc :: Options -> String -> ShowS
@@ -310,6 +312,22 @@ b_show gc =
   tab.("// convert to string (and keep written digits number)"++).nl.
   tab.("int wdigits = snprintf(str, digits+2, \"%d\", i.constr);"++).nl.
   tab.("return strToList(str, wdigits, T0);"++).nl.
+  ("}"++).nl
+
+b_par :: GC -> ShowS
+b_par gc =
+  ("FUNC("++).pprint bf_par.("){"++).nl.
+  -- dummy version, evaluates the second argument and returns that value
+  tab.("Susp b = "++).mkGETARG gc bf_show 1 t0.(";"++).nl.
+  tab.("return b;"++).nl.
+  ("}"++).nl
+
+b_pseq :: GC -> ShowS
+b_pseq gc =
+  ("FUNC("++).pprint bf_pseq.("){"++).nl.
+  -- dummy version, evaluates the second argument and returns that value
+  tab.("Susp b = "++).mkGETARG gc bf_show 1 t0.(";"++).nl.
+  tab.("return b;"++).nl.
   ("}"++).nl
 
 -- * Built-in operators
