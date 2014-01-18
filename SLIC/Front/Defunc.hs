@@ -244,8 +244,9 @@ genAllAppSigs ve defs =
       genAppSigsL lvs el = Map.unions $ List.map (genAppSigsE lvs) el
   in  Map.unions $ List.map (genAppSigsD []) defs
 
--- | Defunctionalizes a definition by inserting apply_T() calls for closures
---   of residual type T and closure constructors for partial applications.
+-- | Defunctionalizes a definition by replacing partial applications with
+--   closure constructors and inserting apply_N() calls for applications of
+--   closures to N arguments.
 defuncD :: TEnv -> VFuns -> DefF -> DfState DefF
 defuncD _ _ def@(DefF _ _ (ConstrF c el)) =
   let isVar (XF (V _)) = True
@@ -255,13 +256,13 @@ defuncD _ _ def@(DefF _ _ (ConstrF c el)) =
       else
         ierr $ "defuncD: malformed constructor function for "++(qName c)
 defuncD ve vfs (DefF f vs e) =
-  let frmNames :: [QName]
-      frmNames = List.map fstFrm vs
+  let frmNames = List.map fstFrm vs
       lvs :: LVars
       lvs      = Map.filterWithKey (\v _ ->v `elem` frmNames) ve
       (e', info') = defuncE ve vfs lvs e
   in  (DefF f vs e', info')
 
+-- | Defunctionalize a list of expressions.
 defuncEL :: TEnv -> VFuns -> LVars -> [ExprF] -> DfState [ExprF]
 defuncEL _ _ _ [] = ([], emptyDfInfo)
 defuncEL ve vfs lvs el =
