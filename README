@@ -73,6 +73,10 @@ To display the options that can be used with `gic`, run:
 
 Use the `newbench.sh` script to run all the benchmarks (NewBench/*.hs).
 
+To compile a program using the OpenMP-based runtime, set the OMP environment variable:
+
+    OMP=1 ./run_libgc.sh Fibpar.hs
+
 Using the built-in interpreter
 ------------------------------
 
