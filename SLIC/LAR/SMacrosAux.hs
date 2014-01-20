@@ -140,10 +140,20 @@ declF opts (f, (aA, vA, n)) = protoFunc f.smFun opts f aA vA n
 mkMainCall :: GC -> MName -> ShowS
 mkMainCall gc m =
   let mainDef = mainDefQName m
-  in  tab.("res = "++).((qName mainDef)++).
-      (case gc of
+      resultCall =
+        tab.("res = "++).((qName mainDef)++).
+        (case gc of
           LibGC    -> ("("++).asMacroPrefixFunc mainDef.("AR());"++)
-          SemiGC _ -> ("(t0);"++)).nl
+          SemiGC _ -> ("(t0);"++))
+  in  ("#ifdef USE_OMP"++).nl.
+      -- ("#pragma omp parallel shared(T0)"++).nl.
+      ("{"++).nl.
+      -- ("#pragma omp single"++).nl.
+      resultCall.nl.
+      ("}"++).nl.
+      ("#else"++).nl.
+      resultCall.nl.
+      ("#endif /* USE_OMP */"++).nl
 
 -- | Construct a LAR for function calls. Takes the GC mode to use (this
 --   affects LAR representation), a flag to indicate if the LAR is going
