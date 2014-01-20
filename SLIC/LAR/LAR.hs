@@ -691,7 +691,7 @@ aRec LibGC =
   tab.tab.("LarArg the_args[n_arity_a];                    \\"++).nl.
   tab.tab.("Susp the_vals[n_arity_v];                      \\"++).nl.    
   tab.tab.("TP_ the_nested[n_nesting];                     \\"++).nl.
-  tab.("}"++).nl)
+  tab.("}"++).nl
 
 -- | Returns the LAR with the actuals of a function call.
 makeActs :: QName -> [QName] -> TEnv -> ConfigLAR -> ShowS
