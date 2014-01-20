@@ -21,9 +21,10 @@ To build the compiler, you need:
 * GHC 7.6
 * haskell-src-exts (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
 * For the C back-end:
-    * GCC
-    * the Boehm-Demers-Weiser garbage collector from:
+    * GCC (with OpenMP support if the parallel runtime is enabled)
+    * The Boehm-Demers-Weiser garbage collector from:
       (http://www.hpl.hp.com/personal/Hans_Boehm/gc/)
+      Note: configure with --enable-parallel-mark/-DTHREAD_LOCAL_ALLOC for the parallel runtime.
     * Optional: libgmp (is the `HAS_GMP` macro is enabled) for big integers
       (the Integer data type, see `run_lar.sh`).
 * For the Erlang back-end: Erlang/OTP R16 or greater.

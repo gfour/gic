@@ -317,16 +317,30 @@ b_show gc =
 b_par :: GC -> ShowS
 b_par gc =
   ("FUNC("++).pprint bf_par.("){"++).nl.
-  -- dummy version, evaluates the second argument and returns that value
-  tab.("Susp b = "++).mkGETARG gc bf_show 1 t0.(";"++).nl.
+  ("#ifdef USE_OMP"++).nl.
+  tab.("Susp a, b;"++).nl.
+  ("#pragma omp single nowait"++).nl.
+  ("{"++).nl.
+  ("#pragma omp task untied"++).nl.
+  tab.("{ a = "++).mkGETARG gc bf_par 0 t0.("; }"++).nl.
+  ("#pragma omp task untied"++).nl.
+  tab.("{ b = "++).mkGETARG gc bf_par 1 t0.("; }"++).nl.
+  ("}"++).nl.
+  ("#pragma omp taskwait"++).nl.
+  ("return b;"++).nl.
+  ("#else"++).nl.
+  tab.("Susp b = "++).mkGETARG gc bf_par 1 t0.(";"++).nl.
   tab.("return b;"++).nl.
+  ("#endif /* USE_OMP */"++).nl.
   ("}"++).nl
 
 b_pseq :: GC -> ShowS
 b_pseq gc =
   ("FUNC("++).pprint bf_pseq.("){"++).nl.
-  -- dummy version, evaluates the second argument and returns that value
-  tab.("Susp b = "++).mkGETARG gc bf_show 1 t0.(";"++).nl.
+  ("#ifdef USE_OMP"++).nl.
+  tab.("Susp a = "++).mkGETARG gc bf_pseq 0 t0.(";"++).nl.
+  ("#endif /* USE_OMP */"++).nl.
+  tab.("Susp b = "++).mkGETARG gc bf_pseq 1 t0.(";"++).nl.
   tab.("return b;"++).nl.
   ("}"++).nl
 

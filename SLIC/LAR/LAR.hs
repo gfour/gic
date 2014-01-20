@@ -300,15 +300,18 @@ epilogue opts = builtins opts.nl
 -- | Generates C code for a block.
 mkCBlock :: BlockL -> TEnv -> ConfigLAR -> ShowS
 mkCBlock (DefL f e bind) env config =
-  ("FUNC("++).pprint f.("){"++).nl.
-  (case Data.Map.lookup f (getStricts config) of 
-      Nothing -> id
-      Just strictFrms ->                
-        let gc = optGC $ getOptions config
-        in  forceStricts gc strictFrms (length bind)).
-  logPrev (getOptions config).
-  (mkCFuncBody config env f e).
-  ("}"++).nl
+  let fArity = length bind
+      gc = optGC $ getOptions config
+  in  ("FUNC("++).pprint f.("){"++).nl.
+      (if (fArity>0) && (gc==LibGC) then
+         ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl
+       else id).
+      (case Data.Map.lookup f (getStricts config) of 
+          Nothing -> id
+          Just strictFrms -> forceStricts gc strictFrms fArity).
+      logPrev (getOptions config).
+      (mkCFuncBody config env f e).
+      ("}"++).nl
 mkCBlock (ActualL v act e) env config =
   ("VAR("++).pprint v.("){"++).nl.
   (mkAct act (getOptions config)).
@@ -583,6 +586,9 @@ mainFunc env opts mainNesting modules =
            ("#endif"++).nl
          LibGC ->
            tab.("GC_init();"++).nl.
+           ("#ifdef USE_OMP"++).nl.
+           tab.("GC_thr_init();"++).nl.
+           ("#endif /* USE_OMP */"++).nl.
            ("#ifdef "++).macroHAS_GMP.nl.
            tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl.
            ("#endif"++).nl
@@ -603,7 +609,10 @@ mainFunc env opts mainNesting modules =
             tab.("t0->nesting = "++).shows mainNesting.(";"++).nl).
       initModules modules.
       logGraphStart opts.
+      ("#pragma omp single"++).nl.
+      ("{"++).nl.
       mkMainCall gc m.
+      ("}"++).nl.
       tab.("t2 = clock();"++).nl.
       (case (findType mainDef env) of
           Tg (T dt) | dt==dtInteger ->

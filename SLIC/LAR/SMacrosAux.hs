@@ -12,10 +12,15 @@ import SLIC.Types
 
 -- * LAR construction
 
--- | Produces uniform names for the arguments of
---   a cpp macro
+-- | Produces uniform names for the arguments of a cpp macro. 
 argsA :: Int -> [ShowS]
-argsA n = map (\x -> ("arg"++).shows x) [1..n]
+argsA n = map (\i->("arg"++).shows i) [1..n]
+
+-- | Place the arguments in { ... }. This is used when they are used to initialize the 
+--   first field of a struct, i.e. when LarArg is a struct (in the parallel runtime, 
+--   'LarArg' values contain locks).
+wrapInBraces :: [ShowS] -> [ShowS]
+wrapInBraces sl = map (\s->("{"++).s.("}"++)) sl
 
 -- | Takes a function name and returns a string to be used
 --   as part of the name of a (specialized for this function)
@@ -64,6 +69,20 @@ mkLARMacroOpt opts name arityA arityV nesting =
         ("      ARGS("++).shows n.(", lar) = "++).arg.
         (";                               \\"++).nl
       fnameM = asMacroPrefix name
+      -- generates the AR_S constructor; the flag controls if LarArg is a struct or a pointer
+      mkAR_S argWrapper =
+        ("#define "++).fnameM.("AR_S"++).
+        lparen.insCommIfMore (argsA arityA).rparen.
+        ("                   \\"++).nl.
+        ("  ((TP_) &((LAR_STRUCT"++).
+        lparen.shows arityA.comma.shows arityV.comma.shows nesting.rparen.rparen.
+        ("             \\"++).nl.
+        (if arityA == 0 then 
+           ("   { T0 "++)
+         else
+           ("   { T0, {"++).insCommIfMore (argWrapper $ argsA arityA).
+           ("}"++)).
+        ("}))"++).nl
   in  ("#define "++).fnameM.("GETARG(x, T)        GETARG(x, "++).
       shows arityA. (", T)"++).nl.
       ("#define "++).fnameM.("GETSTRICTARG(x, T)  GETSTRICTARG(x, "++).
@@ -72,18 +91,14 @@ mkLARMacroOpt opts name arityA arityV nesting =
       shows arityA. (", "++). shows arityV. (", T)"++). nl.
       (if optHeap opts then id
        else
-         ("#define "++).fnameM.("AR_S"++).
-         lparen.insCommIfMore (argsA arityA).rparen.
-         ("                   \\"++).nl.
-         ("  ((TP_) &((LAR_STRUCT"++).
-         lparen.shows arityA.comma.shows arityV.comma.shows nesting.rparen.rparen.
-         ("             \\"++).nl.
-         (if arityA == 0 then 
-            ("   { T0 "++)
-          else 
-            ("   { T0, {"++).insCommIfMore (argsA arityA).
-            ("}"++)).
-         ("}))"++).nl).
+         ("#ifndef USE_OMP"++).nl.
+         -- stack AR, single-threaded runtime, LarArg is a pointer
+         mkAR_S id.
+         ("#else"++).nl.
+         -- stack AR, parallel runtime, LarArg is a struct
+         mkAR_S wrapInBraces.
+         ("#endif /* USE_OMP */"++).nl
+      ).
       ("#define "++).fnameM.("AR"++).
       lparen.insCommIfMore (argsA arityA).rparen.
       (" ({ \\"++).nl.
