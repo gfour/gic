@@ -683,7 +683,7 @@ argDefs ds env stricts cbnVars gc =
 
 -- | The C @struct@ that corresponds to a LAR.
 aRec :: GC -> ShowS
-aRec SemiGC = id
+aRec (SemiGC _) = id
 aRec LibGC =
   ("#define LAR_STRUCT(n_arity_a, n_arity_v, n_nesting) \\"++).nl.
   tab.("struct {                                         \\"++).nl.
