@@ -683,33 +683,15 @@ argDefs ds env stricts cbnVars gc =
 
 -- | The C @struct@ that corresponds to a LAR.
 aRec :: GC -> ShowS
-aRec gc =
-  -- ----------------------- heap-allocated LARs -----------------------
-  -- ("typedef struct T_ {"++).nl.
-  -- (if optGC opts == SemiGC then
-  --    tab.("unsigned long magic;   // the 'magic' marker for GC"++).nl
-  --  else id).
-  -- tab.("TP_ prev;              // link to parent LAR (also GC forwarded pointer)"++).nl.
-  -- (if optGC opts == SemiGC then
-  --   tab.("byte arity;            // the number of arguments in this LAR"++).nl.
-  --   tab.("byte nesting;          // the number of nesting links"++).nl
-  -- else id).
-  -- tab.("void* data[];          // the rest of this struct contains:"++).nl.
-  -- tab.("                       //   - array of args to evaluate (ARGS)"++).nl.
-  -- tab.("                       //   - computed thunk values (VALS)"++).nl.
-  -- tab.("                       //   - nested contexts (NESTED)"++).nl.
-  -- ("} T_;"++).nl.nl.
-  -- ----------------------- stack-allocated LARs ----------------------
-  (case gc of
-      SemiGC _ -> id
-      LibGC    ->
-        ("#define LAR_STRUCT(n_arity_a, n_arity_v, n_nesting) \\"++).nl.
-        tab.("struct {                                         \\"++).nl.
-        tab.tab.("TP_ prev;                                      \\"++).nl.
-        tab.tab.("LarArg the_args[n_arity_a];                    \\"++).nl.
-        tab.tab.("Susp the_vals[n_arity_v];                      \\"++).nl.    
-        tab.tab.("TP_ the_nested[n_nesting];                     \\"++).nl.
-        tab.("}"++).nl)
+aRec SemiGC = id
+aRec LibGC =
+  ("#define LAR_STRUCT(n_arity_a, n_arity_v, n_nesting) \\"++).nl.
+  tab.("struct {                                         \\"++).nl.
+  tab.tab.("TP_ prev;                                      \\"++).nl.
+  tab.tab.("LarArg the_args[n_arity_a];                    \\"++).nl.
+  tab.tab.("Susp the_vals[n_arity_v];                      \\"++).nl.    
+  tab.tab.("TP_ the_nested[n_nesting];                     \\"++).nl.
+  tab.("}"++).nl)
 
 -- | Returns the LAR with the actuals of a function call.
 makeActs :: QName -> [QName] -> TEnv -> ConfigLAR -> ShowS
