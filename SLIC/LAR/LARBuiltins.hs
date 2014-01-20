@@ -106,7 +106,7 @@ prettyPrinterDT opts cids (Data dtName _ constrs) =
         foldDot (prettyPrinterConstr cids) constrs.
         tab.("}"++).nl.
         tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-        ("}"++).nl.nl
+        ("}"++).nl
 
 -- | The part of the pretty printer that handles a constructor.
 prettyPrinterConstr :: CIDs -> DConstr -> ShowS
@@ -154,7 +154,7 @@ prettyPrintInt opts =
     pprinterSig dtInt.(" {"++).nl.
     tab.("printf(\"%d\", i.constr);"++).nl.
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-    ("}"++).nl.nl
+    ("}"++).nl
   
 -- | Built-in pretty printer for Bool.
 prettyPrintBool :: Options -> ShowS
@@ -162,7 +162,7 @@ prettyPrintBool opts =
     pprinterSig dtBool.(" {"++).nl.
     tab.("printf(\"%d\", i.constr);"++).nl.
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-    ("}"++).nl.nl
+    ("}"++).nl
 
 -- | Built-in pretty printer for Integer.
 prettyPrintInteger :: Options -> ShowS
@@ -174,7 +174,7 @@ prettyPrintInteger opts =
     tab.("printf(\"Cannot print Integer, no libgmp support.\\n\");"++).nl.
     ("#endif"++).nl.
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-    ("}"++).nl.nl
+    ("}"++).nl
 
 -- | Built-in pretty printer for defunctionaized values (needed for the
 --   MagicTypleN work-around).
@@ -183,7 +183,7 @@ prettyPrintDefunc opts =
     pprinterSig dfDT.(" {"++).nl.
     tab.("printf(\"<defunc. closure constr. %d>\", i.constr);"++).nl.
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-    ("}"++).nl.nl
+    ("}"++).nl
 
 -- | Built-in pretty printer for Bool.
 prettyPrintMagic :: Options -> ShowS
@@ -191,7 +191,7 @@ prettyPrintMagic opts =
     pprinterSig dtMagic.(" {"++).nl.
     tab.("printf(\"*magic:%d*\", i.constr);"++).nl.
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-    ("}"++).nl.nl
+    ("}"++).nl
 
 -- | Dummy version of the runMainIO function used by GHC.
 b_runMainIO :: Options -> ShowS
@@ -450,7 +450,7 @@ prettyPrintList opts =
       tab.("}"++).nl.
       tab.("else { printf(\"Unknown list constructor: %d\\n\", i.constr); }"++).nl.
       tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
-      ("}"++).nl.nl
+      ("}"++).nl
 
 prettyPrintUnit :: Options -> ShowS
 prettyPrintUnit opts =
