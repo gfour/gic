@@ -131,35 +131,14 @@ macrosC opts modName arities pmDepths arityCAF =
             LibGC    -> id).nl.
       aRec gc.nl.
       defineGCAF modName gc arityCAF.nl.
-      ("#define True 1"++).nl.
-      ("#define False 0"++).nl.
-      ("#define VAR(x)        FUNC(x)"++).nl.
-      ("#define FUNC(x)       Susp x(TP_ T0)"++).nl.
-      ("#define ACTUAL        T0 = T0->prev"++).nl.
       (case gc of
           LibGC    -> createLibGCARInfra opts modName pmDepths.nl
-          SemiGC _ -> createSemiGCARInfra modName gc arities pmDepths arityCAF.nl)
+          SemiGC _ -> createSemiGCARInfra modName gc arities pmDepths arityCAF.nl).nl
 
 -- | Create the necessary macros for handling the optimized LARs. To be used
 --   by the libgc garbage collector.
 createLibGCARInfra :: Options -> MName -> PMDepths -> ShowS
 createLibGCARInfra opts m pmds =
-  ("#define THE_ARGS(T)                         ((byte *) &((T)->data))"++).nl.
-  ("#define THE_VALS(VARSARITY, T)              (THE_ARGS(T) + VARSARITY * sizeof(LarArg))"++).nl.
-  ("#define THE_NESTED(VARSARITY, VALSARITY, T) (THE_VALS(VARSARITY, T) + VALSARITY * sizeof(Susp))"++).nl.
-  ("#define ARGS(x, T)                          (((LarArg*) THE_ARGS(T))[x])"++).nl.
-  ("#define VALS(x, VARSARITY, T)               (((Susp*) THE_VALS(VARSARITY, T))[x])"++).nl.
-  ("#define NESTED(x, VARSARITY, VALSARITY, T)  (((TP_*) THE_NESTED(VARSARITY, VALSARITY, T))[x])"++).nl.
-  ("#define GETARG(x, ARGSARITY, T)  ({            \\"++).nl.
-  ("      if (ARGS(x, T) != NULL) {                \\"++).nl.
-  ("        Susp val = ARGS(x, T)(T);              \\"++).nl.
-  ("        VALS(x, ARGSARITY, T) = val;           \\"++).nl.
-  ("        ARGS(x, T) = NULL;                     \\"++).nl.
-  ("      }                                        \\"++).nl.
-  ("      VALS(x, ARGSARITY, T);                   \\"++).nl.
-  ("    })"++).nl.
-  ("#define GETSTRICTARG(x, VARSARITY, T)  VALS(x, VARSARITY, T)"++).nl.
-  nl.
   -- add libgc handlers for the GMP library
   ("#ifdef "++).macroHAS_GMP.nl.
   ("void *GMP_GC_malloc(size_t sz) { return GC_malloc(sz); }"++).nl.
