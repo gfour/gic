@@ -6,7 +6,6 @@
 *.g.o
 Bench/
 Examples/Misc/
-Examples/Parallel/
 NewBench/
 THIH/
 gic-pack/
