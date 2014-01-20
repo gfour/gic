@@ -179,8 +179,7 @@ evalFL pF =
   let p   = transFL pF
       val = lookupBody p "result"
       st  = [(error "dummy top-level context reached", [])]
-  in  if False then error (show p) else   -- TODO
-      case eval p val st of
+  in  case eval p val st of
         GI i -> putStrLn $ "int result = "++(show i)
         GB b -> putStrLn $ "bool result = "++(show b)
         SC _ -> putStrLn "suspended constructor"
