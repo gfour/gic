@@ -78,13 +78,17 @@ function testLAR {
   ./run_libgc.sh $1
 }
 
+unset OMP
+
 echo -- LAR --
+
 echo -- 1. Simple types --
 export GICFLAGS=-gic-tc-nsig
 for file in Examples/Num/exmh*.hs Examples/Num/myex*.hs Examples/Data/*.hs
 do
     testLAR ${file}
 done
+
 echo -- 2. Polymorphic --
 # use the type checker of the GHC API and explicit type signatures
 export GICFLAGS=-ghc-tc
@@ -92,9 +96,19 @@ for file in Examples/Polymorphic/*.hs
 do
     testLAR ${file}
 done
+
 echo -- 3. GADTs --
 export GICFLAGS=-ghc-tc
 for file in Examples/GADT/*.hs
+do
+    testLAR ${file}
+done
+
+echo -- 4. Parallel --
+export GICFLAGS=-gic-tc-nsig
+export OMP=1
+GHCIFLAGS="${GHCIFLAGS} -threaded"
+for file in Examples/Parallel/*.hs
 do
     testLAR ${file}
 done
