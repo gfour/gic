@@ -1,7 +1,11 @@
 -- It computes the lengths of the Collatz sequences for the first 100000 natural numbers
 
+module Main where
+
+main = putStrLn (show result)
+
 result :: Int
-result = sum1 (mymap f (nums 1 100000))
+result = sum1 (mymap f (nums 1 110000))
 
 f :: Int -> Int;
 f x  = if (x==1) then 0 else if ((x `mod` 2) == 0) then 1+ (f (x `div` 2)) else 1+(f ((3*x)+1));
