@@ -341,7 +341,7 @@ forceStricts :: GC -> StrictInds -> Arity -> ShowS
 forceStricts gc strictInds fArity =
   let aux x =
         mkVALS gc x fArity "T0".
-        (" = ARGS("++).shows x.(", T0)(T0); // strict "++).nl
+        (" = ARGS_FUNC("++).shows x.(", T0)(T0); // strict "++).nl
   in  foldDot aux strictInds
 
 -- | Generates the C code for an expression that is assumed to be the body

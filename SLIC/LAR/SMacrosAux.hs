@@ -16,12 +16,6 @@ import SLIC.Types
 argsA :: Int -> [ShowS]
 argsA n = map (\i->("arg"++).shows i) [1..n]
 
--- | Place the arguments in { ... }. This is used when they are used to initialize the 
---   first field of a struct, i.e. when LarArg is a struct (in the parallel runtime, 
---   'LarArg' values contain locks).
-wrapInBraces :: [ShowS] -> [ShowS]
-wrapInBraces sl = map (\s->("{"++).s.("}"++)) sl
-
 -- | Takes a function name and returns a string to be used
 --   as part of the name of a (specialized for this function)
 --   macro. For now, the string is just the initial
@@ -60,62 +54,6 @@ mkLARMacro opts name arityA arityV nesting =
   else case optGC opts of
          LibGC    -> mkLARMacroOpt opts name arityA arityV nesting
          SemiGC _ -> id
-
--- | Used by 'mkLARMacro' to generate function-specific LAR macros.  
-mkLARMacroOpt :: Options -> String -> Int -> Int -> Int -> ShowS
-mkLARMacroOpt opts name arityA arityV nesting =
-  let initArg :: (Int, ShowS) -> ShowS
-      initArg (n, arg) = 
-        ("      ARGS("++).shows n.(", lar) = "++).arg.
-        (";                               \\"++).nl
-      fnameM = asMacroPrefix name
-      -- generates the AR_S constructor; the flag controls if LarArg is a struct or a pointer
-      mkAR_S argWrapper =
-        ("#define "++).fnameM.("AR_S"++).
-        lparen.insCommIfMore (argsA arityA).rparen.
-        ("                   \\"++).nl.
-        ("  ((TP_) &((LAR_STRUCT"++).
-        lparen.shows arityA.comma.shows arityV.comma.shows nesting.rparen.rparen.
-        ("             \\"++).nl.
-        (if arityA == 0 then 
-           ("   { T0 "++)
-         else
-           ("   { T0, {"++).insCommIfMore (argWrapper $ argsA arityA).
-           ("}"++)).
-        ("}))"++).nl
-  in  ("#define "++).fnameM.("GETARG(x, T)        GETARG(x, "++).
-      shows arityA. (", T)"++).nl.
-      ("#define "++).fnameM.("GETSTRICTARG(x, T)  GETSTRICTARG(x, "++).
-      shows arityA. (", T)"++).nl.
-      ("#define "++).fnameM. ("NESTED(x, T)        NESTED(x, "++). 
-      shows arityA. (", "++). shows arityV. (", T)"++). nl.
-      (if optHeap opts then id
-       else
-         ("#ifndef USE_OMP"++).nl.
-         -- stack AR, single-threaded runtime, LarArg is a pointer
-         mkAR_S id.
-         ("#else"++).nl.
-         -- stack AR, parallel runtime, LarArg is a struct
-         mkAR_S wrapInBraces.
-         ("#endif /* USE_OMP */"++).nl
-      ).
-      ("#define "++).fnameM.("AR"++).
-      lparen.insCommIfMore (argsA arityA).rparen.
-      (" ({ \\"++).nl.
-      ("      TP_ lar = (TP_) GC_MALLOC(sizeof(T_) +             \\"++).nl.
-      ("                               "++).
-      shows arityA. 
-      (" * sizeof(LarArg) +      \\"++).nl.
-      ("                               "++).
-      shows arityV.
-      (" * sizeof(Susp) +        \\"++).nl.
-      ("                               "++).
-      shows nesting.
-      (" * sizeof(TP_));         \\"++).nl.
-      ("      lar->prev = T0;                                    \\"++).nl.
-      (foldl (.) id (map initArg (zip ([0..]) (argsA arityA)))).
-      ("      lar;                                               \\"++).nl.
-      ("    })"++).nl
 
 -- | Generates the macro for variable x of function f (stored in position n).
 mkDefineVar :: GC -> QName -> QName -> Int -> ShowS
@@ -215,3 +153,69 @@ nameGCAF m = ("__GCAF_"++).((asMacroPart m)++)
 namegenv :: MName -> ShowS
 namegenv m = ("__genv_"++).(m++)
 
+-- * Optimized LAR representation
+
+-- | Place the arguments in { ... }. This is used when they are used to initialize the 
+--   first field of a struct, i.e. when LarArg is a struct (in the parallel runtime, 
+--   'LarArg' values contain locks).
+wrapInBraces :: ShowS -> ShowS
+wrapInBraces s = ("{"++).s.("}"++)
+
+-- | Embeds an argument (function pointer) directly in the context field of its value
+--   (masking its last bit). This is used in the single-threaded runtime, to save space
+--   for the LarArg[] fields.
+embedArg :: ShowS -> ShowS
+embedArg arg = ("{0, ARGC("++).arg.(")}"++)
+
+-- | Used by 'mkLARMacro' to generate function-specific LAR macros.  
+mkLARMacroOpt :: Options -> String -> Int -> Int -> Int -> ShowS
+mkLARMacroOpt opts name arityA arityV nesting =
+  let initArg :: (Int, ShowS) -> ShowS
+      initArg (n, arg) = 
+        ("      ARGS("++).shows n.(", lar) = ARGC("++).arg.(")"++).
+        (";                               \\"++).nl
+      fnameM = asMacroPrefix name
+      -- generates the AR_S constructor; the flag controls if LarArg is a struct or a pointer
+      mkAR_S argWrapper =
+        ("#define "++).fnameM.("AR_S"++).
+        lparen.insCommIfMore (argsA arityA).rparen.
+        ("                   \\"++).nl.
+        ("  ((TP_) &((LAR_STRUCT"++).
+        lparen.shows arityA.comma.shows arityV.comma.shows nesting.rparen.rparen.
+        ("             \\"++).nl.
+        (if arityA == 0 then 
+           ("   { T0 "++)
+         else
+           ("   { T0, {"++).insCommIfMore (map argWrapper $ argsA arityA).
+           ("}"++)).
+        ("}))"++).nl
+  in  ("#define "++).fnameM.("GETARG(x, T)        GETARG(x, "++).
+      shows arityA. (", T)"++).nl.
+      ("#define "++).fnameM.("GETSTRICTARG(x, T)  GETSTRICTARG(x, "++).
+      shows arityA. (", T)"++).nl.
+      ("#define "++).fnameM. ("NESTED(x, T)        NESTED(x, "++). 
+      shows arityA. (", "++). shows arityV. (", T)"++). nl.
+      (if optHeap opts then id
+       else
+         ("#ifndef USE_OMP"++).nl.
+         -- stack AR, single-threaded runtime, LarArg is a pointer
+         mkAR_S embedArg.
+         ("#else"++).nl.
+         -- stack AR, parallel runtime, LarArg is a struct
+         mkAR_S wrapInBraces.
+         ("#endif /* USE_OMP */"++).nl
+      ).
+      ("#define "++).fnameM.("AR"++).
+      lparen.insCommIfMore (argsA arityA).rparen.
+      (" ({ \\"++).nl.
+      ("      TP_ lar = (TP_) GC_MALLOC(sizeof(T_) +             \\"++).nl.
+      ("                               "++).
+      ("ZEROIFSEQ("++).shows arityA.(" * sizeof(LarArg)) +      \\"++).nl.
+      ("                               "++).
+      shows arityV.(" * sizeof(Susp) +        \\"++).nl.
+      ("                               "++).
+      shows nesting.(" * sizeof(TP_));         \\"++).nl.
+      ("      lar->prev = T0;                                    \\"++).nl.
+      (foldl (.) id (map initArg (zip ([0..]) (argsA arityA)))).
+      ("      lar;                                               \\"++).nl.
+      ("    })"++).nl
