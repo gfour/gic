@@ -1,8 +1,9 @@
 -- | A non-strict interpreter for FL.
 -- 
---   The interpreter is based on activation records that contain variable bindings. Evaluation uses a 
---   context stack and pattern matching uses a list of nested contexts. The evaluation model is very close
---   to eduction after the intensional transformation is applied to the source program.
+--   The interpreter is based on activation records that contain variable bindings.
+--   Evaluation uses a context stack and pattern matching uses a list of nested
+--   contexts. The evaluation model is very close to eduction after the
+--   intensional transformation is applied to the source program.
 -- 
 
 module SLIC.Front.EvalFL (evalFL) where
@@ -47,13 +48,8 @@ data Susp = Susp (CN, [Expr]) Stack
 eval :: Prog -> Expr -> Stack -> Value
 eval p (V vn) ((ar, _):st) =
   case lookup vn ar of
-    Just eBinding -> eval p eBinding st
+    Just eBinding -> eval p eBinding st                -- see note 1.
     Nothing -> error $ "no binding found for "++vn++" in "++(show ar)
-
-{-  
-  let Just eBinding = lookup vn ar                     -- see note 1.
-  in  eval p eBinding st
--}
 eval p (BApp "+" [e1, e2]) st =
   let GI i1 = eval p e1 st
       GI i2 = eval p e2 st
@@ -160,8 +156,8 @@ transFL p =
       transB vs (SFL.PatF (SFL.SPat c _) e) = (T.lName c, transE vs e)
   in  (map transD fdefs)++builtinDefsFL
 
--- | Built-in function definitions. This includes constructor wrapper functions (they are not that
---   special in this interpreter).
+-- | Built-in function definitions. This includes constructor wrapper functions
+--   (they are not that special in this interpreter).
 builtinDefsFL :: [FDef]
 builtinDefsFL =
   let c_cons = T.lName T.bf_Cons
