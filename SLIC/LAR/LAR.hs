@@ -129,7 +129,6 @@ macrosC opts modName arities pmDepths arityCAF =
       (case gc of
             SemiGC _ -> ("#define GC_MALLOC MM_alloc"++)
             LibGC    -> id).nl.
-      aRec gc.nl.
       defineGCAF modName gc arityCAF.nl.
       (case gc of
           LibGC    -> createLibGCARInfra opts modName pmDepths.nl
@@ -680,18 +679,6 @@ genInitMod m = ("__initModule_"++).(m++)
 argDefs :: [BlockL] -> TEnv -> Stricts -> CBNVars -> GC -> ShowS
 argDefs ds env stricts cbnVars gc =
   foldDot (\def -> (protoB def env stricts cbnVars gc)) ds
-
--- | The C @struct@ that corresponds to a LAR.
-aRec :: GC -> ShowS
-aRec (SemiGC _) = id
-aRec LibGC =
-  ("#define LAR_STRUCT(n_arity_a, n_arity_v, n_nesting) \\"++).nl.
-  tab.("struct {                                         \\"++).nl.
-  tab.tab.("TP_ prev;                                      \\"++).nl.
-  tab.tab.("LarArg the_args[n_arity_a];                    \\"++).nl.
-  tab.tab.("Susp the_vals[n_arity_v];                      \\"++).nl.    
-  tab.tab.("TP_ the_nested[n_nesting];                     \\"++).nl.
-  tab.("}"++).nl
 
 -- | Returns the LAR with the actuals of a function call.
 makeActs :: QName -> [QName] -> TEnv -> ConfigLAR -> ShowS
