@@ -1,4 +1,40 @@
--- | Specialized macros for direct LAR access.
+-- | Specialized macros for using lazy activation records (LARs).
+-- 
+--   We represent LARs in two ways: the \"optimized\" (which is the default) and
+--   the \"simple\".
+-- 
+--   In the \"simple\" representation (@c/lar.h@), each LAR contains information
+--   about its parent LAR, the arguments that have to be evaluated, space for
+--   the memoized results (\"vals\") and pattern-matching values (\"nested\" 
+--   values), and information about the function's arity and number of
+--   pattern-matching clauses (\"pattern matching depth\").
+--   This can be used to do accurate garbage collection (not yet implemented).
+--     
+--   In the \"optimized\" representation (@c/lar_opt.h@), the arities and
+--   pattern matching depths of all functions are used to construct specialized
+--   macros for access to their LAR. This means that no space is 
+--   reserved for this information during runtime.
+-- 
+--   * In the single-threaded runtime, we do one more optimization: the arguments 
+--     that have to be evaluated are embedded inside the \"vals\" fields, using
+--     the @.ctxt@ field.
+--     Since this field is always a pointer, its last bit is assumed to be 0 -- we
+--     initially store there the pointer to the argument to be evaluated, with
+--     the last bit set to 1. Therefore, if a value is not evaluated yet, its
+--     @ctxt@ field will have its last bit set to 1; masking that out, we now
+--     have the argument pointer to use for evaluation. When evaluation finishes
+--     with a value, the structure is overwritten (including @ctxt@) with
+--     it. This means that memoized values always have a valid pointer in @ctxt@
+--     and can be collected by libgc.
+-- 
+--   * In the parallel runtime (when the C macro @USE_OMP@ is defined), we use the 
+--     \"optimized\" representation, without the tagged-pointer embedding.
+--     LAR arguments now occupy their own slot, together with a lock. This is
+--     used to guarantee single evaluation of thunks, even in the presence of
+--     concurrent access.
+--     For garbage collection we use libgc configure for thread-local allocation
+--     and parallel garbage collection.
+-- 
 
 module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
                             mkGETARG, mkGETSTRICTARG, mkLARMacro,
@@ -6,9 +42,9 @@ module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
                             nameGCAF, namegenv, protoFunc, smFun) where
 
 import SLIC.AuxFun (insCommIfMore)
-import SLIC.Constants
-import SLIC.State
-import SLIC.Types
+import SLIC.Constants (comma, nl, lparen, rparen, tab)
+import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
+import SLIC.Types (Arity, MName, PMDepth, QName, qName, mainDefQName, pprint)
 
 -- * LAR construction
 

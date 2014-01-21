@@ -91,7 +91,11 @@ typedef struct T_ {
       }                                        \
       VALS(x, T);                              \
     })
+
+/* A strict argument is already evaluated, just return its value. */
 #define GETSTRICTARG(x, T)  VALS(x, T)
+
+/* A call-by-name argument calls directly the argument, does no memoization. */
 #define GETCBNARG(x, T)     (ARGS(x, T)(T))
 
 #define AR_CAT(A, B) AR_CAT_AUX(A, B)
