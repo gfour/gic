@@ -101,7 +101,7 @@ typedef struct T_ {
 
 // parallel runtime
 
-#define ZEROIFSEQ(x)                        x
+#define ZEROIFTAG(x)                        x
 #define THE_VALS(VARSARITY, T)              (THE_ARGS(T) + VARSARITY * sizeof(LarArg))
 #define ARGS(x, T)                          ((((LarArg*) THE_ARGS(T))[x]).larArg)
 #define ARGS_FUNC(x, T)                     ARGS(x, T)
