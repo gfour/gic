@@ -45,6 +45,7 @@ import SLIC.AuxFun (insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
 import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
 import SLIC.Types (Arity, MName, PMDepth, QName, qName, mainDefQName, pprint)
+import SLIC.LAR.LARAux (wrapIfOMP)
 
 -- * LAR construction
 
@@ -119,15 +120,13 @@ mkMainCall gc m =
         (case gc of
           LibGC    -> ("("++).asMacroPrefixFunc mainDef.("AR());"++)
           SemiGC _ -> ("(t0);"++))
-  in  ("#ifdef USE_OMP"++).nl.
+  in  wrapIfOMP
       -- ("#pragma omp parallel shared(T0)"++).nl.
-      ("{"++).nl.
-      -- ("#pragma omp single"++).nl.
-      resultCall.nl.
-      ("}"++).nl.
-      ("#else"++).nl.
-      resultCall.nl.
-      ("#endif /* USE_OMP */"++).nl
+      (("{"++).nl.
+       -- ("#pragma omp single"++).nl.
+       resultCall.nl.
+       ("}"++).nl)
+      (resultCall.nl)
 
 -- | Construct a LAR for function calls. Takes the GC mode to use (this
 --   affects LAR representation), a flag to indicate if the LAR is going
@@ -233,13 +232,11 @@ mkLARMacroOpt opts name arityA arityV nesting =
       shows arityA. (", "++). shows arityV. (", T)"++). nl.
       (if optHeap opts then id
        else
-         ("#ifndef USE_OMP"++).nl.
-         -- stack AR, single-threaded runtime, LarArg is a pointer
-         mkAR_S embedArg.
-         ("#else"++).nl.
+         wrapIfOMP
          -- stack AR, parallel runtime, LarArg is a struct
-         mkAR_S wrapInBraces.
-         ("#endif /* USE_OMP */"++).nl
+         (mkAR_S wrapInBraces)
+         -- stack AR, single-threaded runtime, LarArg is a pointer
+         (mkAR_S embedArg)
       ).
       ("#define "++).fnameM.("AR"++).
       lparen.insCommIfMore (argsA arityA).rparen.

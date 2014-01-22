@@ -1,6 +1,7 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct) where
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct,
+                        wrapIfGMP, wrapIfOMP) where
 
 import SLIC.Constants
 import SLIC.LAR.LARGraph
@@ -35,3 +36,20 @@ mkAct b opts =
     -- for functions, output a graphviz entry for the LAR entered,
     -- if graphviz trace mode is enabled
     logPrev opts
+
+-- | Wraps a piece of code in @\#ifdef USE_OMP ... \#endif@.
+wrapIfOMP :: ShowS -> ShowS -> ShowS
+wrapIfOMP = wrapIfMacro "USE_OMP"
+
+-- | Wraps a piece of code in @\#ifdef HAS_GMP ... \#endif@.
+wrapIfGMP :: ShowS -> ShowS -> ShowS
+wrapIfGMP = wrapIfMacro "HAS_GMP"
+
+-- | Wraps a piece of code in @\#ifdef macro ... \#endif@.
+wrapIfMacro :: String -> ShowS -> ShowS -> ShowS
+wrapIfMacro macroName s1 s2 =
+  ("#ifdef "++).(macroName++).nl.
+  s1.
+  ("#else"++).nl.
+  s2.
+  ("#endif /* "++).(macroName++).(" */"++).nl

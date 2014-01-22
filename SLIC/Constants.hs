@@ -102,9 +102,6 @@ maxNestedLARs = 255
 maxLARArity :: Int
 maxLARArity = 255
 
--- | The CPP macro controlling the use of libgmp.
-macroHAS_GMP :: ShowS ; macroHAS_GMP = ("HAS_GMP"++);
-
 -- * Distributed eduction
 
 -- | The default number of warehouse to use for distributed eduction.

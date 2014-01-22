@@ -168,11 +168,9 @@ prettyPrintBool opts =
 prettyPrintInteger :: Options -> ShowS
 prettyPrintInteger opts = 
     pprinterSig dtInteger.(" {"++).nl.
-    ("#ifdef "++).macroHAS_GMP.nl.
-    tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)i.ctxt)));"++).nl.
-    ("#else"++).nl.
-    tab.("printf(\"Cannot print Integer, no libgmp support.\\n\");"++).nl.
-    ("#endif"++).nl.
+    wrapIfGMP
+    (tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)i.ctxt)));"++).nl)
+    (tab.("printf(\"Cannot print Integer, no libgmp support.\\n\");"++).nl).
     tab.("return ((Susp) { 1, "++).uTag opts.("0 });"++).nl.
     ("}"++).nl
 
@@ -260,17 +258,15 @@ dummyPre = ("0"++)
 b_toInteger :: Options -> ShowS
 b_toInteger opts =
   ("FUNC("++).pprint bf_toInteger.(") {"++).nl.
-  ("#ifdef "++).macroHAS_GMP.nl.
-  tab.("Susp i = "++).mkGETARG (optGC opts) bf_toInteger 0 t0.(";"++).nl.
-  -- tab.("printf(\"Initializing big int %d\\n\", i.constr);"++).nl.
-  tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
-  tab.("mpz_init_set_ui(*ret, i.constr);"++).nl.
-  -- tab.("printf(\"Initialized big int %d in addr %p: \", i.constr, ret);"++).nl.
-  -- tab.("gmp_printf(\"verify=%d\\n\", mpz_get_ui(*ret));"++).nl.
-  tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("(TP_)ret});"++).nl.
-  ("#else"++).nl.
-  tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("0});"++).nl.
-  ("#endif"++).nl.  
+  wrapIfGMP
+  (tab.("Susp i = "++).mkGETARG (optGC opts) bf_toInteger 0 t0.(";"++).nl.
+   -- tab.("printf(\"Initializing big int %d\\n\", i.constr);"++).nl.
+   tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
+   tab.("mpz_init_set_ui(*ret, i.constr);"++).nl.
+   -- tab.("printf(\"Initialized big int %d in addr %p: \", i.constr, ret);"++).nl.
+   -- tab.("gmp_printf(\"verify=%d\\n\", mpz_get_ui(*ret));"++).nl.
+   tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("(TP_)ret});"++).nl)
+  (tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("0});"++).nl).
   ("}"++).nl
 
 -- | Converts a C string to a Haskell list. For internal use.
@@ -317,29 +313,25 @@ b_show gc =
 b_par :: GC -> ShowS
 b_par gc =
   ("FUNC("++).pprint bf_par.("){"++).nl.
-  ("#ifdef USE_OMP"++).nl.
-  tab.("Susp a, b;"++).nl.
-  ("#pragma omp single nowait"++).nl.
-  ("{"++).nl.
-  ("#pragma omp task untied"++).nl.
-  tab.("{ a = "++).mkGETARG gc bf_par 0 t0.("; }"++).nl.
-  ("#pragma omp task untied"++).nl.
-  tab.("{ b = "++).mkGETARG gc bf_par 1 t0.("; }"++).nl.
-  ("}"++).nl.
-  ("#pragma omp taskwait"++).nl.
-  ("return b;"++).nl.
-  ("#else"++).nl.
-  tab.("Susp b = "++).mkGETARG gc bf_par 1 t0.(";"++).nl.
-  tab.("return b;"++).nl.
-  ("#endif /* USE_OMP */"++).nl.
+  wrapIfOMP
+  (tab.("Susp a, b;"++).nl.
+   ("#pragma omp single nowait"++).nl.
+   ("{"++).nl.
+   ("#pragma omp task untied"++).nl.
+   tab.("{ a = "++).mkGETARG gc bf_par 0 t0.("; }"++).nl.
+   ("#pragma omp task untied"++).nl.
+   tab.("{ b = "++).mkGETARG gc bf_par 1 t0.("; }"++).nl.
+   ("}"++).nl.
+   ("#pragma omp taskwait"++).nl.
+   ("return b;"++).nl)
+  (tab.("Susp b = "++).mkGETARG gc bf_par 1 t0.(";"++).nl.
+   tab.("return b;"++).nl).
   ("}"++).nl
 
 b_pseq :: GC -> ShowS
 b_pseq gc =
   ("FUNC("++).pprint bf_pseq.("){"++).nl.
-  ("#ifdef USE_OMP"++).nl.
-  tab.("Susp a = "++).mkGETARG gc bf_pseq 0 t0.(";"++).nl.
-  ("#endif /* USE_OMP */"++).nl.
+  wrapIfOMP (tab.("Susp a = "++).mkGETARG gc bf_pseq 0 t0.(";"++).nl) id.
   tab.("Susp b = "++).mkGETARG gc bf_pseq 1 t0.(";"++).nl.
   tab.("return b;"++).nl.
   ("}"++).nl
@@ -354,19 +346,17 @@ mulISig = ("Susp "++).pprint CMulI.("(Susp a, Susp b)"++)
 b_mulI :: Options -> ShowS
 b_mulI opts =
   mulISig.(" {"++).nl.
-  ("#ifdef "++).macroHAS_GMP.nl.
-  tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
-  tab.("mpz_t *v1 = (mpz_t *)a.ctxt;"++).nl.
-  tab.("mpz_t *v2 = (mpz_t *)b.ctxt;"++).nl.
-  -- tab.("printf(\"Integer multiplication, addresses %p and %p -> %p\\n\", v1, v2, ret);"++).nl.
-  tab.("mpz_init(*ret);"++).nl.
-  tab.("mpz_mul(ret[0], v1[0], v2[0]);"++).nl.
-  -- tab.gmpFree opts "v1[0]".(";"++).nl.     -- free the memory used by the
-  -- tab.gmpFree opts "v2[0]".(";"++).nl.     -- two consumed numbers (unsafe)
-  tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("(TP_)ret});"++).nl.
-  ("#else"++).nl.
-  tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("0});"++).nl.  
-  ("#endif"++).nl.  
+  wrapIfGMP
+  (tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
+   tab.("mpz_t *v1 = (mpz_t *)a.ctxt;"++).nl.
+   tab.("mpz_t *v2 = (mpz_t *)b.ctxt;"++).nl.
+   -- tab.("printf(\"Integer multiplication, addresses %p and %p -> %p\\n\", v1, v2, ret);"++).nl.
+   tab.("mpz_init(*ret);"++).nl.
+   tab.("mpz_mul(ret[0], v1[0], v2[0]);"++).nl.
+   -- tab.gmpFree opts "v1[0]".(";"++).nl.     -- free the memory used by the
+   -- tab.gmpFree opts "v2[0]".(";"++).nl.     -- two consumed numbers (unsafe)
+   tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("(TP_)ret});"++).nl)
+  (tab.("return ((Susp){"++).dummyPre.(", "++).uTag opts.("0});"++).nl).
   ("}"++).nl
 
 -- * Built-in constructors

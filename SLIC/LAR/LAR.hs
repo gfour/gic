@@ -112,9 +112,7 @@ headersC opts =
             ("#include \"c/lar.h\""++).nl.
             ("#include \"c/gc.h\""++).nl).nl.
       ("#include <c/gic_builtins.h>"++).nl.
-      ("#ifdef "++).macroHAS_GMP.nl.
-      ("#include <gmp.h>"++).nl.
-      ("#endif"++).nl.nl
+      wrapIfGMP (("#include <gmp.h>"++).nl) id.nl
       
 -- | The C macros of the generated code.
 macrosC :: Options -> MName -> Arities -> PMDepths -> Int -> ShowS
@@ -139,11 +137,10 @@ macrosC opts modName arities pmDepths arityCAF =
 createLibGCARInfra :: Options -> MName -> PMDepths -> ShowS
 createLibGCARInfra opts m pmds =
   -- add libgc handlers for the GMP library
-  ("#ifdef "++).macroHAS_GMP.nl.
-  ("void *GMP_GC_malloc(size_t sz) { return GC_malloc(sz); }"++).nl.
-  ("void *GMP_GC_realloc(void *p, size_t old, size_t new) { return GC_realloc(p, new); }"++).nl.
-  ("void GMP_GC_free(void *p, size_t sz) { GC_free(p); }"++).nl.
-  ("#endif"++).nl.
+  wrapIfGMP
+  (("void *GMP_GC_malloc(size_t sz) { return GC_malloc(sz); }"++).nl.
+   ("void *GMP_GC_realloc(void *p, size_t old, size_t new) { return GC_realloc(p, new); }"++).nl.
+   ("void GMP_GC_free(void *p, size_t sz) { GC_free(p); }"++).nl) id.
   mkMainAR opts m pmds.nl
 
 mkMainAR :: Options -> MName -> PMDepths -> ShowS
@@ -585,12 +582,8 @@ mainFunc env opts mainNesting modules =
            ("#endif"++).nl
          LibGC ->
            tab.("GC_init();"++).nl.
-           ("#ifdef USE_OMP"++).nl.
-           tab.("GC_thr_init();"++).nl.
-           ("#endif /* USE_OMP */"++).nl.
-           ("#ifdef "++).macroHAS_GMP.nl.
-           tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl.
-           ("#endif"++).nl
+           wrapIfOMP (tab.("GC_thr_init();"++).nl) id.
+           wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
       tab.("// initial activation record"++).nl.
@@ -615,11 +608,9 @@ mainFunc env opts mainNesting modules =
       tab.("t2 = clock();"++).nl.
       (case (findType mainDef env) of
           Tg (T dt) | dt==dtInteger ->
-            ("#ifdef "++).macroHAS_GMP.nl.
-            tab.("printf(\"Integer result=%s\\n\", mpz_get_str(0, 10, *((mpz_t*)res.ctxt)));"++).nl.
-            ("#else"++).nl.
-            tab.("printf(\"libgmp not found, cannot compute 'result', build with "++).macroHAS_GMP.("\\n\");"++).nl.
-            ("#endif "++).nl
+            wrapIfGMP
+            (tab.("printf(\"Integer result=%s\\n\", mpz_get_str(0, 10, *((mpz_t*)res.ctxt)));"++).nl)
+            (tab.("printf(\"cannot compute 'result', gic must be built with libgmp support\\n\");"++).nl)
           Tg (T dt) ->
             if (dt==dtInt || dt==dtBool) then
               tab.("if (res.ctxt == 0) printf(\"%d, \", res.constr);"++).nl.
