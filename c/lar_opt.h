@@ -85,9 +85,9 @@ typedef struct T_ {
 #define ZEROIFTAG(x)                        0
 #define THE_VALS(VARSARITY, T)              (THE_ARGS(T))
 #define ARGS(x, T)                          ((((Susp*) THE_VALS(0, T))[x])).ctxt
-#define ARGS_FLAG(x, T)                     ((LarArg)((unsigned long)ARGS(x, T) & 0x1))
-#define ARGC(arg)                           (TP_)((unsigned long)arg | 0x1)
-#define ARGS_FUNC(x, T)                     ((LarArg)((unsigned long)ARGS(x, T) & (UINTPTR_MAX-1)))
+#define ARGS_FLAG(x, T)                     ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)0x1))
+#define ARGC(arg)                           (TP_)((uintptr_t)arg | (uintptr_t)0x1)
+#define ARGS_FUNC(x, T)                     ((LarArg)((uintptr_t)ARGS(x, T) & (UINTPTR_MAX-1)))
 #define INIT_ARG_LOCKS(arity_a)                { }
 #define GETARG(x, ARGSARITY, T)  ({            \
       if (ARGS_FLAG(x, T) != NULL) {		       \
