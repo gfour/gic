@@ -82,7 +82,7 @@ typedef struct T_ {
 // single-threaded runtime
 #ifndef USE_OMP
 
-#define ZEROIFSEQ(x)                        0
+#define ZEROIFTAG(x)                        0
 #define THE_VALS(VARSARITY, T)              (THE_ARGS(T))
 #define ARGS(x, T)                          ((((Susp*) THE_VALS(0, T))[x])).ctxt
 #define ARGS_FLAG(x, T)                     ((LarArg)((unsigned long)ARGS(x, T) & 0x1))
