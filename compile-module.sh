@@ -21,7 +21,10 @@ GC_LIB="-pthread /var/tmp/gfour/gc-inst-7.2/lib/libgc.a"
 # STACKTRACE="+RTS -xc -RTS"
 STACKTRACE=
 
+# Needed for tagged pointers to work.
+OPT="-O2"
+
 set -e
 
 echo Compiling $1.g.o...
-./gic $TC $STACKTRACE -debug -cmod $1.hs && gcc $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall
+./gic $TC $STACKTRACE -debug -cmod $1.hs && gcc $OPT $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall

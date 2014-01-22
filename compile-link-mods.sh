@@ -11,6 +11,9 @@ GC_LIB="-pthread /var/tmp/gfour/gc-inst-7.2/lib/libgc.a"
 # GC_INCLUDE="-I/home/ptheof/gc-inst/include"
 # GC_LIB=/home/ptheof/gc-inst/lib/libgc.a
 
+# Needed for tagged pointers to work.
+OPT="-O2"
+
 set -e
 
 # generates a .hi file for the module (used by the GHC type checker)
@@ -42,7 +45,7 @@ fi
 
 ./gic -link $1 $2
 echo Linking with gcc...
-gcc $GC_INCLUDE -I . dfmod.c main-link.c "$1.g.o" "$2.g.o" $GC_LIB -o a.out -ggdb3 -Wall
+gcc $GC_INCLUDE -I . dfmod.c main-link.c "$1.g.o" "$2.g.o" $GC_LIB -o a.out -ggdb3 -Wall $OPT
 echo -n LAR\ \ result:\  
 ./a.out
 
