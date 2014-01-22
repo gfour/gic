@@ -190,15 +190,15 @@ namegenv m = ("__genv_"++).(m++)
 
 -- * Optimized LAR representation
 
--- | Place the arguments in { ... }. This is used when they are used to initialize the 
---   first field of a struct, i.e. when LarArg is a struct (in the parallel runtime, 
---   'LarArg' values contain locks).
+-- | Place the arguments in { ... }. This is used when they are used to initialize 
+--   the first field of a struct, i.e. when LarArg is a struct (in the parallel
+--   runtime, 'LarArg' values contain locks).
 wrapInBraces :: ShowS -> ShowS
 wrapInBraces s = ("{"++).s.("}"++)
 
--- | Embeds an argument (function pointer) directly in the context field of its value
---   (masking its last bit). This is used in the single-threaded runtime, to save space
---   for the LarArg[] fields.
+-- | Embeds an argument (function pointer) directly in the context field of its
+--   value (masking its last bit). This is used in the single-threaded runtime,
+--   to save space for the LarArg[] fields.
 embedArg :: ShowS -> ShowS
 embedArg arg = ("{0, ARGC("++).arg.(")}"++)
 
@@ -243,7 +243,7 @@ mkLARMacroOpt opts name arityA arityV nesting =
       (" ({ \\"++).nl.
       ("      TP_ lar = (TP_) GC_MALLOC(sizeof(T_) +             \\"++).nl.
       ("                               "++).
-      ("ZEROIFSEQ("++).shows arityA.(" * sizeof(LarArg)) +      \\"++).nl.
+      ("ZEROIFTAG("++).shows arityA.(" * sizeof(LarArg)) +      \\"++).nl.
       ("                               "++).
       shows arityV.(" * sizeof(Susp) +        \\"++).nl.
       ("                               "++).
