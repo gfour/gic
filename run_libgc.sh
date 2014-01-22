@@ -8,6 +8,8 @@
 
 set -e
 
+# If optimization level is less than 2, add -falign-functions.
+# CFLAGS="-I . -O1 -falign-functions -ggdb3"
 CFLAGS="-I . -O3 -ggdb3"
 # CFLAGS=-Wpadded
 

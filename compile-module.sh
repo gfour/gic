@@ -22,7 +22,7 @@ GC_LIB="-pthread /var/tmp/gfour/gc-inst-7.2/lib/libgc.a"
 STACKTRACE=
 
 # Needed for tagged pointers to work.
-OPT="-O2"
+OPT="-falign-functions"
 
 set -e
 

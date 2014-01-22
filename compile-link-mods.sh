@@ -12,7 +12,7 @@ GC_LIB="-pthread /var/tmp/gfour/gc-inst-7.2/lib/libgc.a"
 # GC_LIB=/home/ptheof/gc-inst/lib/libgc.a
 
 # Needed for tagged pointers to work.
-OPT="-O2"
+OPT="-falign-functions"
 
 set -e
 
