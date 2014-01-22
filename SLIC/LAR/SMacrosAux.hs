@@ -121,9 +121,9 @@ mkMainCall gc m =
           LibGC    -> ("("++).asMacroPrefixFunc mainDef.("AR());"++)
           SemiGC _ -> ("(t0);"++))
   in  wrapIfOMP
-      -- ("#pragma omp parallel shared(T0)"++).nl.
-      (("{"++).nl.
-       -- ("#pragma omp single"++).nl.
+      (("#pragma omp single"++).nl.
+       ("{"++).nl.
+       -- ("#pragma omp parallel shared(T0)"++).nl.
        resultCall.nl.
        ("}"++).nl)
       (resultCall.nl)

@@ -601,10 +601,7 @@ mainFunc env opts mainNesting modules =
             tab.("t0->nesting = "++).shows mainNesting.(";"++).nl).
       initModules modules.
       logGraphStart opts.
-      ("#pragma omp single"++).nl.
-      ("{"++).nl.
       mkMainCall gc m.
-      ("}"++).nl.
       tab.("t2 = clock();"++).nl.
       (case (findType mainDef env) of
           Tg (T dt) | dt==dtInteger ->
