@@ -38,9 +38,9 @@ logGraphStart opts =
     tab.("counter = 0;"++).nl. 
     tab.("p = fopen(\"graph.dot\", \"w\");"++).nl.
     tab.("if (p== NULL) { printf(\"Error in opening graph file.\"); exit(-1); } ; "++).nl.
-    tab.("printf(\"Initial LAR:%p\\n\", t0);"++).nl.
+    tab.("printf(\"Initial LAR:%p\\n\", T0);"++).nl.
     tab.("fprintf(p, \"digraph G {\\n\");"++).nl.
-    tab.("fprintf(p, \"LAR_%p [shape=house];\\n\", t0);"++).nl
+    tab.("fprintf(p, \"LAR_%p [shape=house];\\n\", T0);"++).nl
   else id
 
 -- | Closes the graph file.
