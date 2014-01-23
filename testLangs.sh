@@ -1,6 +1,14 @@
 #!/bin/bash
-
-# Compiler sanity check
+# 
+# Compiler sanity check, tests the following:
+# (1) The C (LAR) back-end: tagged Susp values, the -enum transformation,
+#     numerical and data benchmarks, polymorphism (including GADTs),
+#     the OpenMP-based runtime, and arbitrary precision integers (with libgmp).
+#     The tests use the lar_opt.h representation and garbage collection with libgc.
+# (2) The 0-order call-by-name interpreter (intensional with context dictionaries).
+# (3) The FL non-strict interpreter (with non-strict activation records).
+# (4) The 0-order lazy eduction interpreter (intensional with a warehouse).
+# 
 
 GHCI_FLAGS="-v0 -w -XGADTs"
 
@@ -78,6 +86,7 @@ function testLAR {
   ./run_libgc.sh $1
 }
 
+# Use the single-threaded runtime.
 unset OMP
 
 echo -- LAR --
@@ -90,7 +99,7 @@ do
 done
 
 echo -- 2. Polymorphic --
-# use the type checker of the GHC API and explicit type signatures
+# Use the type checker of the GHC API and explicit type signatures.
 export GICFLAGS=-ghc-tc
 for file in Examples/Polymorphic/*.hs
 do
@@ -105,7 +114,10 @@ do
 done
 
 echo -- 4. Parallel --
+
+# Use the built-in type checker, ignore type signatures.
 export GICFLAGS=-gic-tc-nsig
+# Use the OpenMP-based runtime.
 export OMP=1
 GHCIFLAGS="${GHCIFLAGS} -threaded"
 for file in Examples/Parallel/*.hs
