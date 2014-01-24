@@ -1,7 +1,9 @@
--- It computes the lengths of the Collatz sequences for the first 100000 natural numbers
+-- Computes the lengths of the Collatz sequences for the first 100000 natural
+-- numbers.
 
 module Main where
 
+main :: IO ()
 main = putStrLn (show result)
 
 result :: Int
