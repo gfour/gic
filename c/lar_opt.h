@@ -127,6 +127,11 @@ typedef struct T_ {
       }                                        \
       VALS(x, ARGSARITY, T);                   \
     })
+
+#ifdef SSTACK
+#error "The shadow stack can only be used in the single-threaded runtime."
+#endif /* SSTACK */
+
 #endif /* USE_OMP */
 
 #define VALS(x, VARSARITY, T)               (((Susp*) THE_VALS(VARSARITY, T))[x])

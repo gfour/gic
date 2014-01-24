@@ -124,9 +124,21 @@ macrosC opts modName arities pmDepths arityCAF =
           ("#error you must enable the USE_TAGS macro for tags to work"++).nl. 
           ("#endif /* USE_TAGS */"++).nl
        else id).
+      (let simplePushRet =
+             ("#define PUSHAR(a) a"++).nl.
+             ("#define RETVAL(x) x"++).nl
+       in  case gc of
+             SemiGC _ -> simplePushRet
+             LibGC    ->
+               wrapIfSSTACK
+               (("// push activation record to shadow stack"++).nl.
+                ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl.
+                ("// get call result and pop activation record"++).nl.
+                ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
+               simplePushRet).
       (case gc of
-            SemiGC _ -> ("#define GC_MALLOC MM_alloc"++)
-            LibGC    -> id).nl.
+          SemiGC _ -> ("#define GC_MALLOC MM_alloc"++)
+          LibGC    -> id).nl.
       defineGCAF modName gc arityCAF.nl.
       (case gc of
           LibGC    -> createLibGCARInfra opts modName pmDepths.nl
@@ -293,19 +305,31 @@ mainProg ds env config = foldDot (\x -> (mkCBlock x env config).nl) ds
 epilogue :: Options -> ShowS
 epilogue opts = builtins opts.nl
 
+-- | Generates a debugging prologue before each function body.
+debugFuncProlog :: QName -> ShowS
+debugFuncProlog f =
+  -- verify that the LAR on the stack is the same as the current LAR visible
+  wrapIfSSTACK
+  (("printf(\"Entered func "++).pprint f.
+   ("@%p(sstack-verified: %s)\\n\", *(sstack_ptr-1), (*(sstack_ptr-1)==T0? \"true\": \"false\"));"++).nl) id
+  
 -- | Generates C code for a block.
 mkCBlock :: BlockL -> TEnv -> ConfigLAR -> ShowS
 mkCBlock (DefL f e bind) env config =
   let fArity = length bind
-      gc = optGC $ getOptions config
+      opts = getOptions config
+      gc = optGC opts
   in  ("FUNC("++).pprint f.("){"++).nl.
       (if (fArity>0) && (gc==LibGC) then
-         ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl
+         ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl.
+         (if optDebug opts then
+            debugFuncProlog f
+          else id)
        else id).
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
           Just strictFrms -> forceStricts gc strictFrms fArity).
-      logPrev (getOptions config).
+      logPrev opts.
       (mkCFuncBody config env f e).
       ("}"++).nl
 mkCBlock (ActualL v act e) env config =
@@ -540,7 +564,11 @@ prologue opts modName arityCAF =
               ("#error THE GC flag must be enabled."++).nl.
               ("#endif"++).nl
             else id)
-         LibGC -> id).
+         LibGC ->
+           wrapIfSSTACK
+           (("static TP_* sstack_bottom;"++).nl.
+            ("static TP_* sstack_ptr;"++).nl
+           ) id).
       (if (optVerbose opts) then
          ("// Graphviz output functionality"++).nl.
          ("int counter; FILE *p; /* file for graph output */"++).nl
@@ -583,7 +611,12 @@ mainFunc env opts mainNesting modules =
          LibGC ->
            tab.("GC_init();"++).nl.
            wrapIfOMP (tab.("GC_thr_init();"++).nl) id.
-           wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id
+           wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id.
+           wrapIfSSTACK
+           (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*100000000);"++).nl.
+            ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
+            ("sstack_ptr = sstack_bottom;"++).nl
+           ) id
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
       tab.("// initial activation record"++).nl.
@@ -672,17 +705,20 @@ argDefs ds env stricts cbnVars gc =
 makeActs :: QName -> [QName] -> TEnv -> ConfigLAR -> ShowS
 makeActs f args env config =
   let fNesting  = findPMDepthSafe f (getPMDepths config)
+      isVar = case args of { [] | fNesting==0 -> True ; _ -> False }
+      allocHeap = optHeap (getOptions config) || (returnsThunk env f)
       -- nullary functions don't create a new LAR but use the current one (T0)
       -- unless they have nesting > 0
       fLAR =
-        case args of
-          [] | fNesting==0 -> ("T0"++)
-          _   ->
-            let fArity    = length args
-                allocHeap = optHeap (getOptions config) || (returnsThunk env f)
-                gc        = optGC (getOptions config)
-            in  mkAllocAR gc allocHeap f fArity fNesting $ pprintList (", "++) args
-  in  pprint f.("("++).fLAR.(")"++)
+        if isVar then ("T0"++)
+        else
+          let fArity    = length args
+              gc        = optGC (getOptions config)
+          in  mkAllocAR gc allocHeap f fArity fNesting $ pprintList (", "++) args
+  in  if isVar || allocHeap then
+        pprint f.("("++).fLAR.(")"++)
+      else
+        ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int

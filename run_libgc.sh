@@ -31,6 +31,10 @@ GC_LIB="-pthread /var/tmp/gfour/gc-inst-7.2/lib/libgc.a"
 # GC_INCLUDE="-I/home/ptheof/gc-inst/include"
 # GC_LIB=/home/ptheof/gc-inst/lib/libgc.a
 
+# If set, enables the shadow stack.
+# SSTACK="-DSSTACK"
+SSTACK=
+
 if [ "$CC" == "" ]; then
     CC=gcc
 fi
@@ -48,7 +52,7 @@ if [ "$GICFLAGS" = ""  ]; then
 fi
 
 ./gic ${GICFLAGS} -cl $1 > /dev/null
-CMD="${CC} ${GC_INCLUDE} ${CFLAGS} ${USE_GMP} ${USE_OMP} main.c ${GC_LIB}"
+CMD="${CC} ${SSTACK} ${GC_INCLUDE} ${CFLAGS} ${USE_GMP} ${USE_OMP} main.c ${GC_LIB}"
 # echo $CMD
 $CMD
 ./a.out

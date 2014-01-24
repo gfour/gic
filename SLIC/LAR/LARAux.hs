@@ -1,7 +1,7 @@
 -- | Helper definitions for the LAR back-end.
 
 module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct,
-                        wrapIfARGTAGS, wrapIfGMP, wrapIfOMP) where
+                        wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfSSTACK) where
 
 import SLIC.Constants
 import SLIC.LAR.LARGraph
@@ -48,6 +48,10 @@ wrapIfGMP = wrapIfMacro "HAS_GMP"
 -- | Wraps a piece of code in @\#ifdef ARGTAGS ... \#else ... \#endif@.
 wrapIfARGTAGS :: ShowS -> ShowS -> ShowS
 wrapIfARGTAGS = wrapIfMacro "ARGTAGS"
+
+-- | Wraps a piece of code in @\#ifdef SSTACK ... \#else ... \#endif@.
+wrapIfSSTACK :: ShowS -> ShowS -> ShowS
+wrapIfSSTACK = wrapIfMacro "SSTACK"
 
 -- | Wraps a piece of code in @\#ifdef macro ... \#endif@.
 wrapIfMacro :: String -> ShowS -> ShowS -> ShowS
