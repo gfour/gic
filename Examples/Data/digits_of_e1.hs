@@ -1,3 +1,8 @@
+module Main where
+
+main :: IO ()
+main = putStrLn (show result)
+
 eContFrac :: [Int]
 eContFrac = 2 : (aux 2);
 aux :: Int -> [Int]
