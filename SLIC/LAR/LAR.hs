@@ -124,18 +124,15 @@ macrosC opts modName arities pmDepths arityCAF =
           ("#error you must enable the USE_TAGS macro for tags to work"++).nl. 
           ("#endif /* USE_TAGS */"++).nl
        else id).
-      (let simplePushRet =
-             ("#define PUSHAR(a) a"++).nl.
-             ("#define RETVAL(x) x"++).nl
-       in  case gc of
-             SemiGC _ -> simplePushRet
-             LibGC    ->
-               wrapIfSSTACK
-               (("// push activation record to shadow stack"++).nl.
-                ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl.
-                ("// get call result and pop activation record"++).nl.
-                ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
-               simplePushRet).
+      wrapIfSSTACK
+      -- Use a shadow stack for function calls (use with the semi-space collector).
+      (("// push activation record to shadow stack"++).nl.
+       ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl.
+       ("// get call result and pop activation record"++).nl.
+       ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
+      -- No shadow stack, dummy macros (use with libgc).
+      (("#define PUSHAR(a) a"++).nl.
+       ("#define RETVAL(x) x"++).nl).
       (case gc of
           SemiGC _ -> ("#define GC_MALLOC MM_alloc"++)
           LibGC    -> id).nl.
@@ -548,27 +545,25 @@ prologue opts modName arityCAF =
                  ("/* Memory management */"++).nl.
                  ("inline unsigned char *MM_allocLAR(size_t bytes, TP_ T0);"++).nl.
                  ("unsigned char *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl.
-                 ("unsigned char *stackStart, *stackCur;"++).nl.
                  ("#define DEFAULT_MAXMEM "++).shows (optMaxMem opts).nl.
                  ("unsigned long MAXMEM = DEFAULT_MAXMEM;"++).nl.
                  ("unsigned long MAXMEMSPACE = DEFAULT_MAXMEM / 2;"++).nl.
                  ("// Function prototypes for the allocator"++).nl.
                  ("inline byte* MM_alloc(size_t bytes);"++).nl.
-                 ("byte *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl.
-                 ("byte *stackStart, *stackCur;"++).nl
+                 ("byte *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl
                CompileModule -> 
                  ("extern inline byte* MM_alloc(size_t bytes);"++).nl).
            ("// Memory management -- heap and stack"++).nl.
            (if sgc then
-              ("#ifndef GC"++).nl.
-              ("#error The GC flag must be enabled."++).nl.
-              ("#endif"++).nl
+              wrapIfNotMacro "GC" (("#error The GC flag must be enabled."++).nl).
+              wrapIfSSTACK id
+              (("#error The shadow stack must be enabled (macro SSTACK)."++).nl)
             else id)
-         LibGC ->
-           wrapIfSSTACK
-           (("static TP_* sstack_bottom;"++).nl.
-            ("static TP_* sstack_ptr;"++).nl
-           ) id).
+         LibGC -> id).
+      wrapIfSSTACK
+      (("static TP_* sstack_bottom;"++).nl.
+       ("static TP_* sstack_ptr;"++).nl)
+      id.
       (if (optVerbose opts) then
          ("// Graphviz output functionality"++).nl.
          ("int counter; FILE *p; /* file for graph output */"++).nl
@@ -603,22 +598,19 @@ mainFunc env opts mainNesting modules =
            tab.tab.("exit(1);"++).nl.
            tab.("}"++).nl.
            tab.("space = spaceStart = space1;"++).nl.
-           tab.("spaceEnd = space + MAXMEMSPACE;"++).nl.
-           tab.("stackStart = (byte*) &res;"++).nl.
-           ("#if VERBOSE_GC"++).nl.
-           tab.("printf(\"stack start = %p\\n\", stackStart); // !!!"++).nl.
-           ("#endif"++).nl
+           tab.("spaceEnd = space + MAXMEMSPACE;"++).nl
          LibGC ->
            tab.("GC_init();"++).nl.
            wrapIfOMP (tab.("GC_thr_init();"++).nl) id.
-           wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id.
-           wrapIfSSTACK
-           (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*100000000);"++).nl.
-            ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
-            ("sstack_ptr = sstack_bottom;"++).nl
-           ) id
+           wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
+      -- shadow stack initialization
+      wrapIfSSTACK
+      (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*100000000);"++).nl.
+       ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
+       ("sstack_ptr = sstack_bottom;"++).nl
+      ) id.      
       tab.("// initial activation record"++).nl.
       tab.("TP_ T0=NULL;"++).nl.
       (case gc of
@@ -707,18 +699,20 @@ makeActs f args env config =
   let fNesting  = findPMDepthSafe f (getPMDepths config)
       isVar = case args of { [] | fNesting==0 -> True ; _ -> False }
       allocHeap = optHeap (getOptions config) || (returnsThunk env f)
+      gc        = optGC (getOptions config)
       -- nullary functions don't create a new LAR but use the current one (T0)
       -- unless they have nesting > 0
       fLAR =
         if isVar then ("T0"++)
         else
           let fArity    = length args
-              gc        = optGC (getOptions config)
           in  mkAllocAR gc allocHeap f fArity fNesting $ pprintList (", "++) args
-  in  if isVar || allocHeap then
-        pprint f.("("++).fLAR.(")"++)
-      else
-        ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
+      simpleCall = pprint f.("("++).fLAR.(")"++)
+  in  case gc of
+        LibGC    -> simpleCall
+        SemiGC _ ->
+          if isVar then simpleCall
+          else ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int
