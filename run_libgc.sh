@@ -7,9 +7,9 @@
 #
 # Reads the following environment variables:
 # 
-#   CC : the C compiler to use (default=gcc)
+#   CC       : the C compiler to use (default=gcc)
 #   GICFLAGS : flags passed on to gic (e.g. the type checker to use)
-#   OMP : set it to any value, to enable the OpenMP runtime
+#   OMP      : set it to any value, to enable the OpenMP runtime
 #
 
 set -e
