@@ -19,11 +19,12 @@ if [ "$CC" = "" ]; then
 fi
 
 # add -DGC and -DSSTACK to the gcc flags if compiling with -semigc
-# add -DUSE_TAGS if compiling with -tag
 USE_GC="-DGC -DSSTACK"
 # USE_GC="-DGC -DSSTACK -DVERBOSE_GC"
-CFLAGS="-O3 -I ."
+
+CFLAGS="-O3 -I . -ggdb3"
 # CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
+# e.g. add -DUSE_TAGS if compiling with -tag
 
 ./gic -debug -semigc $1 $2 $3 $4 $5 $6 $7 $8 $9
 
