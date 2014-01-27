@@ -1,6 +1,7 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct,
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, wrapIfMacro,
+                        wrapIfNotMacro,
                         wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfSSTACK) where
 
 import SLIC.Constants
@@ -53,11 +54,18 @@ wrapIfARGTAGS = wrapIfMacro "ARGTAGS"
 wrapIfSSTACK :: ShowS -> ShowS -> ShowS
 wrapIfSSTACK = wrapIfMacro "SSTACK"
 
--- | Wraps a piece of code in @\#ifdef macro ... \#endif@.
+-- | Wraps a piece of code in @\#ifdef macro ... \#else .. \#endif@.
 wrapIfMacro :: String -> ShowS -> ShowS -> ShowS
 wrapIfMacro macroName s1 s2 =
   ("#ifdef "++).(macroName++).nl.
   s1.
   ("#else"++).nl.
   s2.
+  ("#endif /* "++).(macroName++).(" */"++).nl
+
+-- | Wraps a piece of code in @\#ifndef macro ... \#endif@.
+wrapIfNotMacro :: String -> ShowS -> ShowS
+wrapIfNotMacro macroName s =
+  ("#ifndef "++).(macroName++).nl.
+  s.
   ("#endif /* "++).(macroName++).(" */"++).nl
