@@ -5,7 +5,7 @@
 // Enables internal consistency check (used for debugging)
 #define DEBUG_GC 0
 // Print (lots of) diagnostic messages
-// #define VERBOSE_GC 0
+// #define VERBOSE_GC
 // Print statistics
 #define GC_STATS 1
 
