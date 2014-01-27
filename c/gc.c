@@ -105,8 +105,8 @@ static void MM_gc ()
 // If this is not exact, the program will crash.
 static void MM_process_stack ()
 {
-  byte* ptr;
-  for (ptr = stackCur; ptr <= stackStart; ptr++) {
+  TP_* ptr;
+  for (ptr = sstack_bottom; ptr <= sstack_ptr; ptr++) {
     TP_ lar = *((TP_ *) ptr);
     if (MM_valid(lar)) {
 #if VERBOSE_GC
@@ -249,7 +249,6 @@ inline byte* MM_alloc (size_t bytes)
     exit(1);
 #else
     // or garbage collect
-    stackCur = (byte *) &bytes;
     MM_gc();
     if (space + bytes > spaceEnd) {
       fprintf(stderr,
