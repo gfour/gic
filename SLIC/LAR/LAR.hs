@@ -561,7 +561,7 @@ prologue opts modName arityCAF =
            ("// Memory management -- heap and stack"++).nl.
            (if sgc then
               ("#ifndef GC"++).nl.
-              ("#error THE GC flag must be enabled."++).nl.
+              ("#error The GC flag must be enabled."++).nl.
               ("#endif"++).nl
             else id)
          LibGC ->
