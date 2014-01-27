@@ -1,21 +1,36 @@
 #!/bin/bash
+#
+# Compiles and runs a program using the "simple" LAR representation.
+# 
+# Reads the following environment variables:
+# 
+#   CC       : the C compiler to use (default=gcc)
+#   GICFLAGS : flags passed on to gic (e.g. the type checker to use)
+#   CFLAGS2  : extra flags passed to the C compiler
+# 
 
 set -e
 
-#USE_GMP=
+# USE_GMP=
 USE_GMP="-DHAS_GMP -lgmp"
 if [ "$CC" = "" ]; then
 #   CC=llvm-gcc-4.7
     CC=gcc
 fi
 
-# add -DGC to the gcc flags if compiling with -semigc
+# add -DGC and -DSSTACK to the gcc flags if compiling with -semigc
 # add -DUSE_TAGS if compiling with -tag
+USE_GC="-DGC -DSSTACK"
+# USE_GC="-DGC -DSSTACK -DVERBOSE_GC"
 CFLAGS="-O3 -I ."
 # CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
 
-./gic -nogc $1 $2 $3 $4 $5 $6 $7 $8 $9
+./gic -debug -semigc $1 $2 $3 $4 $5 $6 $7 $8 $9
 
 cat c/gc.c >> main.c
 
-${CC} ${CFLAGS} ${CFLAGS2} main.c ${USE_GMP} && ./a.out
+CMD="${CC} ${CFLAGS} ${CFLAGS2} main.c ${USE_GC} ${USE_GMP}"
+# echo $CMD
+$CMD
+
+./a.out
