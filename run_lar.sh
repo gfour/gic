@@ -25,7 +25,7 @@ CFLAGS="-O3 -I . -ggdb3"
 # CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
 # e.g. add -DUSE_TAGS if compiling with -tag
 
-./gic -semigc $1 $2 $3 $4 $5 $6 $7 $8 $9
+./gic -semigc $GICFLAGS $1 $2 $3 $4 $5 $6 $7 $8 $9 > /dev/null
 
 cat c/gc.c >> main.c
 
