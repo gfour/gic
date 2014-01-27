@@ -14,7 +14,6 @@ set -e
 # USE_GMP=
 USE_GMP="-DHAS_GMP -lgmp"
 if [ "$CC" = "" ]; then
-#   CC=llvm-gcc-4.7
     CC=gcc
 fi
 
@@ -26,7 +25,7 @@ CFLAGS="-O3 -I . -ggdb3"
 # CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
 # e.g. add -DUSE_TAGS if compiling with -tag
 
-./gic -debug -semigc $1 $2 $3 $4 $5 $6 $7 $8 $9
+./gic -semigc $1 $2 $3 $4 $5 $6 $7 $8 $9
 
 cat c/gc.c >> main.c
 
