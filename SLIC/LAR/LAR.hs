@@ -78,8 +78,8 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
               epilogue opts
             CompileModule ->
               (case gc of
-                  SemiGC _ -> id
-                  LibGC ->
+                  SemiGC -> id
+                  LibGC  ->
                     pdeclExts opts imports.
                     pdeclExtApps opts (diEApps $ dfiDfInfo dfi)).
               defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl.
@@ -105,10 +105,10 @@ headersC :: Options -> ShowS
 headersC opts =
   let gc   = optGC opts
   in  (case gc of
-          LibGC    ->
+          LibGC  ->
             ("#include \"c/lar_opt.h\""++).nl.
             ("#include \"gc.h\""++).nl
-          SemiGC _ ->
+          SemiGC ->
             ("#include \"c/lar.h\""++).nl.
             ("#include \"c/gc.h\""++).nl).nl.
       ("#include <c/gic_builtins.h>"++).nl.
@@ -134,12 +134,12 @@ macrosC opts modName arities pmDepths arityCAF =
       (("#define PUSHAR(a) a"++).nl.
        ("#define RETVAL(x) x"++).nl).
       (case gc of
-          SemiGC _ -> ("#define GC_MALLOC MM_alloc"++)
-          LibGC    -> id).nl.
+          SemiGC -> ("#define GC_MALLOC MM_alloc"++)
+          LibGC  -> id).nl.
       defineGCAF modName gc arityCAF.nl.
       (case gc of
-          LibGC    -> createLibGCARInfra opts modName pmDepths.nl
-          SemiGC _ -> createSemiGCARInfra modName gc arities pmDepths arityCAF.nl).nl
+          LibGC  -> createLibGCARInfra opts modName pmDepths.nl
+          SemiGC -> createSemiGCARInfra modName gc arities pmDepths arityCAF.nl).nl
 
 -- | Create the necessary macros for handling the optimized LARs. To be used
 --   by the libgc garbage collector.
@@ -182,8 +182,8 @@ createSemiGCARInfra m gc fArities pmDepths arityCAF =
       hAR_CLEAR d =
         ("#define AR_CLEAR_"++).shows d.("(lar, n) do {                 \\"++).nl.
         (case gc of
-            SemiGC _ -> tab.tab.("NESTED(n, lar) = NULL;                      \\"++).nl
-            LibGC    -> id).
+            SemiGC -> tab.tab.("NESTED(n, lar) = NULL;                      \\"++).nl
+            LibGC  -> id).
         tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, n+1);                       \\"++).nl.
         tab.tab.("} while(0)"++).nl
   in  if maxArity > maxLARArity then
@@ -245,8 +245,8 @@ pdeclExts opts imports =
             in smFun opts fname fArity fArity nesting
         pdecls = foldDot predeclEF (Data.Map.keys imports').nl
     in  case optGC opts of
-          SemiGC _ -> ierr "pdeclExts: not to be used with semiGC"
-          LibGC    -> pdecls
+          SemiGC -> ierr "pdeclExts: not to be used with semiGC"
+          LibGC  -> pdecls
 
 -- | Generates specialized macros for LARs used by dispatchers 
 --   for (unknown) external constructors
@@ -262,7 +262,7 @@ pdeclGCAF config arityCAF =
         opts    = getOptions config
         modGCAF = mkLARMacro opts ("GCAF_"++m) arityCAF arityCAF 0.nl
     in  case (optGC $ getOptions config) of
-          SemiGC _ ->
+          SemiGC ->
             if arityCAF == 0 then
               id
             else
@@ -512,7 +512,7 @@ protoF gc strs cbns fName (n, x)
     ("(T0) GETCBNARG(" ++).(shows n).(", T0)"++).nl
   | otherwise =
     case gc of
-      SemiGC _ ->
+      SemiGC ->
         ("#define " ++).pprint x.("(T0) "++).
         ("GETARG("++).(shows n).(", T0)"++).nl
       LibGC -> mkDefineVar gc x fName n
@@ -521,7 +521,7 @@ protoF gc strs cbns fName (n, x)
 defineGCAF :: MName -> GC -> Int -> ShowS
 defineGCAF modName gc arityCAF =
   case gc of
-    SemiGC _ ->
+    SemiGC ->
       ("#define "++).nameGCAF modName.("(x)  GETARG(x, "++).namegenv modName.(")"++)
     LibGC ->
       ("#define "++).nameGCAF modName.("(x)  GETARG(x, "++).
@@ -539,7 +539,7 @@ prologue opts modName arityCAF =
   let gc           = optGC opts
   in  genv modName arityCAF.nl.
       (case gc of
-         SemiGC sgc ->
+         SemiGC ->
            (case optCMode opts of
                Whole ->
                  ("/* Memory management */"++).nl.
@@ -554,11 +554,9 @@ prologue opts modName arityCAF =
                CompileModule -> 
                  ("extern inline byte* MM_alloc(size_t bytes);"++).nl).
            ("// Memory management -- heap and stack"++).nl.
-           (if sgc then
-              wrapIfNotMacro "GC" (("#error The GC flag must be enabled."++).nl).
-              wrapIfSSTACK id
-              (("#error The shadow stack must be enabled (macro SSTACK)."++).nl)
-            else id)
+           wrapIfNotMacro "GC" (("#error The GC flag must be enabled."++).nl).
+           wrapIfSSTACK id
+           (("#error The shadow stack must be enabled (macro SSTACK)."++).nl)
          LibGC -> id).
       wrapIfSSTACK
       (("static TP_* sstack_bottom;"++).nl.
@@ -583,7 +581,7 @@ mainFunc env opts mainNesting modules =
       tab.("Susp res;"++).nl.
       tab.("t1 = clock();\n"++).
       (case gc of
-         SemiGC _ ->
+         SemiGC ->
            tab.("/* allocate space in the heap */"++).nl.
            tab.("if (argc > 1) {"++).nl.
            tab.tab.("MAXMEM = strtoul(argv[1], NULL, 10);"++).nl.
@@ -615,13 +613,11 @@ mainFunc env opts mainNesting modules =
       tab.("TP_ T0=NULL;"++).nl.
       (case gc of
           LibGC -> id
-          SemiGC sgc ->
+          SemiGC ->
             tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl.
-            (if sgc then
-               tab.("#ifdef GC"++).nl.
-               tab.("t0->magic = MAGIC;"++).nl.
-               tab.("#endif"++).nl
-             else id)).
+            tab.("#ifdef GC"++).nl.
+            tab.("t0->magic = MAGIC;"++).nl.
+            tab.("#endif"++).nl).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.
@@ -672,7 +668,7 @@ initMod m config =
   in  ("void "++).genInitMod m.("(TP_ T0) {"++).nl.
       (if arityCAF > 0 then
         (case gc of
-            SemiGC _ ->
+            SemiGC ->
               tab.namegenv m.(" = AR("++).shows arityCAF.
               (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++).
               (");"++)
@@ -707,8 +703,8 @@ makeActs f args env config =
           in  mkAllocAR gc allocHeap f fArity fNesting $ pprintList (", "++) args
       simpleCall = pprint f.("("++).fLAR.(")"++)
   in  case gc of
-        LibGC    -> simpleCall
-        SemiGC _ ->
+        LibGC  -> simpleCall
+        SemiGC ->
           if isVar then simpleCall
           else ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 

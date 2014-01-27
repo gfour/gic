@@ -89,16 +89,16 @@ mkLARMacro opts name arityA arityV nesting =
   if (arityA==0) && (arityV==0) && (nesting==0) then
     id
   else case optGC opts of
-         LibGC    -> mkLARMacroOpt opts name arityA arityV nesting
-         SemiGC _ -> id
+         LibGC  -> mkLARMacroOpt opts name arityA arityV nesting
+         SemiGC -> id
 
 -- | Generates the macro for variable x of function f (stored in position n).
 mkDefineVar :: GC -> QName -> QName -> Int -> ShowS
 mkDefineVar gc x f n =
   ("#define " ++).pprint x.("(T0) "++).
   (case gc of
-      LibGC    -> asMacroPrefixFunc f
-      SemiGC _ -> id).
+      LibGC  -> asMacroPrefixFunc f
+      SemiGC -> id).
   ("GETARG("++).(shows n).(", T0)"++).nl
 
 -- | The prototype of a function.
@@ -118,8 +118,8 @@ mkMainCall gc m =
       resultCall =
         tab.("res = "++).((qName mainDef)++).
         (case gc of
-          LibGC    -> ("("++).asMacroPrefixFunc mainDef.("AR());"++)
-          SemiGC _ -> ("(t0);"++))
+          LibGC  -> ("("++).asMacroPrefixFunc mainDef.("AR());"++)
+          SemiGC -> ("(t0);"++))
   in  wrapIfOMP
       (("#pragma omp single"++).nl.
        ("{"++).nl.
@@ -136,8 +136,8 @@ mkAllocAR :: GC -> Bool -> QName -> Arity -> PMDepth -> ShowS -> ShowS
 mkAllocAR gc allocHeap f fArity fNesting argsS =
   let larConstr = if allocHeap then ("AR"++) else ("AR_S"++)
   in  (case gc of
-          LibGC    -> asMacroPrefixFunc f.larConstr.lparen
-          SemiGC _ ->
+          LibGC  -> asMacroPrefixFunc f.larConstr.lparen
+          SemiGC ->
             larConstr.lparen.shows fArity.(", "++).shows fNesting.
             if fArity > 0 then (", "++) else id).
       argsS.rparen
@@ -149,24 +149,24 @@ mkAllocAR gc allocHeap f fArity fNesting argsS =
 mkGETARG :: GC -> QName -> Int -> String -> ShowS
 mkGETARG gc f i ctxt =
   (case gc of
-      LibGC    -> asMacroPrefixFunc f
-      SemiGC _ -> id).
+      LibGC  -> asMacroPrefixFunc f
+      SemiGC -> id).
   ("GETARG("++).shows i.(", "++).(ctxt++).(")"++)
 
 -- | Generates a NESTED accessor for a function, at a nesting position.
 mkNESTED :: GC -> QName -> Int -> ShowS
 mkNESTED gc f i =
   (case gc of
-      LibGC    -> asMacroPrefixFunc f
-      SemiGC _ -> id).
+      LibGC  -> asMacroPrefixFunc f
+      SemiGC -> id).
   ("NESTED("++).shows i.(", T0)"++)
 
 -- | Generates a GETSTRICTARG accessor for a function, at a LAR position.
 mkGETSTRICTARG :: GC -> QName -> Int -> ShowS
 mkGETSTRICTARG gc f i =
   (case gc of
-      LibGC    -> asMacroPrefixFunc f
-      SemiGC _ -> id).("GETSTRICTARG("++).shows i.(", T0)"++)
+      LibGC  -> asMacroPrefixFunc f
+      SemiGC -> id).("GETSTRICTARG("++).shows i.(", T0)"++)
 
 -- | Generates a VALS accessor for a LAR position (where the LAR has a specified
 --   arity). Also takes a string representation of the context.
@@ -174,8 +174,8 @@ mkVALS :: GC -> Int -> Int -> String -> ShowS
 mkVALS gc i argsNum ctxt =
   ("VALS("++).shows i.(", "++).
   (case gc of
-      LibGC    -> shows argsNum.(", "++)
-      SemiGC _ -> id).
+      LibGC  -> shows argsNum.(", "++)
+      SemiGC -> id).
   (ctxt++).(")"++)
 
 -- * CAF construction

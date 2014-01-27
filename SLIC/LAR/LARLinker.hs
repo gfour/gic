@@ -93,9 +93,9 @@ makeCLinker opts dfis modNames =
       macrosC opts modName arities pmDepths arityCAF.
       prologue opts modName arityCAF.
       (case gc of
-          SemiGC _ ->
+          SemiGC ->
             createSemiGCARInfra modName gc arities pmDepths arityCAF
-          LibGC    ->
+          LibGC  ->
             mkLARMacroOpt opts (qName mainDef) 0 0 mainDepth.nl).
       ("extern "++).protoFunc mainDef.
       foldDot extInitMod modNames.             -- linked module initializers

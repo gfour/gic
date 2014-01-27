@@ -73,7 +73,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "             -heap    : allocate all lazy activation records on the heap"
            putStrLn "             -debug   : keep extra debugging information"
            putStrLn "             -v       : produce a graph trace file after program execution"
-           putStrLn "             -nogc    : no garbage collection"
            putStrLn "             -semigc  : enable semispace garbage collection (EXPERIMENTAL)"
            putStrLn "             -libgc   : use Boehm GC [libgc] (default)"
            putStrLn("             -mem M   : use M bytes of memory (default="++(showNum defaultMemSize)++")")
@@ -136,8 +135,7 @@ processArgs cmdArgs =
         aux ("-v"     : args) opts = aux args opts{optVerbose = True}
         aux ("-enum"  : args) opts = aux args opts{optOptEnums = True}
         aux ("-strict": args) opts = aux args opts{optStrict = True}
-        aux ("-nogc"  : args) opts = aux args opts{optGC = SemiGC False}
-        aux ("-semigc": args) opts = aux args opts{optGC = SemiGC True }
+        aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
         aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
         aux ("-tag"   : args) opts = aux args opts{optTag = True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC = GHCTc}{optTC=GHCTypeInf}

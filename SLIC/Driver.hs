@@ -255,8 +255,8 @@ itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
       allImps  = unions $ map ideclINames $ modImports pLAR
       -- get the names of CAFs
       cafInfo = case optGC opts of
-        SemiGC _ -> []  -- disable the CAF analysis for semi-gc
-        _        -> getCAFDcts p0Final
+        SemiGC -> []  -- disable the CAF analysis for semi-gc (TODO: fix)
+        _      -> getCAFDcts p0Final
       pmDepths = countPMDepths pLAR
       allArities = unions [builtinArities, calcFuncArities pLAR]
       conf = ConfigLAR { getCBNVars   = cbnVars

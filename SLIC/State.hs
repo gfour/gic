@@ -41,8 +41,7 @@ data CompileMode =
               
 -- | The garbage collector to use.
 data GC =
-    SemiGC Bool  -- ^ custom semispace garbage collector (flag = 'False' to 
-                 --   just test allocation)
+    SemiGC       -- ^ custom semispace garbage collector
   | LibGC        -- ^ Boehm's garbage collector (libgc)
   deriving (Eq)
                  
@@ -132,7 +131,6 @@ instance Show Options where
     ("Compilation mode: "++).shows (optCMode opts).nl.
     ("Garbage collector: "++).
     (case optGC opts of
-        SemiGC False   -> ("semispace (disabled)"++)
-        SemiGC True    -> ("semispace"++)
-        LibGC          -> ("libgc"++)).nl
+        SemiGC -> ("semispace"++)
+        LibGC  -> ("libgc"++)).nl
     
