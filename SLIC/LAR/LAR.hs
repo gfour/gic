@@ -621,9 +621,7 @@ mainFunc env opts mainNesting modules =
                tab.("#ifdef GC"++).nl.
                tab.("t0->magic = MAGIC;"++).nl.
                tab.("#endif"++).nl
-             else id).
-            tab.("t0->arity = 0;"++).nl.
-            tab.("t0->nesting = "++).shows mainNesting.(";"++).nl).
+             else id)).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.
