@@ -138,10 +138,10 @@ processArgs cmdArgs =
         aux ("-strict": args) opts = aux args opts{optStrict = True}
         aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
         aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
-        aux ("-compact":args) opts = aux args opts{optCompact = True}
+        aux ("-compact":args) opts = aux args opts{optCompact = True}{optGC=SemiGC}
         aux ("-tag"   : args) opts = aux args opts{optTag = True}
-        aux ("-ghc-tc": args) opts = aux args opts{optGHC = GHCTc}{optTC=GHCTypeInf}
-        aux ("-gic-tc": args) opts = aux args opts{optGHC = NoGHC}{optTC=GICTypeInf True}
+        aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
+        aux ("-gic-tc": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf True}
         aux ("-gic-tc-nsig": args) opts = aux args opts{optGHC = NoGHC}{optTC=GICTypeInf False}
         aux ("-ghc-core": args) opts = aux args opts{optGHC = GHCCore}{optTC=GHCTypeInf}
         aux ("-heap"  : args) opts = aux args opts{optHeap = True}

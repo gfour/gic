@@ -106,8 +106,10 @@ typedef struct T_ {
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
     { MAGIC, T0, n_arity, n_nesting, { __VA_ARGS__ } }))
 
+// Macros for compatibility with the LAR API.
 #define GETPREV(T0)      T0->prev
 #define GETPTR(p)        p
 #define ARITY(lar)       lar->arity
 #define NESTING(lar)     lar->nesting
 #define ARGS_FUNC(x, T)  ARGS(x, T)
+#define ARGC(arg)        arg

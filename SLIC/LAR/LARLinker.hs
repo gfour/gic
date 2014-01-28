@@ -13,7 +13,7 @@
 module SLIC.LAR.LARLinker (compileWholeL, linkLAR) where
 
 import Data.List (map)
-import qualified Data.Map as Map (empty, fromList, insert, union)
+import qualified Data.Map as Map (empty, fromList, insert, map, union)
 import Data.Set as Set (toList)
 
 import SLIC.AuxFun (foldDot, nameOf)
@@ -89,12 +89,13 @@ makeCLinker opts dfis modNames =
       cafs      = []
       arityCAF  = length cafs
       gc        = optGC opts
+      compact   = optCompact opts
   in  headersC opts.
       macrosC opts modName arities pmDepths arityCAF.
       prologue opts modName arityCAF.
       (case gc of
           SemiGC ->
-            createSemiGCARInfra modName gc arities pmDepths arityCAF
+            createSemiGCARInfra modName gc compact arities pmDepths arityCAF
           LibGC  ->
             mkLARMacroOpt opts (qName mainDef) 0 0 mainDepth.nl).
       ("extern "++).protoFunc mainDef.
@@ -116,13 +117,15 @@ compileWholeL :: DFI -> ProgL -> ConfigLAR -> ImportedNames -> IO ()
 compileWholeL dfi finalProgLAR config allImports =
   let eLAR = dfiTEnv dfi
       opts = getOptions config
-      (modFinal, (_, (cbns', strs'), pmdepths')) = linkWithDf opts dfi finalProgLAR
+      (modFinal, (fsigs', (cbns', strs'), pmdepths')) =
+        linkWithDf opts dfi finalProgLAR
       finalProgLAR' = modProg modFinal
       -- update the configuration with defunctionalization's usage information
       cbns    = Map.union (getCBNVars config) cbns'
       stricts = Map.union (getStricts config) strs'
       pmds    = Map.union (getPMDepths config) pmdepths'
-      config' = config{getCBNVars = cbns}{getStricts = stricts}{getPMDepths=pmds}
+      ars     = Map.union (getArities config) (Map.map length fsigs')
+      config' = config{getCBNVars = cbns}{getStricts = stricts}{getPMDepths=pmds}{getArities=ars}
   in  putOutput
       (makeC finalProgLAR' eLAR config' (dfi, allImports, Map.empty) "")
 

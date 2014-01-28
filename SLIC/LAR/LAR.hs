@@ -121,6 +121,7 @@ headersC opts =
 macrosC :: Options -> MName -> Arities -> PMDepths -> Int -> ShowS
 macrosC opts modName arities pmDepths arityCAF =
   let gc   = optGC opts
+      co   = optCompact opts
   in  ("// Macros"++).nl.nl.
       (if optTag opts then
           ("#ifndef USE_TAGS"++).nl.
@@ -142,7 +143,8 @@ macrosC opts modName arities pmDepths arityCAF =
       defineGCAF modName gc arityCAF.nl.
       (case gc of
           LibGC  -> createLibGCARInfra opts modName pmDepths.nl
-          SemiGC -> createSemiGCARInfra modName gc arities pmDepths arityCAF.nl).nl
+          SemiGC ->
+            createSemiGCARInfra modName gc co arities pmDepths arityCAF.nl).nl
 
 -- | Create the necessary macros for handling the optimized LARs. To be used
 --   by the libgc garbage collector.
@@ -165,8 +167,8 @@ mkMainAR opts m pmds =
   
 -- | Create all possible activation record shapes (to be allocated in the heap).
 --   Not to be used with the optimized LARs (that omit the size fields).
-createSemiGCARInfra :: MName -> GC -> Arities -> PMDepths -> Int -> ShowS
-createSemiGCARInfra m gc fArities pmDepths arityCAF =
+createSemiGCARInfra :: MName -> GC -> Bool -> Arities -> PMDepths -> Int -> ShowS
+createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
   let arities     = nub $ elems fArities
       nestings    = nub $ elems pmDepths
       maxArity    = maximum (arityCAF:arities)
@@ -178,24 +180,37 @@ createSemiGCARInfra m gc fArities pmDepths arityCAF =
       hAR_COPY 0  = ("#define AR_COPY_0(lar, n) do { } while(0)"++).nl
       hAR_COPY a  =
         ("#define AR_COPY_"++).shows a.("(lar, n, a0, ...) do {         \\"++).nl.
-        tab.tab.("ARGS(n, lar) = (a0);                        \\"++).nl.
+        tab.tab.("ARGS(n, lar) = ARGC(a0);                    \\"++).nl.
         tab.tab.("AR_COPY_"++).shows (a-1).("(lar, n+1, ## __VA_ARGS__);        \\"++).nl.
         tab.("} while(0)"++).nl
+      -- AR_CLEAR, simple representation
       hAR_CLEAR 0 = ("#define AR_CLEAR_0(lar, n) do { } while(0)"++).nl
       hAR_CLEAR d =
-        ("#define AR_CLEAR_"++).shows d.("(lar, n) do {                 \\"++).nl.
+        ("#define AR_CLEAR_"++).shows d.("(lar, n) do {            \\"++).nl.
         (case gc of
-            SemiGC -> tab.tab.("NESTED(n, lar) = NULL;                      \\"++).nl
+            SemiGC -> tab.tab.("NESTED(n, lar) = NULL;                \\"++).nl
             LibGC  -> id).
-        tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, n+1);                       \\"++).nl.
+        tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, n+1);                 \\"++).nl.
+        tab.tab.("} while(0)"++).nl
+      -- AR_CLEAR, compact representation
+      hAR_CLEARc 0 = ("#define AR_CLEAR_0(lar, ar, n) do { } while(0)"++).nl
+      hAR_CLEARc d =
+        ("#define AR_CLEAR_"++).shows d.("(lar, ar, n) do {            \\"++).nl.
+        (case gc of
+            SemiGC -> tab.tab.("NESTED(n, ar, lar) = NULL;                \\"++).nl
+            LibGC  -> id).
+        tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, ar, n+1);           \\"++).nl.
         tab.tab.("} while(0)"++).nl
   in  if maxArity > maxLARArity then
         error $ "Maximum function/LAR arity exceeded: "++(show maxArity)++", maximum is "++(show maxLARArity)
         else if maxNestings > maxNestedLARs then
                error $ "Maximum function/LAR nesting exceeded: "++(show maxNestings)++", maximum is "++(show maxNestedLARs)
-             else 
+             else                    
                (foldDot hAR_COPY [0..maxArity]).nl.
-               (foldDot hAR_CLEAR [0..maxNestings]).nl
+               (if compact then
+                  foldDot hAR_CLEARc [0..maxNestings]
+                else
+                  foldDot hAR_CLEAR [0..maxNestings]).nl
 
 -- | Generates the "extern" declarations that link to the defunctionalization
 --   interface and to functions in other modules. The CIDs table given is used
@@ -443,10 +458,12 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
             CaseL _ _ _ -> id
             _           -> ("Res = "++)).
         mkCExp env config ePB
+      compact = optCompact opts
+      argsN = getFuncArity efunc (getArities config)
   in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
       -- TODO: eliminate this when all patterns are nullary constructors
       -- (or are used as such, see 'bindsVars')
-      tab.mkNESTED (optGC opts) efunc depth.(" = cl["++).dS.("].ctxt;"++).nl.
+      tab.mkNESTED (optGC opts) compact efunc depth argsN.(" = cl["++).dS.("].ctxt;"++).nl.
       logDict opts d.
       -- if debug mode is off, optimize away constructor choice when there is
       -- only one pattern (will segfault/misbehave if the constructor
@@ -469,9 +486,18 @@ mkCExp _ _ e@(CaseL (Nothing, _) _ _) =
 mkCExp _ _ (ConstrL _) =
   ierr "LAR: ConstrL can only occur as the first symbol of a definition"
 mkCExp _ config (BVL v (Just depth, fname)) =
-  pprint v.("("++).mkNESTED (optGC $ getOptions config) fname depth.(")"++)
+  let gc = optGC $ getOptions config
+      compact = optCompact $ getOptions config
+      argsN = getFuncArity fname (getArities config)
+  in  pprint v.("("++).mkNESTED gc compact fname depth argsN.(")"++)
 mkCExp _ _ e@(BVL _ (Nothing, _)) =
     ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
+
+getFuncArity :: QName -> Arities -> Arity
+getFuncArity f ars =
+  case Data.Map.lookup f ars of
+    Just n -> n
+    Nothing -> ierr $ "mkCExp: BV: no arity of enclosing function "++(lName f)
 
 -- | Generates C code for a built-in binary operator.
 --   All the supported operators are on integers.
@@ -547,7 +573,6 @@ prologue opts modName arityCAF =
                Whole ->
                  ("/* Memory management */"++).nl.
                  ("inline unsigned char *MM_allocLAR(size_t bytes, TP_ T0);"++).nl.
-                 ("unsigned char *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl.
                  ("#define DEFAULT_MAXMEM "++).shows (optMaxMem opts).nl.
                  ("unsigned long MAXMEM = DEFAULT_MAXMEM;"++).nl.
                  ("unsigned long MAXMEMSPACE = DEFAULT_MAXMEM / 2;"++).nl.
@@ -555,14 +580,11 @@ prologue opts modName arityCAF =
                  ("inline byte* MM_alloc(size_t bytes);"++).nl.
                  ("byte *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl
                CompileModule -> 
-                 ("extern inline byte* MM_alloc(size_t bytes);"++).nl).
-           ("// Memory management -- heap and stack"++).nl.
-           wrapIfNotMacro "GC" (("#error The GC flag must be enabled."++).nl).
-           wrapIfSSTACK id
-           (("#error The shadow stack must be enabled (macro SSTACK)."++).nl)
+                 ("extern inline byte* MM_alloc(size_t bytes);"++).nl)
          LibGC -> id).
       wrapIfSSTACK
-      (("static TP_* sstack_bottom;"++).nl.
+      (("// Memory management: shadow stack pointers (base/current)"++).nl.
+       ("static TP_* sstack_bottom;"++).nl.
        ("static TP_* sstack_ptr;"++).nl)
       id.
       (if (optVerbose opts) then
@@ -589,14 +611,14 @@ mainFunc env opts mainNesting modules =
            tab.("if (argc > 1) {"++).nl.
            tab.tab.("MAXMEM = strtoul(argv[1], NULL, 10);"++).nl.
            tab.tab.("MAXMEMSPACE = MAXMEM / 2;"++).nl.
-           tab.tab.("printf(\"heap size = 2 x %ld bytes\\n\", MAXMEMSPACE);"++).nl.
+           tab.tab.("printf(\"heap size = 2 x %lu bytes\\n\", MAXMEMSPACE);"++).nl.
            tab.("}"++).nl.
-           tab.("space1 = (byte *) malloc(MAXMEMSPACE);"++).nl.
-           tab.("space2 = (byte *) malloc(MAXMEMSPACE);"++).nl.
+           tab.("space1 = (byte *) malloc((size_t)MAXMEMSPACE);"++).nl.
+           tab.("space2 = (byte *) malloc((size_t)MAXMEMSPACE);"++).nl.
            tab.("if (space1==NULL || space2==NULL) {"++).nl.
            tab.tab.("printf(\"Cannot allocate memory to start program, \""++).nl.
-           tab.tab.("       \"tried 2 x %ld bytes.\\n\", MAXMEMSPACE);"++).nl.
-           tab.tab.("exit(1);"++).nl.
+           tab.tab.("       \"tried 2 x %lu bytes.\\n\", MAXMEMSPACE);"++).nl.
+           tab.tab.("exit(EXIT_FAILURE);"++).nl.
            tab.("}"++).nl.
            tab.("space = spaceStart = space1;"++).nl.
            tab.("spaceEnd = space + MAXMEMSPACE;"++).nl
@@ -705,8 +727,9 @@ makeActs f args env config =
       fLAR =
         if isVar then ("T0"++)
         else
-          let fArity    = length args
-          in  mkAllocAR gc allocHeap f fArity fNesting $ pprintList (", "++) args
+          let fArity = length args
+              c      = optCompact (getOptions config)
+          in  mkAllocAR gc allocHeap c f fArity fNesting (map pprint args)
       simpleCall = pprint f.("("++).fLAR.(")"++)
   in  case gc of
         LibGC  -> simpleCall

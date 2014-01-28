@@ -43,7 +43,7 @@ module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
 
 import SLIC.AuxFun (insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
-import SLIC.State (GC(LibGC, SemiGC), Options(optCompact, optGC, optHeap))
+import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
 import SLIC.Types (Arity, MName, PMDepth, QName, qName, mainDefQName, pprint)
 import SLIC.LAR.LARAux (wrapIfOMP)
 
@@ -98,7 +98,7 @@ mkDefineVar gc x f n =
   ("#define " ++).pprint x.("(T0) "++).
   (case gc of
       LibGC  -> asMacroPrefixFunc f
-      SemiGC -> id).
+      SemiGC -> id).  
   ("GETARG("++).(shows n).(", T0)"++).nl
 
 -- | The prototype of a function.
@@ -130,15 +130,22 @@ mkMainCall gc m =
 
 -- | Construct a LAR for function calls. Takes the GC mode to use (this
 --   affects LAR representation), a flag to indicate if the LAR is going
---   in the heap (if False, it goes in the stack), the function
---   name\/arity\/depth, and the string containing the arguments.
-mkAllocAR :: GC -> Bool -> QName -> Arity -> PMDepth -> ShowS -> ShowS
-mkAllocAR gc allocHeap f fArity fNesting argsS =
+--   in the heap (if False, it goes in the stack), a flag to indicate if
+--   the LAR is using the compact representation, the function
+--   name\/arity\/depth, and the argument representations.
+mkAllocAR :: GC -> Bool -> Bool -> QName -> Arity -> PMDepth -> [ShowS] -> ShowS
+mkAllocAR gc allocHeap compact f fArity fNesting args =
   let larConstr = if allocHeap then ("AR"++) else ("AR_S"++)
+      args'     = if (compact && (not allocHeap)) then
+                     map (\a->("((Susp){0, ARGC("++).a.(")})"++)) args
+                  else args
+      argsS     = insCommIfMore args'
   in  (case gc of
           LibGC  -> asMacroPrefixFunc f.larConstr.lparen
           SemiGC ->
+            -- LAR constructors take extra "arity, nesting, ..." parameters.
             larConstr.lparen.shows fArity.(", "++).shows fNesting.
+            -- If function arguments follow, add comma.
             if fArity > 0 then (", "++) else id).
       argsS.rparen
 
@@ -153,13 +160,17 @@ mkGETARG gc f i ctxt =
       SemiGC -> id).
   ("GETARG("++).shows i.(", "++).(ctxt++).(")"++)
 
--- | Generates a NESTED accessor for a function, at a nesting position.
-mkNESTED :: GC -> QName -> Int -> ShowS
-mkNESTED gc f i =
+-- | Generates a NESTED accessor for a function, at a nesting position. Also
+--   takes the arity of the enclosing function.
+mkNESTED :: GC -> Bool -> QName -> Int -> Arity -> ShowS
+mkNESTED gc compact f i argsN =
   (case gc of
       LibGC  -> asMacroPrefixFunc f
       SemiGC -> id).
-  ("NESTED("++).shows i.(", T0)"++)
+  (if compact then
+     ("NESTED("++).shows i.(", "++).shows argsN.(", T0)"++)
+   else
+     ("NESTED("++).shows i.(", T0)"++))
 
 -- | Generates a GETSTRICTARG accessor for a function, at a LAR position.
 mkGETSTRICTARG :: GC -> QName -> Int -> ShowS
@@ -210,7 +221,8 @@ mkLARMacroOpt opts name arityA arityV nesting =
         ("      ARGS("++).shows n.(", lar) = ARGC("++).arg.(")"++).
         (";                               \\"++).nl
       fnameM = asMacroPrefix name
-      -- generates the AR_S constructor; the flag controls if LarArg is a struct or a pointer
+      -- generates the AR_S constructor; the flag controls if LarArg is a struct
+      -- or a pointer
       mkAR_S argWrapper =
         ("#define "++).fnameM.("AR_S"++).
         lparen.insCommIfMore (argsA arityA).rparen.
@@ -234,9 +246,8 @@ mkLARMacroOpt opts name arityA arityV nesting =
           compactAR_S = mkAR_S embedArg
           -- stack AR, parallel runtime, LarArg is a struct
           bigAR_S = mkAR_S wrapInBraces
-       in  if optCompact opts then compactAR_S
-           else if optHeap opts then id
-                else wrapIfOMP bigAR_S compactAR_S).
+       in  if optHeap opts then id
+           else wrapIfOMP bigAR_S compactAR_S).
       ("#define "++).fnameM.("AR"++).
       lparen.insCommIfMore (argsA arityA).rparen.
       (" ({ \\"++).nl.

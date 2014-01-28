@@ -275,6 +275,7 @@ b_strToList opts =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
       Just (_, cidNil)  = Data.Map.lookup bf_Nil  builtinCIDs
       gc = optGC opts
+      compact = optCompact opts
   in  ("Susp strToList(char *str, int chars, TP_ T0) {"++).nl.
       tab.("// construct list from back-to-front"++).nl.
       tab.("int d;"++).nl.
@@ -283,7 +284,7 @@ b_strToList opts =
       tab.("TP_ consTP;"++).nl.
       tab.("for (d=chars-1; d>=0; d--) {"++).nl.
       tab.tab.("consTP = "++).
-              mkAllocAR gc True bf_Cons 2 0 ("0, 0"++).("; "++).
+              mkAllocAR gc True compact bf_Cons 2 0 [("0"++), ("0"++)].("; "++).
               ("// generate evaluated LAR for Cons"++).nl.
       tab.tab.("// read character as integer"++).nl.
       tab.tab.(mkVALS gc 0 2 "consTP").(" = (Susp){(int)str[d], "++).listTag opts.("0};"++).nl.
