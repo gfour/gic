@@ -110,3 +110,4 @@ typedef struct T_ {
 #define GETPTR(p)        p
 #define ARITY(lar)       lar->arity
 #define NESTING(lar)     lar->nesting
+#define ARGS_FUNC(x, T)  ARGS(x, T)

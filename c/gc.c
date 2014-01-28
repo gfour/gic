@@ -17,6 +17,8 @@ static void MM_scan (TP_ lar);
 static void MM_compare_heaps (byte* old_space);
 static void MM_compare (TP_ lar);
 
+// The minimum amount of space that should be left after garbage collection.
+#define GC_HEADROOM 1000000
 
 #if GC_STATS
 // Statistics: count the copied LARs & processed LAR pointers in the stack
@@ -130,7 +132,7 @@ static TP_ MM_forward (TP_ lar)
   // if already forwarded, just return it
   if (lar->magic == FORWARDED) {
 #if VERBOSE_GC
-    printf("already to %p\n", lar->prev);
+    printf("already to %p\n", GETPTR(lar->prev));
 #endif
     return lar->prev;
   }
@@ -161,10 +163,10 @@ static void MM_scan (TP_ lar)
   if (MM_valid(lar->prev))
     lar->prev = MM_forward(lar->prev);
   int n;
-  for (n=0; n<lar->arity; n++)
+  for (n=0; n<ARITY(lar); n++)
     if (ARGS(n, lar) == NULL && MM_valid(VALS(n, lar).ctxt))
       VALS(n, lar).ctxt = MM_forward(VALS(n, lar).ctxt);
-  for (n=0; n<lar->nesting; n++)
+  for (n=0; n<NESTING(lar); n++)
     if (MM_valid(NESTED(n, lar)))
       NESTED(n, lar) = MM_forward(NESTED(n, lar));
 }
@@ -201,23 +203,23 @@ static void MM_compare (TP_ lar)
             "invalid forwarding pointer");
   ASSERT_GC(*((size_t*) lar) = *((size_t*) copy),
             "mismatch in sizes");
-  ASSERT_GC(lar->arity == copy->arity,
+  ASSERT_GC(ARITY(lar) == ARITY(copy),
             "mismatch in arity");
-  ASSERT_GC(lar->nesting == copy->nesting,
+  ASSERT_GC(NESTING(lar) == NESTING(copy),
             "mismatch in nesting");
-  ASSERT_GC(lar->arity == copy->arity,
+  ASSERT_GC(ARITY(lar) == ARITY(copy),
             "mismatch in arity");
   int n;
-  for (n=0; n<lar->arity; n++)
+  for (n=0; n<ARITY(lar); n++)
     ASSERT_GC(ARGS(n, lar) == ARGS(n, copy),
               "mismatch in ARGS");
-  for (n=0; n<lar->arity; n++) {
+  for (n=0; n<ARITY(lar); n++) {
     ASSERT_GC(VALS(n, lar).constr == VALS(n, copy).constr,
               "mismatch in VALS constr");
     ASSERT_GC(MM_ptr_eq(VALS(n, lar).ctxt, VALS(n, copy).ctxt),
               "mismatch in VALS context");
   }
-  for (n=0; n<lar->nesting; n++)
+  for (n=0; n<NESTING(lar); n++)
     ASSERT_GC(MM_ptr_eq(NESTED(n, lar), NESTED(n, copy)),
               "mismatch in NESTED");
 }
@@ -236,7 +238,7 @@ inline byte* MM_alloc (size_t bytes)
   bytes = ALIGN(bytes + MEM_HEADER_SZ);
 #else
   bytes = ALIGN(bytes);
-#endif
+#endif /* GC */
 
   // If no space left
   if (space + bytes > spaceEnd) {
@@ -250,14 +252,15 @@ inline byte* MM_alloc (size_t bytes)
 #else
     // or garbage collect
     MM_gc();
-    if (space + bytes > spaceEnd) {
+    if (space + bytes > spaceEnd - GC_HEADROOM) {
       fprintf(stderr,
               "Heap overflow: more than %lu bytes needed, "
-              "even after GC. Use more memory with -mem when compiling.\n",
-              (unsigned long) MAXMEM);
+              "less than %d bytes free after GC. "
+	      "Use more memory with -mem when compiling.\n",
+              (unsigned long) MAXMEM, GC_HEADROOM);
       exit(1);
     }
-#endif
+#endif /* GC */
   }
 
 #ifdef GC
@@ -266,7 +269,7 @@ inline byte* MM_alloc (size_t bytes)
   byte* ret = space + MEM_HEADER_SZ;
 #else
   byte* ret = space;
-#endif
+#endif /* GC */
   space += bytes;
   return ret;
 }
