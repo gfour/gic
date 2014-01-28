@@ -1,18 +1,14 @@
 #!/bin/bash
 #
 # Test the separate compilation features using the simple LAR representation.
-# The GC variable controls whether semispace garbage collection is enabled.
 #
 
 set -e
 
-# semispace GC (disabled)
-GC="-nogc"
-CFLAGS="-I ."
-
-# semispace GC
-# GC="-semigc"
-# CFLAGS="-DGC -I ."
+# Semi-space GC
+GC="-semigc"
+CFLAGS="-I . -I ./c"
+# CFLAGS="-DGC -I . -I ./c"
 
 function compileLink {
     for module in $1 $2
@@ -36,7 +32,7 @@ function compileLink {
     echo "Main.result" | ghci -v0 $1.hs $2.hs
 }
 
-echo --- Separate compilation tests [lar, ${GC}] ---
+echo --- Separate compilation tests [lar, simple] ---
 echo -- [Example1] --
 compileLink Examples/Modules/Example1/ModuleA Examples/Modules/Example1/Main
 echo -- [Example2] --
