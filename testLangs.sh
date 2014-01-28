@@ -86,6 +86,7 @@ function testLAR {
   echo -n $1, LAR:\ 
   ./run_libgc.sh $1
   # ./run_lar.sh -mem 1280000000 $1
+  # CFLAGS2="-w" ./run_lar.sh -mem 2280000000 -compact $1
 }
 
 # Use the single-threaded runtime.
