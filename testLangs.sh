@@ -18,6 +18,7 @@ echo Testing -tag...
 TAG_EXAMPLE=Examples/Data/example2.hs
 CFLAGS2="-DUSE_TAGS" ./run_lar.sh -tag ${TAG_EXAMPLE}
 echo "result" | ghci ${GHCI_FLAGS} ${TAG_EXAMPLE}
+unset CFLAGS2
 
 ############# Test -enum type transformation
 
@@ -84,6 +85,7 @@ function testLAR {
 
   echo -n $1, LAR:\ 
   ./run_libgc.sh $1
+  # ./run_lar.sh -mem 1280000000 $1
 }
 
 # Use the single-threaded runtime.
