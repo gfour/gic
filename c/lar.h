@@ -1,5 +1,5 @@
 /*
-   LAR infrastructure, standard representation for use with the semispace
+   LAR infrastructure, standard representation for use with the semi-space
    garbage collector.
 */
 
