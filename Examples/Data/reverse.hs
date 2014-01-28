@@ -1,3 +1,8 @@
+module Main where
+
+main :: IO ()
+main = putStrLn (show result)
+
 data List = Nil | Cons Int List;
 
 head2 :: List -> Int
