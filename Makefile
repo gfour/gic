@@ -16,7 +16,7 @@ EXTRA=-package ghc -fwarn-unused-binds -Wall
 #EXTRA=-fhpc
 #EXTRA=-auto -prof
 
-# enable use of the GHC API
+# Use of the GHC API for type checking.
 USE_GHC=-DUSE_GHC -XRankNTypes
 # USE_GHC=
 
