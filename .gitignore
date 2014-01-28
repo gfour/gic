@@ -6,7 +6,6 @@
 *.g.o
 Bench/
 Examples/Misc/
-NewBench/
 THIH/
 gic-pack/
 mdefunc/
