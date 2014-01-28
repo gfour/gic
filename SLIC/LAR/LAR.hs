@@ -109,7 +109,10 @@ headersC opts =
             ("#include \"c/lar_opt.h\""++).nl.
             ("#include \"gc.h\""++).nl
           SemiGC ->
-            ("#include \"c/lar.h\""++).nl.
+            (if optCompact opts then
+               ("#include \"c/lar_compact.h\""++).nl
+             else
+               ("#include \"c/lar.h\""++).nl).
             ("#include \"c/gc.h\""++).nl).nl.
       ("#include <c/gic_builtins.h>"++).nl.
       wrapIfGMP (("#include <gmp.h>"++).nl) id.nl
@@ -615,9 +618,12 @@ mainFunc env opts mainNesting modules =
           LibGC -> id
           SemiGC ->
             tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl.
-            tab.("#ifdef GC"++).nl.
-            tab.("t0->magic = MAGIC;"++).nl.
-            tab.("#endif"++).nl).
+            if optCompact opts then
+              id
+            else
+              tab.("#ifdef GC"++).nl.
+              tab.("t0->magic = MAGIC;"++).nl.
+              tab.("#endif"++).nl).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.

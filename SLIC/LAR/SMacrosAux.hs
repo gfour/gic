@@ -43,7 +43,7 @@ module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
 
 import SLIC.AuxFun (insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
-import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
+import SLIC.State (GC(LibGC, SemiGC), Options(optCompact, optGC, optHeap))
 import SLIC.Types (Arity, MName, PMDepth, QName, qName, mainDefQName, pprint)
 import SLIC.LAR.LARAux (wrapIfOMP)
 
@@ -230,14 +230,13 @@ mkLARMacroOpt opts name arityA arityV nesting =
       shows arityA. (", T)"++).nl.
       ("#define "++).fnameM. ("NESTED(x, T)        NESTED(x, "++). 
       shows arityA. (", "++). shows arityV. (", T)"++). nl.
-      (if optHeap opts then id
-       else
-         wrapIfOMP
-         -- stack AR, parallel runtime, LarArg is a struct
-         (mkAR_S wrapInBraces)
-         -- stack AR, single-threaded runtime, LarArg is a pointer
-         (mkAR_S embedArg)
-      ).
+      (let -- stack AR, single-threaded runtime, LarArg is a pointer
+          compactAR_S = mkAR_S embedArg
+          -- stack AR, parallel runtime, LarArg is a struct
+          bigAR_S = mkAR_S wrapInBraces
+       in  if optCompact opts then compactAR_S
+           else if optHeap opts then id
+                else wrapIfOMP bigAR_S compactAR_S).
       ("#define "++).fnameM.("AR"++).
       lparen.insCommIfMore (argsA arityA).rparen.
       (" ({ \\"++).nl.

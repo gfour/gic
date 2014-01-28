@@ -98,6 +98,7 @@ data Options = Options
   , optLink    :: Bool             -- ^ linking mode
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
   , optWhRedis :: Bool             -- ^ use the Redis-based warehouse for the Erlang back-end
+  , optCompact :: Bool             -- ^ use the compact x86-64 representation
   }
 
 -- | The default options of the compiler. It is used as a default for
@@ -122,6 +123,7 @@ defaultOptions = Options
   , optLink    = False
   , optCMode   = Whole
   , optWhRedis = False
+  , optCompact = False
   }
 
 instance Show Options where
