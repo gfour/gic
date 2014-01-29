@@ -325,7 +325,9 @@ transl_def opts fm (S.PatBind _ pat _ rhs _) st =
       _ -> errM fm $ "Unsupported pattern definition"++(show pat)
 transl_def opts fm (S.FunBind [S.Match _ hsName pats _ rhs _]) st =
     let defQName = QN Nothing (getName hsName)
-        getFrm pv@(S.PVar _) = Frm (pv2v fm pv) (optStrict opts)
+        getFrm pv@(S.PVar _)   = Frm (pv2v fm pv) (optStrict opts)
+        getFrm (S.PBangPat pv) = Frm (pv2v fm pv) True
+        getFrm (S.PParen pp)   = getFrm pp
         getFrm f = errM fm $ "Haskell-to-FL: unsupported formal in pattern, "++(show f)
         formals = map getFrm pats
         S.UnGuardedRhs body = rhs

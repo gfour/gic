@@ -292,7 +292,7 @@ parseFL :: Options -> FPath -> String -> IO ModFPre
 parseFL opts f text =
   let pMode = ParseMode { parseFilename = f
       -- does not work: , baseLanguage = Haskell2010
-                        , Parser.extensions = [GADTs]
+                        , Parser.extensions = [GADTs, BangPatterns]
                         , ignoreLanguagePragmas = False
                         , ignoreLinePragmas = False
                         , fixities = Nothing
