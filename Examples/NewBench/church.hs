@@ -1,5 +1,10 @@
 -- Church numerals
 
+module Main where
+
+main :: IO ()
+main = putStrLn (show result)
+
 church :: Int -> (Int -> Int) -> Int -> Int
 church i f x =
    if i == 0 then
