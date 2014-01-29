@@ -137,7 +137,7 @@ mkAllocAR :: GC -> Bool -> Bool -> QName -> Arity -> PMDepth -> [ShowS] -> ShowS
 mkAllocAR gc allocHeap compact f fArity fNesting args =
   let larConstr = if allocHeap then ("AR"++) else ("AR_S"++)
       args'     = if (compact && (not allocHeap)) then
-                     map (\a->("((Susp){0, ARGC("++).a.(")})"++)) args
+                     map (\a->("ARGC("++).a.(")"++)) args
                   else args
       argsS     = insCommIfMore args'
   in  (case gc of

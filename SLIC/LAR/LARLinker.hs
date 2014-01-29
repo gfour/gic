@@ -102,7 +102,7 @@ makeCLinker opts dfis modNames =
       foldDot extInitMod modNames.             -- linked module initializers
       declarationsBuiltins opts.
       mainFunc env opts mainDepth modNames.
-      prettyPrintersC opts.nl.
+      prettyPrintersC.nl.
       epilogue opts.nl
 
 getMainDepth :: [DFI] -> PMDepth

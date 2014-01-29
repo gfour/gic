@@ -1,29 +1,38 @@
 -- | Tags for value annotations.
 -- 
 
-module SLIC.Tags (builtinTags, intTag, listTag, findTagOfDT, uTag) where
+module SLIC.Tags (builtinTags, intTag, integerTag, listTag, findTagOfDT, uTag,
+                  mBoolTag, mIntTag) where
 
 import Data.Map (Map, fromList, lookup, toList)
 import SLIC.AuxFun (foldDot, ierr)
-import SLIC.State (Options, optTag)
+import SLIC.LAR.LARAux (ConfigLAR(getOptions))
+import SLIC.State (Options(optTag))
 import SLIC.Types
 
 -- | Unknown tags, placeholder.
-uTag :: Options -> ShowS
-uTag opts = if optTag opts then ("0 /* unknown tag */, "++) else id      
+uTag :: ShowS
+uTag = ("0"++)
     
 -- | The tag for the built-in Int data type.
-builtinTag :: Options -> DTName -> ShowS
-builtinTag opts dt =
-  if optTag opts then shows (findTagOfDT dt builtinTags).(", "++) else id
+builtinTag :: DTName -> ShowS
+builtinTag dt = shows (findTagOfDT dt builtinTags)
 
 -- | The tag for the Int type.
-intTag :: Options -> ShowS
-intTag opts = builtinTag opts dtInt
+intTag :: ShowS
+intTag = builtinTag dtInt
+
+-- | The tag for the Bool type.
+boolTag :: ShowS
+boolTag = builtinTag dtBool
+
+-- | The tag for the Integer type.
+integerTag :: ShowS
+integerTag = builtinTag dtInteger
 
 -- | The tag for the list type.
-listTag :: Options -> ShowS
-listTag opts = builtinTag opts dtList
+listTag :: ShowS
+listTag = builtinTag dtList
 
 -- | A tag is a nuber.
 type Tag = Int
@@ -47,3 +56,8 @@ findTagOfDT dt tags =
     Just tId -> tId
     Nothing  -> ierr $ (qName dt)++" is not in tags: "++(pprintTags tags "")
 
+mTag :: ShowS -> ConfigLAR -> ShowS
+mTag tag config = if (optTag $ getOptions config) then (", "++).tag else id
+
+mIntTag     :: ConfigLAR -> ShowS ; mIntTag     = mTag intTag
+mBoolTag    :: ConfigLAR -> ShowS ; mBoolTag    = mTag boolTag

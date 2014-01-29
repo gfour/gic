@@ -146,3 +146,25 @@ typedef struct T_ {
 
 /* A call-by-name argument calls directly the argument, does no memoization. */
 #define GETCBNARG(x, T)                    (ARGS_FUNC(x, T)(T))
+
+/* *********** Macros of the LAR API *********** */
+
+#define GETTPTR(p)         p
+#define CONSTR(p)          p.constr
+
+/* Primitive value read/create macros. Isomorphic to nullary constructors. */
+#define PRIMVAL_R(p)                   p.constr
+
+#ifdef USE_TAGS
+#error TODO: USE_TAGS for lar_opt.h
+#else
+#define PRIMVAL_C(i)                   ((Susp) { i, NULL })
+#endif /* USE_TAGS */
+
+#ifdef USE_TAGS
+/* Thunk constructor: (constructor, tag, ctxt). */
+#define SUSP(c, t, p)      ((Susp) {c, t, p})
+#else
+/* Thunk constructor, ignores the tag 't'. */
+#define SUSP(c, t, p)      ((Susp) {c, p})
+#endif /* USE_TAGS */

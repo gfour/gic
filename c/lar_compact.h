@@ -1,7 +1,7 @@
 /*
    LAR infrastructure, compact representation for use with the semi-space
    garbage collector. Only works on the x86-64 architecture due to heavy
-   use of tagged pointers.
+   use of tagged pointers and assumptions about the use of bits in pointers.
 */
 
 // Header files
@@ -30,7 +30,7 @@
 #endif /* GC */
 #endif /* SSTACK */
 
-/* Give a warning when compiling without garbage collection enabled. */
+/* Give a warning when compiling without garbage collection. */
 #ifndef GC
 #warning Garbage collection is disabled for this build.
 #endif /* GC */
@@ -42,9 +42,9 @@ typedef unsigned char byte;
 typedef struct T_* TP_;
 
 typedef struct Susp {
-  int constr;              // constructor id
+  //  int constr;              // constructor id
   //  union {
-    TP_ ctxt;              // lazy constructor context
+  TP_ ctxt;                    // lazy constructor context
   //    LarArg arg;            // unevaluated argument
   //}
 } Susp;
@@ -66,12 +66,15 @@ typedef struct T_ {
     TP_  the_nested[n_nesting];                    \
   }
 
-// Macros
+/* Macros */
 
 #define True 1
 #define False 0
 
 #define ZEROIFTAG(x)                   0
+
+/* The mask that singles out with AND the important bits in a pointer (3:47). */
+#define PTRMASK                        0xfffffffffff8
 
 #define THE_ARGS(T)                    ((byte *) &((T)->data))
 #define VALS(x, T)                     (((Susp*) (THE_ARGS(T)))[x])
@@ -117,13 +120,24 @@ typedef struct T_ {
     { ARINFO(n_arity, n_nesting, T0), { __VA_ARGS__ } }))
 
 // Embeds arity/nesting/previous-pointer information in a single word.
-#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | ((uintptr_t)n_nesting << 48) | (((uintptr_t)prev) & 0xfffffffffff8))
+#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | ((uintptr_t)n_nesting << 48) | (((uintptr_t)prev) & PTRMASK))
 
-// Macros for compatibility with the LAR API.
-#define GETPREV(T0) GETTPTR(T0->prev)
-#define GETTPTR(p) (TP_)(((intptr_t)(((uintptr_t)(p)) << 16) >> 16) & (~7))
-// AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3)
-#define ARITY(lar) (unsigned char)(((uintptr_t)((TP_)lar)->prev) >> 56)
-#define NESTING(lar) (unsigned char)((((uintptr_t)((TP_)lar)->prev) & 0xffffffffffff) >> 48)
-#define ARGC(arg)                      (TP_)((uintptr_t)arg | (uintptr_t)0x1)
+/* *********** Macros of the LAR API *********** */
+
+#define GETPREV(T0)   GETTPTR(T0->prev)
+#define GETTPTR(p)    ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
+/* AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3) */
+#define ARITY(lar)    (unsigned char)(((uintptr_t)((TP_)lar)->prev) >> 56)
+#define NESTING(lar)  (unsigned char)((((uintptr_t)((TP_)lar)->prev) & 0xffffffffffff) >> 48)
+#define ARGC(arg)                      ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
 #define ARGS_FUNC(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)(~1)))
+
+/* shift right, fill with 0s */
+#define CONSTR(p)                      ((int)(((uintptr_t)p.ctxt) >> 48))
+
+/* Primitive value read/create macros. These values use all high 61 bits. */
+#define PRIMVAL_R(p)                   ((unsigned long)(((uintptr_t)(p).ctxt) >> 3))
+#define PRIMVAL_C(i)                   ((Susp) { (TP_)(((uintptr_t)(i)) << 3) } )
+
+/* Thunk constructor, ignores the tag 't'. */
+#define SUSP(c, t, p)                  ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )

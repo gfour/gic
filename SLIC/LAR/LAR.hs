@@ -48,6 +48,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
         cbns        = getCBNVars config
         arities     = getArities config
         pmDepths    = getPMDepths config
+        cids        = getCIDs config
         importFuns  = keys imports
         opts        = getOptions config
         gc          = optGC opts        
@@ -74,7 +75,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
               initMod modName config.
               mainFunc env opts (depthOfMainDef defs) [modName].nl.
               mainProg defs env config.
-              prettyPrintersC opts.
+              prettyPrintersC.
               epilogue opts
             CompileModule ->
               (case gc of
@@ -87,7 +88,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
               defineGCAF modName gc arityCAF.nl.     -- CAF LAR macro
               initMod modName config.nl.             -- module initializer
               mainProg defs' env config).
-        prettyPrintersFor dTypes config.nl
+        prettyPrintersFor dTypes cids.nl
 
 -- | Tests if a block is local. Non-local functions are those from another module 
 --   (so far only the closure dispatchers of defunctionalization satisfy this
@@ -395,9 +396,9 @@ mkCStmBody (ConstrL (CC c cId cArity)) _ config =
   in  logConstr opts c.
       -- keep the context if the constructor is not nullary (or when debugging)
       (if (cArity>0) || optDebug opts then
-         ("return ((Susp){ "++).shows cId.(", "++).uTag opts.("T0 });"++).nl
+         ("return (SUSP("++).shows cId.(", "++).uTag.(", T0));"++).nl
        else
-         ("return ((Susp){ "++).shows cId.(", "++).uTag opts.("NULL });"++)).nl
+         ("return (SUSP("++).shows cId.(", "++).uTag.(", (TP_)NULL));"++)).nl
 mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
 
 -- | Generates C code for a LAR expression. Takes the name of the containing
@@ -405,22 +406,23 @@ mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
 --   configuration, and the LAR expression.
 mkCExp :: TEnv -> ConfigLAR -> ExprL -> ShowS
 mkCExp env config (LARC (CN c) exps) =
-  let opts = getOptions config
+  let compact = optCompact $ getOptions config
   in  case c of
-        CIf  -> ("("++).(mkCExp env config (exps !! 0) ).(".constr?"++).
+        CIf  -> ("(PRIMVAL_R("++).(mkCExp env config (exps !! 0) ).(")?"++).
                  ("("++).(mkCExp env config (exps !! 1)).("):"++).
                  ("("++).(mkCExp env config (exps !! 2)).("))"++)
         c' | c' `elem` [ CMinus, CPlus, CMult, CDivide, CEqu, CLe, CGe  
                        , CGt, CLt, CAnd, COr, CMulI, CNEq, CMod, CDiv] ->
           mkBinOp c' exps env config
-        CNeg -> ("((Susp) { -("++).(mkCExp env config (exps !! 0)).
-                (").constr, "++).intTag opts.("NULL})"++)
-        CTrue-> intSusp "True"  opts
-        CFalse->intSusp "False" opts
-        _     -> error $ "mkCExp: unknown built-in constant "++(pprint c "")
+        CNeg -> 
+          ("PRIMVAL_C(-(PRIMVAL_R("++).(mkCExp env config (exps !! 0)).
+          ("))"++).mIntTag config.(")"++)
+        CTrue  -> intSusp compact "True"
+        CFalse -> intSusp compact "False"
+        _      -> error $ "mkCExp: unknown built-in constant "++(pprint c "")
 mkCExp _ config (LARC (LitInt i) exps) =
   case exps of
-    []    -> intSusp (show i) (getOptions config)
+    []    -> intSusp (optCompact $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
 mkCExp env config (LARCall n acts) = 
   if elem n (nmsids2nms (getCAFnmsids config)) then
@@ -433,8 +435,8 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
       opts        = getOptions config
       dS          = shows depth
       defaultCase = tab.("default: printf(\"Pattern matching on "++).pprint e.
-                    (" failed: constructor %d encountered.\\n\", cl["++).
-                    dS.("].constr); exit(0);"++)
+                    (" failed: constructor %d encountered.\\n\", CONSTR(cl["++).
+                    dS.("])); exit(0);"++)
       -- | Generates C code for a pattern. /case/ bodies are contained
       --   in {...} as they may contain declarations.
       mkCPat (PatL (CC c cId _) eP bindsVars) =
@@ -476,7 +478,7 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
               let [PatL _ patE bindsVars] = pats
               in  tab.mkPatBody patE bindsVars.semi
             else
-              tab.("switch (cl["++).dS.("].constr) {"++).nl.
+              tab.("switch (CONSTR(cl["++).dS.("])) {"++).nl.
               cases.
               -- only add "default:" when debugging
               (if optDebug opts then defaultCase else id).
@@ -505,22 +507,33 @@ mkBinOp :: COp -> [ExprL] -> TEnv -> ConfigLAR -> ShowS
 mkBinOp c [e1, e2] env config =
   let e1' = mkCExp env config e1
       e2' = mkCExp env config e2
-      val1 = e1'.(".constr"++)
-      val2 = e2'.(".constr"++)        
-      opts = getOptions config
-      cBin cOp = ("((Susp) { ("++).val1.(cOp++).val2.("), "++).intTag opts.("NULL })"++)
+      val1 = ("PRIMVAL_R("++).e1'.(")"++)
+      val2 = ("PRIMVAL_R("++).e2'.(")"++)
+      cBin cOp tagFunc =
+        ("(PRIMVAL_C("++).val1.(cOp++).val2.tagFunc config.("))"++)
   in  case c of
+        -- C operators that are different from Haskell
         CMulI -> lparen.(pprint CMulI).lparen.e1'.comma.e2'.rparen.rparen
-        CNEq  -> cBin "!="
-        CMod  -> cBin "%"
-        CDiv  -> cBin "/"
-        _     -> cBin (pprint c "")
+        CNEq  -> cBin "!=" mBoolTag
+        CMod  -> cBin "%"  mIntTag
+        CDiv  -> cBin "/"  mIntTag
+        -- C operators that return Int values
+        iResOp | iResOp `elem` [ CMinus, CPlus, CMult, CDivide, CMod, CDiv] ->
+          cBin (pprint c "") mIntTag
+        -- C operators that return Bool values
+        bResOp | bResOp `elem` [ CEqu, CLe, CGe, CGt, CLt, CAnd, COr, CNEq] ->
+          cBin (pprint c "") mBoolTag
+        _     -> ierr $ "mkBinOp: unhandled operator " ++ (pprint c "")
 mkBinOp _ _ _ _ =
   ierr "mkBinOp: called with wrong arguments"
 
 -- | An integer value or equivalent (nullary constructor or ground value).
-intSusp :: String -> Options -> ShowS
-intSusp c opts = ("((Susp) { "++).(c++).(", "++).intTag opts.("NULL })"++)
+intSusp :: Bool -> String -> ShowS
+intSusp compact c =
+  if compact then
+    ("PRIMVAL_C("++).(c++).(")"++)
+  else
+    ("(SUSP("++).(c++).(", "++).intTag.(", (TP_)NULL))"++)
 
 -- | Generates C macros for accessing function arguments in a LAR block.
 --   Takes into consideration strictness/call-by-name information.
@@ -601,6 +614,7 @@ mainFunc env opts mainNesting modules =
       m       = case modules of [m'] -> m' ; _ -> "Main"
       mainDef = mainDefQName m
       printResDT dt = tab.pprinterName dt.("(res); printf(\"  \");"++).nl
+      compact = optCompact opts
   in  ("int main(int argc, char* argv[]){\n"++).
       tab.("clock_t t1, t2;"++).nl.
       tab.("Susp res;"++).nl.
@@ -640,7 +654,7 @@ mainFunc env opts mainNesting modules =
           LibGC -> id
           SemiGC ->
             tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl.
-            if optCompact opts then
+            if compact then
               id
             else
               tab.("#ifdef GC"++).nl.
@@ -657,8 +671,13 @@ mainFunc env opts mainNesting modules =
             (tab.("printf(\"cannot compute 'result', gic must be built with libgmp support\\n\");"++).nl)
           Tg (T dt) ->
             if (dt==dtInt || dt==dtBool) then
-              tab.("if (res.ctxt == 0) printf(\"%d, \", res.constr);"++).nl.
-              tab.("else printf(\"Thunk{%d, %p}\", res.constr, res.ctxt);"++).nl
+              if compact then
+                -- compact mode, special int representation
+                tab.("printf(\"%lu, \", PRIMVAL_R(res));"++).nl
+              else
+                -- normal mode, ints are isomorphic to nullary constructors
+                tab.("if ((GETTPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
+                tab.("else printf(\"Thunk{%d, %p}\", CONSTR(res), GETTPTR(res.ctxt));"++).nl
             else
               printResDT dt
           typ@(Tg (TDF _ _)) ->

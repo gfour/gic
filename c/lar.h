@@ -106,10 +106,31 @@ typedef struct T_ {
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
     { MAGIC, T0, n_arity, n_nesting, { __VA_ARGS__ } }))
 
-// Macros for compatibility with the LAR API.
+/* *********** Macros of the LAR API *********** */
+
 #define GETPREV(T0)      T0->prev
 #define GETPTR(p)        p
 #define ARITY(lar)       lar->arity
 #define NESTING(lar)     lar->nesting
 #define ARGS_FUNC(x, T)  ARGS(x, T)
 #define ARGC(arg)        arg
+
+#define GETTPTR(p)         p
+#define CONSTR(p)          p.constr
+
+/* Primitive value read/create macros. Isomorphic to nullary constructors. */
+#define PRIMVAL_R(p)                   p.constr
+
+#ifdef USE_TAGS
+#define PRIMVAL_C(i, tag)              ((Susp) { i, tag, NULL })
+#else
+#define PRIMVAL_C(i)                   ((Susp) { i, NULL })
+#endif /* USE_TAGS */
+
+#ifdef USE_TAGS
+/* Thunk constructor: (constructor, tag, ctxt). */
+#define SUSP(c, t, p)      ((Susp) {c, t, p})
+#else
+/* Thunk constructor, ignores the tag 't'. */
+#define SUSP(c, t, p)      ((Susp) {c, p})
+#endif /* USE_TAGS */
