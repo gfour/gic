@@ -23,6 +23,11 @@
 #error "The compact LAR representation does not support data type tags."
 #endif /* USE_TAGS */
 
+/* The OpenMP runtime is not supported. */
+#ifdef OMP
+#error "The compact LAR representation does not support the OpenMP runtime."
+#endif /* OMP */
+
 /* The shadow stack should only be used when GC is on. */
 #ifdef SSTACK
 #ifndef GC
