@@ -1,39 +1,59 @@
 -- | Specialized macros for using lazy activation records (LARs).
 -- 
---   We represent LARs in two ways: the \"optimized\" (which is the default) and
---   the \"simple\".
+--   There are three LAR representations that can be used by the runtime:
+--   the \"simple\", the \"optimized\" (which is the default), and the \"compact\".
 -- 
 --   In the \"simple\" representation (@c/lar.h@), each LAR contains information
---   about its parent LAR, the arguments that have to be evaluated, space for
---   the memoized results (\"vals\") and pattern-matching values (\"nested\" 
---   values), and information about the function's arity and number of
---   pattern-matching clauses (\"pattern matching depth\").
---   This can be used to do accurate garbage collection (not yet implemented).
+--   about its parent LAR (/pev/), the arguments that have to be evaluated, space
+--   for memoized results (/vals/) and pattern-matching values (/nested/values),
+--   and information about the function's /arity/ and number of
+--   pattern-matching clauses (/pattern matching depth/).
+--   This information describes the structure of each LAR in memory and can 
+--   be used to do accurate garbage collection.
 --     
 --   In the \"optimized\" representation (@c/lar_opt.h@), the arities and
 --   pattern matching depths of all functions are used to construct specialized
---   macros for access to their LAR. This means that no space is 
+--   macros for LAR construction and access. This means that no space is 
 --   reserved for this information during runtime.
 -- 
 --   * In the single-threaded runtime, we do one more optimization: the arguments 
---     that have to be evaluated are embedded inside the \"vals\" fields, using
+--     that have to be evaluated are embedded inside the /vals/, using
 --     the @.ctxt@ field.
---     Since this field is always a pointer, its last bit is assumed to be 0 -- we
---     initially store there the pointer to the argument to be evaluated, with
---     the last bit set to 1. Therefore, if a value is not evaluated yet, its
+--     Since this field is always a pointer, its last bit is assumed to be 0 due
+--     to alignment assumptions on IA-32 and x86-64 platforms. We can therefore
+--     use the pointer field as a union of two different data types, with the
+--     last bit discriminating between the two. We initially store in the field
+--     the pointer to the argument to be evaluated, with the last bit set to 1.
+--     This means that if a value is not evaluated yet, its
 --     @ctxt@ field will have its last bit set to 1; masking that out, we now
 --     have the argument pointer to use for evaluation. When evaluation finishes
 --     with a value, the structure is overwritten (including @ctxt@) with
---     it. This means that memoized values always have a valid pointer in @ctxt@
---     and can be collected by libgc.
+--     it. Since @ctxt@ is a pointer again (or 0 for nullary constructors), the
+--     last bit will now be 0.
+--     In this way, memoized values always have a valid pointer in @ctxt@
+--     and can be collected by conservative garbage collection such as libgc.
 -- 
 --   * In the parallel runtime (when the C macro @USE_OMP@ is defined), we use the 
 --     \"optimized\" representation, without the tagged-pointer embedding.
---     LAR arguments now occupy their own slot, together with a lock. This is
+--     LAR arguments now occupy their own slot, paired with a lock. This lock is
 --     used to guarantee single evaluation of thunks, even in the presence of
 --     concurrent access.
---     For garbage collection we use libgc configure for thread-local allocation
---     and parallel garbage collection.
+--     For garbage collection we use libgc configured for thread-local allocation
+--     and parallel garbage collection (see
+--     <http://www.hpl.hp.com/personal/Hans_Boehm/gc/scale.html> for details).
+-- 
+--   In the \"compact\" representation (@c/lar_compact.h@), details of the x86-64
+--   ABI are used to fuse together both a LAR argument and the resulting thunk 
+--   constructor and context into a singe machine word. The arity and nesting
+--   fields of the LAR are also fused with the /prev/ pointer, and
+--   built-in nullary data types (Int, Bool) are unboxed.
+--   This is an experimental representation that should be combined with accurate
+--   garbage collection (such as our semi-space collector).
+--   This representation currently does not support parallel evaluation and
+--   data type tagging (see "SLIC.Tags").
+--   Because of defunctionalization, this technique is applicable to small programs
+--   (having at most 2^16 syntactically different partial applications in the
+--   whole program text).
 -- 
 
 module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
