@@ -29,11 +29,11 @@
 #endif /* OMP */
 
 /* The shadow stack should only be used when GC is on. */
-#ifdef SSTACK
-#ifndef GC
+#ifdef GC
+#ifndef SSTACK
 #error Garbage collection in compact mode requires the shadow stack, #define SSTACK.
-#endif /* GC */
 #endif /* SSTACK */
+#endif /* GC */
 
 /* Give a warning when compiling without garbage collection. */
 #ifndef GC

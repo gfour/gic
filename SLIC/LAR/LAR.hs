@@ -131,8 +131,13 @@ macrosC opts modName arities pmDepths arityCAF =
        else id).
       wrapIfSSTACK
       -- Use a shadow stack for function calls (use with the semi-space collector).
-      (("// push activation record to shadow stack"++).nl.
-       ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl.
+      (("// shadow stack maximum size"++).nl.
+       ("#define SSTACK_MAX_SIZE 100000000"++).nl.
+       ("// push activation record to shadow stack"++).nl.
+       (if optDebug opts then
+          ("#define PUSHAR(a) ({ if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Shadow stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr++ = a; })"++).nl
+        else
+          ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl).
        ("// get call result and pop activation record"++).nl.
        ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
       -- No shadow stack, dummy macros (use with libgc).
@@ -644,7 +649,7 @@ mainFunc env opts mainNesting modules =
       ).
       -- shadow stack initialization
       wrapIfSSTACK
-      (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*100000000);"++).nl.
+      (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*SSTACK_MAX_SIZE);"++).nl.
        ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
        ("sstack_ptr = sstack_bottom;"++).nl
       ) id.      
