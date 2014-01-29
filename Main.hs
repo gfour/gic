@@ -190,7 +190,8 @@ processArgs cmdArgs =
 main :: IO ()
 main =
     do args  <- getArgs
-       opts <- processArgs args
+       opts0 <- processArgs args
+       let opts = validateOpts opts0
        case optAction opts of
          ANone -> return ()
          APrintDFI ->
@@ -302,3 +303,9 @@ parseFL opts f text =
                  (show srcColumn0)++": "++message)
         ParseOk hsMod ->
           return $ fromHStoHF opts f hsMod    -- translate Haskell source to FL
+
+-- | Checks that certain flag combinations are not allowed.
+validateOpts :: Options -> Options
+validateOpts opts | ((optGC opts == LibGC) && (optCompact opts)) =
+  error "The -compact mode cannot be combined with -libgc."
+validateOpts opts = opts
