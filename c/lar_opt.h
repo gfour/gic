@@ -111,9 +111,14 @@ typedef struct T_ {
 /* Initializes the arity_a locks of a LAR. */
 #define INIT_ARG_LOCKS(arity_a)             {int a; for (a=0; a<arity_a; a++) { omp_init_lock(LOCKS(a, T0)); }}
 
-/* Thunks need locks in concurrent evaluation.
+/* 
+   Thunks need locks in concurrent evaluation.
    We use double-checked locking (where ARGS(x, T) is the flag checked twice). 
-   We assume the flag update to be atomic and our technique to be data-race free.
+   This is known to be buggy, since the VALS update touches two machine words
+   and is not an atomic write, see:
+   (1) "The ''Double-Checked Locking is Broken'' Declaration",
+       http://www.cs.umd.edu/~pugh/java/memoryModel/DoubleCheckedLocking.html
+   (2) Hans-J. Boehm, "How to miscompile programs with ''benign'' data races".
 */
 #define GETARG(x, ARGSARITY, T)  ({            \
       if (ARGS(x, T) != NULL) {                \
