@@ -71,23 +71,23 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
         argDefs defs env strictVars cbns gc.nl.
         declarationsBuiltins opts.nl.
         (case cMode of
-            Whole ->
-              initMod modName config.
-              mainFunc env opts (depthOfMainDef defs) [modName].nl.
-              mainProg defs env config.
-              prettyPrintersC.
-              epilogue opts
+            Whole -> id
             CompileModule ->
               (case gc of
                   SemiGC -> id
                   LibGC  ->
                     pdeclExts opts imports.
                     pdeclExtApps opts (diEApps $ dfiDfInfo dfi)).
-              defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl.
-              genv modName arityCAF.nl.              -- CAF LAR variable
-              defineGCAF modName gc arityCAF.nl.     -- CAF LAR macro
-              initMod modName config.nl.             -- module initializer
-              mainProg defs' env config).
+              defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl).
+        genv modName arityCAF.nl.                    -- module CAF
+        initMod modName config.nl.                   -- module initializer
+        (case cMode of
+            Whole -> mainFunc env opts (depthOfMainDef defs) [modName].nl
+            CompileModule -> id).
+        mainProg defs' env config.
+        (case cMode of
+            Whole -> prettyPrintersC.epilogue opts
+            CompileModule -> id).
         prettyPrintersFor dTypes cids.nl
 
 -- | Tests if a block is local. Non-local functions are those from another module 
@@ -284,14 +284,9 @@ pdeclGCAF :: ConfigLAR -> Int -> ShowS
 pdeclGCAF config arityCAF =
     let m       = getModName config
         opts    = getOptions config
-        modGCAF = mkLARMacro opts ("GCAF_"++m) arityCAF arityCAF 0.nl
     in  case (optGC $ getOptions config) of
-          SemiGC ->
-            if arityCAF == 0 then
-              id
-            else
-              ierr "semi-gc doesn't support CAFs yet"
-          LibGC    -> modGCAF
+          SemiGC -> id
+          LibGC  -> mkLARMacro opts ("GCAF_"++m) arityCAF arityCAF 0
 
 -- | Generates the C declarations of the LAR blocks and the forcing
 --   functions for the module data types.
@@ -704,14 +699,6 @@ initModules (m:ms) = tab.genInitMod m.("(T0);"++).nl.initModules ms
 
 -- | The code for a module initializer. So far, it only initializes the module CAFs.
 initMod :: MName -> ConfigLAR -> ShowS
-{-initMod m config =
-  let arityCAF = length (getCAFnmsids config)
-  in  ("void "++).genInitMod m.("(TP_ T0) {"++).nl.
-      (if arityCAF > 0 then
-         tab.namegenv m.(" = AR("++).shows arityCAF.
-         (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ y) "" (nmsids2nms (getCAFnmsids config)))++).(");"++).nl
-       else id).
-      ("}"++).nl.nl-}
 initMod m config =
   let arityCAF = length (getCAFnmsids config)
       opts     = getOptions config
@@ -719,14 +706,14 @@ initMod m config =
       nms      = map pprint $ nmsids2nms (getCAFnmsids config)
   in  ("void "++).genInitMod m.("(TP_ T0) {"++).nl.
       (if arityCAF > 0 then
-        (case gc of
-            SemiGC ->
-              tab.namegenv m.(" = AR("++).shows arityCAF.
-              (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++).
-              (");"++)
-            LibGC ->
-              tab.namegenv m.(" = "++).(nameGCAF m).("_AR("++).
-              insCommIfMore nms.(");"++)).nl
+         tab.namegenv m.(" = PUSHAR("++).
+         (case gc of
+             SemiGC ->
+               ("AR("++).shows arityCAF.
+               (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++)
+             LibGC ->
+               (nameGCAF m).("_AR("++).insCommIfMore nms).
+         ("));"++).nl
        else id).
       ("}"++).nl.nl
       
