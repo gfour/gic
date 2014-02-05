@@ -125,7 +125,7 @@ typedef struct T_ {
     { ARINFO(n_arity, n_nesting, T0), { __VA_ARGS__ } }))
 
 // Embeds arity/nesting/previous-pointer information in a single word.
-#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | ((uintptr_t)n_nesting << 48) | (((uintptr_t)prev) & PTRMASK))
+#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | (((uintptr_t)n_nesting) << 48) | (((uintptr_t)prev) & PTRMASK))
 
 /* *********** Macros of the LAR API *********** */
 
