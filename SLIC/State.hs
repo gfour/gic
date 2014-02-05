@@ -1,6 +1,7 @@
 -- | Compiler state structure and control flags.
 -- 
 
+{-# LANGUAGE CPP #-}
 module SLIC.State (Action(..), CompileMode(..), GC(..), GHCAPI(..),
                    Options(..), TypeChecker(..), Verb, defaultOptions,
                    opt) where
@@ -114,7 +115,11 @@ defaultOptions = Options
   , optWhSize  = defaultMaxWHSize
   , optMaxMem  = defaultMemSize
   , optGC      = LibGC
+#ifdef USE_GHC
+  , optTC      = GHCTypeInf
+#else
   , optTC      = GICTypeInf True
+#endif /* USE_GHC */
   , optTag     = False
   , optGHC     = NoGHC
   , optHeap    = False

@@ -19,6 +19,7 @@ Requirements
 To build the compiler, you need:
 
 * GHC 7.6
+* ghc-paths
 * haskell-src-exts (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
 * For the C back-end:
     * GCC (with OpenMP support if the parallel runtime is enabled)
@@ -31,8 +32,6 @@ To build the compiler, you need:
 * For the Maude back-end: Maude 2.6 and Full Maude.
 * Optional: the GHC profiling libs (if HPROFILE is set in the Makefile),
   to support stack traces in the compiler executable.
-* Optional: ghc-paths (if `USE_GHC` is set in the Makefile), if GHC is used as a
-  front-end or for type checking.
 
 Building the compiler
 ---------------------

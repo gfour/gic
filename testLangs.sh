@@ -12,6 +12,8 @@
 
 GHCI_FLAGS="-v0 -w -XGADTs"
 
+export GICFLAGS="-gic-tc"
+
 ############# Test tags
 
 echo Testing -tag...
@@ -46,7 +48,7 @@ echo -- Call-by-name eduction --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/records.hs Examples/Data/unit.hs
 do
   echo -n ${file}, call-by-name eduction:\ 
-  ./gic -ecbn ${file}
+  ./gic ${GICFLAGS} -ecbn ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
@@ -57,7 +59,7 @@ echo -- Non-strict FL interpreter --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/records.hs Examples/Data/unit.hs Examples/Data/addsx.hs
 do
   echo -n ${file}, non-strict FL interpreter:\ 
-  ./gic -fl ${file}
+  ./gic ${GICFLAGS} -fl ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
@@ -68,7 +70,7 @@ echo -- Lazy eduction --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/nested.hs Examples/Data/records.hs Examples/Data/unit.hs
 do
   echo -n ${file}, lazy eduction:\ 
-  ./gic -e ${file}
+  ./gic ${GICFLAGS} -e ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done

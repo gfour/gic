@@ -5,6 +5,9 @@
 
 set -e
 
+# Use the built-in type checker.
+export TC="-gic-tc"
+
 # Semi-space GC
 GC="-semigc"
 CFLAGS="-I . -I ./c"
@@ -14,7 +17,7 @@ function compileLink {
     for module in $1 $2
     do
 	echo Compiling module: ${module} --
-	./gic -cmod -debug ${GC} ${module}.hs
+	./gic $TC -cmod -debug ${GC} ${module}.hs
 	gcc -c ${CFLAGS} ${module}.c -o ${module}.o
     done
     echo Creating linker...

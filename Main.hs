@@ -32,10 +32,10 @@ import GHC.Paths (libdir)
 import DynFlags (ExtensionFlag(..), defaultFatalMessager, defaultFlushOut, xopt_set)
 #else
 import DynFlags (ExtensionFlag(..), defaultLogAction, xopt_set)
-#endif
+#endif /* __GLASGOW_HASKELL__ version check */
 import Outputable (Outputable, ppr)
 import SLIC.Front.GHCBackEnd (coreGHC, getVTypes, showPPr, tcGHC, transfCore)
-#endif
+#endif /* USE_GHC */
 
 import Data.List (isPrefixOf, map)
 import Language.Haskell.Exts.Parser as Parser
