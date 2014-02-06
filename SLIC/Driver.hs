@@ -193,12 +193,12 @@ processFL opts dfis inputModule =
                   APrintHIL2 -> printLn pTrans
                   APrintZOIL -> printLn p3
                   APrintTTD  ->
-                    do callTTDBackend (modProg p3) opts
+                    do callTTDBackend p3 opts
                        return Nothing
 
                   -- generates the dataflow graph for the TTD program
                   AGenerateDFG ->
-                     do callTTDBackend (modProg p3) opts
+                     do callTTDBackend p3 opts
                         return Nothing
 
                   -- interpreters: call-by-name, integrated lazy, Erlang-based
@@ -218,16 +218,22 @@ processFL opts dfis inputModule =
                         in  do callErlBackend m code opts env mergedVarUsage cids'
                                return Nothing
 
-                  -- compiler back-ends: Maude, Erlang, TTD, LAR
+                  -- Call the Maude back-end.
                   ACompileMaude ->
                     do callMaudeBackend (modProg p3) opts
                        return Nothing
+
+                  -- Call the Erlang compiler back-end.
                   ACompileErl -> error "TODO: compile erl"
                   -- let Prog dts' _ = wholeProgFinal'
                   -- in  callErlBackend (modProg p3) opts env mergedVarUsage (calcCIDs dts')
+
+                  -- Call the TTD back-end.
                   ACompileTTD ->
-                    do callTTDBackend (modProg p3) opts
+                    do callTTDBackend p3 opts
                        return Nothing
+
+                  -- Call the LAR back-end.
                   _  ->
                     let cUnit = (p0Final, p3, p0Dfi, cbnVars, stricts)
                     in  itransfLAR opts env cUnit

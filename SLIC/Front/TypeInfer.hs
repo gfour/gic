@@ -357,7 +357,6 @@ inferE cs an e =
 		theta CTrue   = return (STground gBool, [])
 		theta CFalse  = return (STground gBool, [])
                 theta CMulI   = return (STground gInteger, [STground gInteger, STground gInteger])
-                theta (CMOp _)= ierr "theta encountered merged operator"
 	    in  theta c >>= \(t, tl) ->
 	        inferEL cs an el >>= \tl' ->
 	        unifyL tl tl' >>

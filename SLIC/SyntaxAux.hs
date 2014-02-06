@@ -279,7 +279,6 @@ data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
          | CAnd      | COr       | CEqu     | CNEq
          | CLt       | CGt       | CLe      | CGe      | CMulI    | CIf
          | CNeg      | CTrue     | CFalse   
-         | CMOp String -- ^ a "merged operator" in TTD
          deriving (Eq, Ord, Read, Show)
 
 -- | The mapping between the built-in operators and their string representation.
@@ -298,12 +297,10 @@ cOpsBool = [CEqu, CNEq, CGt, CLt, CLe, CGe, CAnd, COr]
               
 instance PPrint COp where
   pprintPrec _ c =
-    case c of
-      CMOp cm -> (cm++)
-      _ -> case Map.lookup c cOps of
-             Just s  -> (s++)
-             Nothing ->
-               ierr $ "String representation of constant "++(show c)++" not found."
+    case Map.lookup c cOps of
+      Just s  -> (s++)
+      Nothing ->
+        ierr $ "String representation of constant "++(show c)++" not found."
 
 -- | Given a string representation, returns the corresponding 'COp'. If more
 --   than one operators correspond to the same representation (such as '-'),
@@ -362,13 +359,8 @@ prettyConst p (CN cn) el =
       showParen (p > 3) (("-"++).pprintPrec 4 (el !! 0))
     CTrue   -> ("True"++)
     CFalse  -> ("False"++)
-    CMOp cm -> (cm++)
     _    ->
-      -- if isMOp cn then
-      --   (cn ++).lparen.pprintList (", "++) el.rparen
-      -- else
-        -- (cn ++).pprintList space el
-        ierr $ "prettyConst: Unhandled built-in constant: "++(pprint cn "")
+      ierr $ "prettyConst: Unhandled built-in constant: "++(pprint cn "")
 prettyConst _ (LitInt n) [] = shows n
 prettyConst _ c _ =
   ierr $ "prettyConst: Unhandled built-in constant or literal with arity: "++

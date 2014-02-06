@@ -2,47 +2,33 @@
 
 module SLIC.TTD.TTD (callTTDBackend) where
 
-import Data.List (sort)
 import SLIC.AuxFun (ierr)
+import SLIC.Constants (dfMod)
 import SLIC.ITrans.Syntax
 import SLIC.State
-import SLIC.TTD.DFG
-import SLIC.TTD.SyntaxTTD
-import SLIC.Types
+import SLIC.SyntaxAux (Prog(..), Mod(..))
+import SLIC.TTD.DFG (generateDFG)
+import SLIC.TTD.ZItoTTD (fromZOILtoTTD)
+import SLIC.Types (mName, pprint)
 
 -- | The entry point to the TTD back-end.
-callTTDBackend :: ProgZ -> Options -> IO ()
-callTTDBackend p opts =
-  let pMergedOps  = mergeOpsZI p
-      pTTD        = fromZItoTTD (fst pMergedOps)
-      pTTDOps     = snd pMergedOps
-      pTTDPorts   = enumPorts pTTD pTTDOps
-      -- let pTTDSeq   = enumPorts $ compact $ sequenceProg pTTD
+callTTDBackend :: ModZ -> Options -> IO ()
+callTTDBackend m opts =
+  let mn = fst $ modNameF m
+      Prog _ defsZ = modProg m
+      pTTD = fromZOILtoTTD (filter isLocal defsZ)
+      isLocal def =
+        let Just mn' = mName $ defVarZ def
+        in  (mn'==mn) || (mn'==dfMod)
   in  case optAction opts of
+        APrintTTD ->
+          putStrLn "== Dataflow program ==" >>
+          putStrLn (pprint pTTD "")
+        AGenerateDFG ->
+          let file = "./dfg.dot"
+          in  putStrLn ("Writing graph to file: "++file) >>
+              writeFile file (generateDFG pTTD "")
         ACompileTTD ->
           let ttdCode = error "TODO: makeTTD pTTD"
           in  putStrLn (ttdCode "")
-        APrintTTD ->
-          let -- file = "./test.dot"
-              putOps :: [MOpDef] -> IO ()
-              putOps [] = putStrLn ""
-              putOps ((opN, op):ops) = putStrLn ("Operator "++(qName opN)++": "++(pprint op "")) >> putOps ops
-          in  putStrLn "== ZOIL program with merged ops ==" >>
-              putStrLn (pprint (fst pMergedOps) "") >>
-              putOps (sort (snd pMergedOps)) >>
-              putStrLn "== Tagged-Token Dataflow ==" >>
-              putStrLn (pprint pTTDPorts "")
-              -- putStrLn "== Sequenced Dataflow ==" >>
-              -- putStrLn (show pTTDSeq) >>
-              -- putStrLn "== Flow fragments ==" >>
-              -- putStrLn (fragments pTTDSeq "") >>
-              -- putStr   "Dataflow Graph saved in: " >>
-              -- putStrLn file >>
-              -- writeFile file ((dotGraph pTTDPorts) "")                  
-              -- writeFile file ((dotGraph $ analyzeTTD pTTDPorts) "")
-        AGenerateDFG ->
-          let file = "./dfg.dot"
-          in  putStr (pprint pTTDPorts "") >>
-              -- return () -- 
-              writeFile file (generateDFG pTTDPorts "")
         a -> ierr $ "The TTD back-end cannot handle action "++(show a)
