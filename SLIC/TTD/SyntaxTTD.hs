@@ -59,13 +59,13 @@ instance PPrint ProgT where
     foldDot (\(nID, instrT)->pprintNodeID nID.(" : "++).pprint instrT.nl) entries
 
 instance PPrint InstrT where
-  pprint (CallT iidx nID) = ("Call-"++).pprintIdx iidx.("->"++).pprintNodeID nID
-  pprint (VarT nID) = ("->"++).pprintNodeID nID
+  pprint (CallT iidx nID) = ("Call-"++).pprintIdx iidx.("@"++).pprintNodeID nID
+  pprint (VarT nID) = ("Var@"++).pprintNodeID nID
   pprint (ActualsT nIDs) =
-    ("Actuals["++).insCommIfMore (map pprintNodeID nIDs).("]"++)
+    ("Actuals("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
   pprint (ConT (LitInt i) []) = shows i
   pprint (ConT (CN c) nIDs) =
-    ("Op-"++).pprint c.("("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
+    ("["++).pprint c.("]("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
   pprint _ = ierr "Unknown instruction, no pretty printer available."
 
 pprintNodeID :: NodeID -> ShowS
