@@ -41,7 +41,7 @@ showNum num =
       else showNum ndiv ++ "," ++ showTripl nmod
 
 -- | Iterate a function over lists with a threaded counter.
-threadfunc_l :: Int -> [a] -> (Int -> a -> (a, Int)) -> ([a], Int)
+threadfunc_l :: Int -> [a] -> (Int -> a -> (b, Int)) -> ([b], Int)
 threadfunc_l i [] _ = ([], i)
 threadfunc_l i (x:xs) f =
   let (x', i')   = f i x
