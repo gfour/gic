@@ -2,15 +2,17 @@
 --   engine.
 -- 
 
-module SLIC.TTD.ZItoTTD (fromZOILtoTTD) where
+module SLIC.TTD.ZItoTTD (builtinNodeIDs, fromZOILtoTTD, maxBuiltinNodeID) where
 
-import Data.Map (Map, elems, fromList, lookup)
+import Data.Map (Map, elems, fromList, keys, lookup, union)
 import SLIC.AuxFun (ierr, threadfunc_l)
 import SLIC.ITrans.Syntax
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
 import SLIC.Types
 
+-- | A mapping from qualified names to node identifiers, used to replace
+--   variables with their instruction entry.
 type NodeIDs = Map QName NodeID
 
 -- | Translates an intensional program to a TTD program containing labelled
@@ -18,9 +20,10 @@ type NodeIDs = Map QName NodeID
 fromZOILtoTTD :: [DefZ] -> ProgT
 fromZOILtoTTD defsZ =
   let -- Generate the node IDs corresponding to the defined variables.
-      vIDs :: NodeIDs
-      vIDs = fromList $ zip (map defVarZ defsZ) [0..]
-      maximumVarID = maximum $ elems vIDs
+      defIDs :: NodeIDs
+      defIDs = fromList $ zip (map defVarZ defsZ) [(maxBuiltinNodeID+1)..]
+      maximumVarID = maximum $ elems defIDs
+      vIDs = union builtinNodeIDs defIDs
       (entries, _) = threadfunc_l maximumVarID defsZ (transD vIDs)
   in  ProgT ((map fst entries)++(concatMap snd entries))
 
@@ -79,3 +82,13 @@ idOf vIDs qn =
   case Data.Map.lookup qn vIDs of
     Just nID -> nID
     Nothing  -> ierr $ "idOf: no node ID for "++(pprint qn "")
+
+-- | Returns the maximum node ID assigned to a built-in function.
+maxBuiltinNodeID :: NodeID
+maxBuiltinNodeID = maximum $ elems builtinNodeIDs
+
+-- | Generate the node IDs for the built-in functions.
+builtinNodeIDs :: NodeIDs
+builtinNodeIDs = 
+  let builtinNames = keys builtinFuncSigs -- ++ (concat $ elems builtinFuncSigs)
+  in  fromList $ zip builtinNames [0..]
