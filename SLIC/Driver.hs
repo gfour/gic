@@ -16,7 +16,7 @@
 -- 
 --   Misc. features: ZOIL call-by-name interpreter ("SLIC.ITrans.Eval"),
 --   ZOIL lazy eduction interpreter ("SLIC.ITrans.EvalEduction"),
---   Erlang-based back-end ("SLIC.Distr.ZItoErl", "SLIC.Distr.EvalErl"), 
+--   Erlang-based back-end ("SLIC.Distr.EvalErl"), 
 --   Maude back-end ("SLIC.Maude.ZItoMaude").
 -- 
 
@@ -35,7 +35,6 @@ import SLIC.Front.Typeclass (builtinTcInfo, inlineTcMethods)
 import SLIC.Front.TypeInfer
 -- import SLIC.Front.TypeInfer2
 import SLIC.Distr.EvalErl
-import SLIC.Distr.ZItoErl
 import SLIC.ITrans.Eval (evalZOILCBN)
 import SLIC.ITrans.EvalEduction (evalZOILLazy)
 import SLIC.ITrans.HFtoHI
@@ -137,7 +136,7 @@ processFL opts dfis inputModule =
       -- do variable usage analysis
       let cbnVars = findCBNVars p0Final
       let stricts = gatherStrictVars p0Final
-      let mergedVarUsage = (cbnVars, stricts)
+      -- let mergedVarUsage = (cbnVars, stricts)
           
       if not ok then
         do putStrLn "Invalid input program."
@@ -212,21 +211,15 @@ processFL opts dfis inputModule =
                     case optCMode opts of
                       CompileModule -> error "The Erlang-based interpreter does not support separate compilation."
                       Whole ->
-                        let m = fst $ modNameF p3
+                        let m    = fst $ modNameF p3
                             code = optimize m $ modProg p3
-                            cids' = error "No CIDs"
-                        in  do callErlBackend m code opts env mergedVarUsage cids'
+                        in  do callErlBackend m code opts
                                return Nothing
 
                   -- Call the Maude back-end.
                   ACompileMaude ->
                     do callMaudeBackend (modProg p3) opts
                        return Nothing
-
-                  -- Call the Erlang compiler back-end.
-                  ACompileErl -> error "TODO: compile erl"
-                  -- let Prog dts' _ = wholeProgFinal'
-                  -- in  callErlBackend (modProg p3) opts env mergedVarUsage (calcCIDs dts')
 
                   -- Call the TTD back-end.
                   ACompileTTD ->
@@ -290,17 +283,8 @@ itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
                          return $ Just dfi
         action -> ierr $ "Invalid LAR compiler action: "++(show action)
 
-callErlBackend :: MName -> ITrans.Syntax.ProgZ -> Options -> TEnv -> 
-                  VUsage -> CIDs -> IO ()
-callErlBackend m p opts env varUsage cids =
+callErlBackend :: MName -> ITrans.Syntax.ProgZ -> Options -> IO ()
+callErlBackend m p opts =
   case optAction opts of
     AEvalErl -> putStrLn (makeErlRepr m p)
-    ACompileErl ->
-      case optCMode opts of
-        Whole ->
-          let config  = (env, varUsage, opts, cids)
-              erlCode = makeErl m (optimize m p) config
-          in  putStrLn (erlCode "")
-        CompileModule ->
-          error "Separate compilation is not supported by the Erlang back-end."
     a -> ierr $ "The Erlang back-end cannot handle action "++(show a)

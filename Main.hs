@@ -85,9 +85,8 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -e      : transform and evaluate the 0-order program (lazy eduction)"
            putStrLn("             -maxwh N : maximum warehouse entries before GC (default="++(showNum defaultMaxWHSize)++")")
            putStrLn "             -v       : show debugging trace during evaluation"           
-           putStrLn "* Erlang back-ends:"
+           putStrLn "* Erlang back-end:"
            putStrLn "  -erl    : transform and pretty print the 0-order program for the Erlang intepreter"
-           putStrLn "  -cerl   : transform and compile the 0-order program to Erlang"
            putStrLn("             -ctxts N : each warehouse can hold at most N contexts (default="++(showNum defaultMaxCtxts)++")")
            putStrLn "             -redis   : use the Redis-based warehouse"
            putStrLn "             -v       : show debugging trace during evaluation"
@@ -130,7 +129,6 @@ processArgs cmdArgs =
         aux ("-cm"    : args) opts = aux args opts{optAction = ACompileMaude}
         aux ("-ttd"   : args) opts = aux args opts{optAction = ACompileTTD}
         aux ("-erl"   : args) opts = aux args opts{optAction = AEvalErl}
-        aux ("-cerl"  : args) opts = aux args opts{optAction = ACompileErl}
         aux ("-df"    : args) opts = aux args opts{optAction = APrintDF}
         aux ("-debug" : args) opts = aux args opts{optDebug = True}
         aux ("-v"     : args) opts = aux args opts{optVerbose = True}

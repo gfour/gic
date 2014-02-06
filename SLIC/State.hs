@@ -26,7 +26,6 @@ data Action =
    | APrintDFI      -- ^ pretty-print a defunctionalization interface file
    | ACompileLAR    -- ^ transform and compile the 0-order program to C (LAR)
    | ACompileMaude  -- ^ transform and compile to Maude
-   | ACompileErl    -- ^ transform and compile to Erlang
    | ACompileTTD    -- ^ transform and compile for tagged-token dataflow
    | AEvalErl       -- ^ transform and translate for the Erlang interpreter
    | AEvalFL        -- ^ evaluate the FL program using the non-strict FL semantics
