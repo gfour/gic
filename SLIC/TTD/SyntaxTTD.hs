@@ -74,4 +74,3 @@ instance PPrint InstrT where
 
 pprintPlug :: Plug -> ShowS
 pprintPlug (nId, pId) = ("~["++).shows nId.(":"++).shows pId.("]"++)
-
