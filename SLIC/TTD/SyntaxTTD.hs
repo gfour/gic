@@ -28,11 +28,14 @@ type Token = Int
 -- | The unique identifier characterizing every TTD node.
 type NodeID = Int
 
--- | TODO: Is this needed?
-type Loc = NodeID
+-- | The identifier of a TTD demand-receive port (unique per node).
+type PortID = Int
+
+-- | A plug is a pair of a node and a port.
+type Plug = (NodeID, PortID)
 
 -- | A demand chain.
-type DChain = [Loc]
+type DChain = [Plug]
 
 -- | A message is the tuple (sender, receiver, token, payload, demand chain).
 type Message a = (NodeID, NodeID, Token, a, DChain)
@@ -44,10 +47,10 @@ type Demand = Message ()
 type Response = Message ValueT
 
 -- | A TTD instruction.
-data InstrT = CallT QOp NodeID       -- ^ Call a node using an intensional index.
-            | VarT NodeID            -- ^ Call a node using the same context.
-            | ActualsT [NodeID]
-            | ConT Const [NodeID]
+data InstrT = CallT QOp Plug         -- ^ Call a node using an intensional index.
+            | VarT Plug              -- ^ Call a node using the same context.
+            | ActualsT [Plug]        -- ^ Intensional actuals() operator.
+            | ConT Const [Plug]      -- ^ Built-in operator (including base values).
 
 -- | A node containing an instruction.
 type EntryT = (NodeID, InstrT)
@@ -57,17 +60,18 @@ data ProgT = ProgT [EntryT]
 
 instance PPrint ProgT where
   pprint (ProgT entries) =
-    foldDot (\(nID, instrT)->pprintNodeID nID.(" : "++).pprint instrT.nl) entries
+    foldDot (\(nID, instrT)->shows nID.(" | "++).pprint instrT.nl) entries
 
 instance PPrint InstrT where
-  pprint (CallT qOp nID) = pprint qOp.pprintNodeID nID
-  pprint (VarT nID) = ("var"++).pprintNodeID nID
-  pprint (ActualsT nIDs) =
-    ("actuals("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
+  pprint (CallT qOp plug) = pprint qOp.pprintPlug plug
+  pprint (VarT plug) = ("var"++).pprintPlug plug
+  pprint (ActualsT plugs) =
+    ("actuals("++).insCommIfMore (map pprintPlug plugs).(")"++)
   pprint (ConT (LitInt i) []) = shows i
-  pprint (ConT (CN c) nIDs) =
-    ("["++).pprint c.("]("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
+  pprint (ConT (CN c) plugs) =
+    ("["++).pprint c.("]("++).insCommIfMore (map pprintPlug plugs).(")"++)
   pprint _ = ierr "Unknown instruction, no pretty printer available."
 
-pprintNodeID :: NodeID -> ShowS
-pprintNodeID nId = ("~"++).shows nId
+pprintPlug :: Plug -> ShowS
+pprintPlug (nId, pId) = ("~["++).shows nId.(":"++).shows pId.("]"++)
+

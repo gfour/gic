@@ -36,15 +36,16 @@ transE _ n (ConZ i@(LitInt _) []) =
   in (((n', ConT i []), []), n')
 transE vIDs n (ConZ cOp@(CN _) el) =
   let (topEntriesIDs, entries, n') = transL vIDs n el
+      plugs = zip topEntriesIDs [0..]
       n'' = n' + 1
-  in  (((n'', ConT cOp topEntriesIDs), entries), n'')
+  in  (((n'', ConT cOp plugs), entries), n'')
 transE _ _ (ConZ c _) = ierr $ "TODO: fromZOILtoTTD: unknown built-in constant"++(pprint c "")
 transE vIDs n (FZ qOp f) = 
   let n' = n+1
-  in  (((n', CallT qOp (idOf vIDs f)), []), n')
+  in  (((n', CallT qOp (idOf vIDs f, 0)), []), n')
 transE vIDs n (XZ (V qn)) =
   let n' = n+1
-  in  (((n', VarT (idOf vIDs qn)), []), n')
+  in  (((n', VarT (idOf vIDs qn, 0)), []), n')
 transE _ _ e = ierr $ "The ZItoTTD translator does not understand: "++(pprint e "")
   
 -- | Translate an intensional definition to a TTD instruction containing node IDs.
@@ -58,7 +59,8 @@ transD vIDs n (DefZ qn eD) =
   in  (((idOf vIDs qn, snd entry), others), nD)
 transD vIDs n (ActualsZ qn _ el) =
   let (topEntriesIDs, entries, n') = transL vIDs n el
-  in  (((idOf vIDs qn, ActualsT topEntriesIDs), entries), n')
+      plugs = zip topEntriesIDs [0..]
+  in  (((idOf vIDs qn, ActualsT plugs), entries), n')
 
 -- | Translates a list of expressions. Returns the list of top-level IDs,
 --   all the generated instruction entries, and the last used ID.
