@@ -1,4 +1,5 @@
--- | The Graphviz-based dataflow graph generator.
+-- | Generates a graph for the TTD program in Graphviz format.
+-- 
 
 module SLIC.TTD.DFG (generateDFG) where
 
@@ -14,26 +15,31 @@ generateDFG (ProgT entries) =
   tab.("{"++).nl.
   foldDot genEntryBox entries.
   tab.("}"++).nl.
-  foldDot connectBoxes entries.
+  foldDot connectEntries entries.
   ("}"++).nl.nl
   
+-- | Generates a box for a TTD instruction entry.
 genEntryBox :: EntryT -> ShowS
 genEntryBox (nID, instrT) =
-  tab.nodeName nID.(" ["++).nl.
+  tab.instrName nID.(" ["++).nl.
   tab.tab.("style=filled,"++).nl.
   tab.tab.("color=lightgrey,"++).nl.
-  -- tab.tab.("node [style=filled, color=white];"++).nl.
   tab.tab.("label=\""++).shows nID.(": "++).pprint instrT.("\""++).nl.
   tab.("]"++).nl
 
-nodeName :: NodeID -> ShowS
-nodeName nID = ("node_"++).shows nID
+-- | Generates a name for a TTD instruction.
+instrName :: NodeID -> ShowS
+instrName nID = ("instr_"++).shows nID
 
-connectBoxes :: EntryT -> ShowS
-connectBoxes (nID, CallT _ nID')    = createEdge nID nID'
-connectBoxes (nID, VarT nID')       = createEdge nID nID'
-connectBoxes (nID, ActualsT nIDs)   = foldDot (createEdge nID) nIDs
-connectBoxes (nID, ConT _ nIDs)     = foldDot (createEdge nID) nIDs
+-- | Connects instructions.
+connectEntries :: EntryT -> ShowS
+connectEntries (nID, CallT _ nID')    = createEdge nID nID'
+connectEntries (nID, VarT nID')       = createEdge nID nID'
+connectEntries (nID, ActualsT nIDs)   = foldDot (createEdge nID) nIDs
+connectEntries (nID, ConT _ nIDs)     = foldDot (createEdge nID) nIDs
 
+-- | Creates an edge between two instructions. The direction of the arrow is
+--   that of the demand messages, the response messages are assumed to have
+--   the opposite direction.
 createEdge :: NodeID -> NodeID -> ShowS
-createEdge n1 n2 = tab.tab.nodeName n1.(" -> "++).nodeName n2.semi.nl
+createEdge n1 n2 = tab.tab.instrName n1.(" -> "++).instrName n2.semi.nl
