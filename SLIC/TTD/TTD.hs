@@ -16,7 +16,7 @@ callTTDBackend :: ModZ -> Options -> IO ()
 callTTDBackend m opts =
   let mn = fst $ modNameF m
       Prog _ defsZ = modProg m
-      pTTD = fromZOILtoTTD (filter isLocal defsZ)
+      (pTTD, defIDs) = fromZOILtoTTD (filter isLocal defsZ)
       isLocal def =
         let Just mn' = mName $ defVarZ def
         in  (mn'==mn) || (mn'==dfMod)
@@ -27,7 +27,7 @@ callTTDBackend m opts =
         AGenerateDFG ->
           let file = "./dfg.dot"
           in  putStrLn ("Writing graph to file: "++file) >>
-              writeFile file (generateDFG pTTD "")
+              writeFile file (generateDFG defIDs pTTD "")
         ACompileTTD ->
           let ttdCode = error "TODO: makeTTD pTTD"
           in  putStrLn (ttdCode "")

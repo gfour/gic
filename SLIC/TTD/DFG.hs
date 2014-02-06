@@ -3,38 +3,48 @@
 
 module SLIC.TTD.DFG (generateDFG) where
 
-import Data.Map (filter, toList)
+import Data.Map (filter, toList, union)
 import Data.Maybe (catMaybes)
-import SLIC.AuxFun (foldDot)
+import SLIC.AuxFun (foldDot, showStrings)
 import SLIC.Constants
 import SLIC.TTD.SyntaxTTD
-import SLIC.TTD.ZItoTTD (builtinNodeIDs, maxBuiltinNodeID)
+import SLIC.TTD.ZItoTTD (NodeIDs, builtinNodeIDs, maxBuiltinNodeID)
 import SLIC.Types
 
 -- | Generates a Graphviz graph for a TTD program.
-generateDFG :: ProgT -> ShowS
-generateDFG (ProgT entries) =
-  ("digraph G {"++).nl.
-  tab.("{"++).nl.
-  genBuiltinEntryBoxes entries.
-  foldDot genEntryBox entries.
-  tab.("}"++).nl.
-  foldDot connectEntries entries.
-  ("}"++).nl.nl
+generateDFG :: NodeIDs -> ProgT -> ShowS
+generateDFG defIDs (ProgT entries) =
+  let usedIDs = usedNodeMap entries
+  in  ("digraph G {"++).nl.
+      tab.("{"++).nl.
+      foldDot genBuiltinEntryBox (toList usedIDs).
+      foldDot genEntryBox entries.
+      tab.("}"++).nl.
+      foldDot connectEntries entries.
+      genLegend (union defIDs usedIDs).
+      ("}"++).nl.nl
 
--- | Generates opaque boxes for the built-in functions used by the program.
-genBuiltinEntryBoxes :: [EntryT] -> ShowS
-genBuiltinEntryBoxes entries =
+-- | Generates the legend that shows which node ID is assigned to which name.
+genLegend :: NodeIDs -> ShowS
+genLegend nIDs =
+  let (nIDs_qns, nIDs_ids) = unzip $ toList nIDs
+      makeCells f sl = showStrings " | " $ map f sl
+  in  tab.("legend [shape=record, label=\"{ID|"++).
+      makeCells show nIDs_ids.("}| {Function|"++).
+      makeCells (\x->pprint x "") nIDs_qns.("}\"];"++).nl
+
+-- | Returns the part of the built-in IDs table only for the IDs actually used.
+usedNodeMap :: [EntryT] -> NodeIDs
+usedNodeMap entries =
   let test nID = if nID > maxBuiltinNodeID then Nothing else Just nID
       findUsed (CallT _ (nID, _)) = [test nID]
       findUsed (VarT (nID, _))    = [test nID]
       findUsed (ActualsT plugs)   = map (test.fst) plugs
       findUsed (ConT _ plugs)     = map (test.fst) plugs
       usedBuiltinIDs = catMaybes $ concatMap (findUsed.snd) entries
-      usedNodeMap = Data.Map.filter (\i->i `elem` usedBuiltinIDs) builtinNodeIDs
-  in  foldDot genBuiltinEntryBox (toList usedNodeMap)
+  in  Data.Map.filter (\i->i `elem` usedBuiltinIDs) builtinNodeIDs
 
--- | Generates a box for a built-in block.
+-- | Generates an opaque box for a built-in function.
 genBuiltinEntryBox :: (QName, NodeID) -> ShowS
 genBuiltinEntryBox (qn, nID) =
   tab.instrName nID.

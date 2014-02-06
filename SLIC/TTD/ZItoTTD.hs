@@ -2,7 +2,8 @@
 --   engine.
 -- 
 
-module SLIC.TTD.ZItoTTD (builtinNodeIDs, fromZOILtoTTD, maxBuiltinNodeID) where
+module SLIC.TTD.ZItoTTD (NodeIDs, builtinNodeIDs, fromZOILtoTTD,
+                         maxBuiltinNodeID) where
 
 import Data.Map (Map, elems, fromList, keys, lookup, union)
 import SLIC.AuxFun (ierr, threadfunc_l)
@@ -16,8 +17,8 @@ import SLIC.Types
 type NodeIDs = Map QName NodeID
 
 -- | Translates an intensional program to a TTD program containing labelled
---   TTD instructions.
-fromZOILtoTTD :: [DefZ] -> ProgT
+--   TTD instructions. Also returns the IDs assigned to the definitions.
+fromZOILtoTTD :: [DefZ] -> (ProgT, NodeIDs)
 fromZOILtoTTD defsZ =
   let -- Generate the node IDs corresponding to the defined variables.
       defIDs :: NodeIDs
@@ -25,7 +26,7 @@ fromZOILtoTTD defsZ =
       maximumVarID = maximum $ elems defIDs
       vIDs = union builtinNodeIDs defIDs
       (entries, _) = threadfunc_l maximumVarID defsZ (transD vIDs)
-  in  ProgT ((map fst entries)++(concatMap snd entries))
+  in  (ProgT ((map fst entries)++(concatMap snd entries)), defIDs)
 
 -- | Translate an intensional expression to a TTD expression containing node IDs.
 --   Subexpressions are broken off as separate TTD instructions with their own
