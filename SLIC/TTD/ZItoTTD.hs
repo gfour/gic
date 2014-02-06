@@ -34,12 +34,11 @@ transE :: NodeIDs -> NodeID -> ExprZ -> ((EntryT, [EntryT]), NodeID)
 transE _ n (ConZ i@(LitInt _) []) =
   let n' = n+1
   in (((n', ConT i []), []), n')
-transE vIDs n (ConZ cBinOp@(CN _) [e1, e2]) =
-  let ((entry1, others1), n1) = transE vIDs n  e1
-      ((entry2, others2), n2) = transE vIDs n1 e2
-      n' = n2+1
-  in  (((n', ConT cBinOp [n1, n2]), entry1:entry2:(others1++others2)), n')
-transE _ _ (ConZ _ _) = ierr "TODO: fromZOILtoTTD: unknown built-in constant"
+transE vIDs n (ConZ cOp@(CN _) el) =
+  let (topEntriesIDs, entries, n') = transL vIDs n el
+      n'' = n' + 1
+  in  (((n'', ConT cOp topEntriesIDs), entries), n'')
+transE _ _ (ConZ c _) = ierr $ "TODO: fromZOILtoTTD: unknown built-in constant"++(pprint c "")
 transE vIDs n (FZ qOp f) = 
   let n' = n+1
   in  case qOp of
@@ -60,17 +59,19 @@ transD vIDs n (DefZ qn eD) =
   let ((entry, others), nD) = transE vIDs n eD
   in  (((idOf vIDs qn, snd entry), others), nD)
 transD vIDs n (ActualsZ qn _ el) =
-  let (elActs, nActs) = threadfunc_l n el (transE vIDs)
-      entries :: [EntryT]
-      entries = map fst elActs
-      entriesIDs :: [NodeID]
-      entriesIDs = map fst entries
-      others :: [EntryT]
-      others = concatMap snd elActs
-      actT :: EntryT
-      actT = (idOf vIDs qn, ActualsT entriesIDs)
-  in  ((actT, entries++others), nActs)
-      
+  let (topEntriesIDs, entries, n') = transL vIDs n el
+  in  (((idOf vIDs qn, ActualsT topEntriesIDs), entries), n')
+
+-- | Translates a list of expressions. Returns the list of top-level IDs,
+--   all the generated instruction entries, and the last used ID.
+transL :: NodeIDs -> NodeID -> [ExprZ] -> ([NodeID], [EntryT], NodeID)
+transL vIDs n el =
+  let (el', n') = threadfunc_l n el (transE vIDs)
+      topEntries = map fst el'
+      topEntriesIDs = map fst topEntries
+      others = concatMap snd el'
+  in  (topEntriesIDs, topEntries++others, n')
+
 -- | Returns the node ID assigned to one of the variables in the intensional      
 --   program.
 idOf :: NodeIDs -> QName -> NodeID
