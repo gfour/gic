@@ -13,6 +13,7 @@ module SLIC.TTD.SyntaxTTD where
 
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore)
 import SLIC.Constants (nl)
+import SLIC.ITrans.Syntax (QOp)
 import SLIC.SyntaxAux
 import SLIC.Types
 
@@ -43,7 +44,7 @@ type Demand = Message ()
 type Response = Message ValueT
 
 -- | A TTD instruction.
-data InstrT = CallT IIndex NodeID   -- ^ Call a node using an intensional index.
+data InstrT = CallT QOp NodeID       -- ^ Call a node using an intensional index.
             | VarT NodeID            -- ^ Call a node using the same context.
             | ActualsT [NodeID]
             | ConT Const [NodeID]
@@ -59,10 +60,10 @@ instance PPrint ProgT where
     foldDot (\(nID, instrT)->pprintNodeID nID.(" : "++).pprint instrT.nl) entries
 
 instance PPrint InstrT where
-  pprint (CallT iidx nID) = ("Call-"++).pprintIdx iidx.("@"++).pprintNodeID nID
-  pprint (VarT nID) = ("Var@"++).pprintNodeID nID
+  pprint (CallT qOp nID) = pprint qOp.pprintNodeID nID
+  pprint (VarT nID) = ("var"++).pprintNodeID nID
   pprint (ActualsT nIDs) =
-    ("Actuals("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
+    ("actuals("++).insCommIfMore (map pprintNodeID nIDs).(")"++)
   pprint (ConT (LitInt i) []) = shows i
   pprint (ConT (CN c) nIDs) =
     ("["++).pprint c.("]("++).insCommIfMore (map pprintNodeID nIDs).(")"++)

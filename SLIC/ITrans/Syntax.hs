@@ -26,8 +26,8 @@ data ExprH =
   deriving (Eq,Read)
 
 -- | An intensional call(i) operator.
-data QOp = NOp 
-         | Call IIndex deriving (Eq,Read)
+data QOp = NOp                             -- ^ No index, used for CAFs.
+         | Call IIndex deriving (Eq,Read)  -- ^ Call with intensional index.
 
 -- | A HIL definition.
 data DefH = 
@@ -57,7 +57,7 @@ type ModH = Mod ProgH
 instance PPrint QOp where
    pprint (Call i) = ("call[" ++).pprintIdx i.("]"++)
    pprint NOp      = id
-      
+
 instance PPrint ExprH where
    pprint (XH vn)          = pprintVar vn
    pprint (ConH cn el)     = prettyConst 0 cn el

@@ -21,11 +21,10 @@ generateDFG (ProgT entries) =
 -- | Generates a box for a TTD instruction entry.
 genEntryBox :: EntryT -> ShowS
 genEntryBox (nID, instrT) =
-  tab.instrName nID.(" ["++).nl.
-  tab.tab.("style=filled,"++).nl.
-  tab.tab.("color=lightgrey,"++).nl.
-  tab.tab.("label=\""++).shows nID.(": "++).pprint instrT.("\""++).nl.
-  tab.("]"++).nl
+  tab.instrName nID.
+  (" ["++).("shape=box, style=\"rounded,filled\","++).
+  (" color=black, fillcolor=lightgrey,"++).
+  (" label=\""++).shows nID.(": "++).pprint instrT.("\"]"++).nl
 
 -- | Generates a name for a TTD instruction.
 instrName :: NodeID -> ShowS

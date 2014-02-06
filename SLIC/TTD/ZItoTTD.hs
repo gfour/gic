@@ -41,9 +41,7 @@ transE vIDs n (ConZ cOp@(CN _) el) =
 transE _ _ (ConZ c _) = ierr $ "TODO: fromZOILtoTTD: unknown built-in constant"++(pprint c "")
 transE vIDs n (FZ qOp f) = 
   let n' = n+1
-  in  case qOp of
-        Call iidx -> (((n', CallT iidx (idOf vIDs f)), []), n')
-        NOp       -> transE vIDs n (XZ (V f))
+  in  (((n', CallT qOp (idOf vIDs f)), []), n')
 transE vIDs n (XZ (V qn)) =
   let n' = n+1
   in  (((n', VarT (idOf vIDs qn)), []), n')
