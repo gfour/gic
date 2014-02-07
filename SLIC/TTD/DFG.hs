@@ -5,8 +5,9 @@ module SLIC.TTD.DFG (generateDFG) where
 
 import Data.Map (filter, toList, union)
 import Data.Maybe (catMaybes)
-import SLIC.AuxFun (foldDot, showStrings)
+import SLIC.AuxFun (foldDot, ierr, showStrings)
 import SLIC.Constants
+import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
 import SLIC.TTD.ZItoTTD (NodeIDs, builtinNodeIDs, maxBuiltinNodeID)
 import SLIC.Types
@@ -15,7 +16,7 @@ import SLIC.Types
 generateDFG :: NodeIDs -> ProgT -> ShowS
 generateDFG defIDs (ProgT entries) =
   let usedIDs = usedNodeMap entries
-  in  ("digraph G {"++).nl.
+  in  ("digraph G {splines=true"++).nl.  -- Another option: splines=ortho
       tab.("{"++).nl.
       foldDot genBuiltinEntryBox (toList usedIDs).
       foldDot genEntryBox entries.
@@ -56,17 +57,36 @@ genBuiltinEntryBox (qn, nID) =
 genEntryBox :: EntryT -> ShowS
 genEntryBox (nID, instrT) =
   let -- Escape special characters that clash with the 'label' format of Graphviz.
-      instrLabel = concatMap escapeChar (pprint instrT "")
+      escape c = ((concatMap escapeChar (pprint c ""))++)
       escapeChar '<' = "\\<"
       escapeChar '>' = "\\>"
       escapeChar '}' = "\\}"
       escapeChar '{' = "\\{"
       escapeChar '|' = "\\|"
       escapeChar c   = [c]
+      ports ps = map snd ps
+      pField p = (("<"++).portName p.("> ~"++).shows p) ""
+      pFields ps = showStrings " | " $ map pField $ ports ps
   in  tab.instrName nID.
       (" ["++).("shape=record, style=\"rounded,filled\","++).
       (" color=black, fillcolor=lightgrey,"++).
-      (" label=\""++).shows nID.(" | "++).(instrLabel++).("\"]"++).nl
+      (" label=\"<"++).nodePortName.("> "++).shows nID.(" | "++).      
+      (case instrT of
+          ConT (CN c) plugs -> ("["++).escape c.("] | "++).pFields plugs
+          ConT (LitInt i) []-> shows i 
+          ActualsT plugs    -> (" actuals | "++).pFields plugs
+          CallT qOp plug    -> pprint qOp.(" | "++).pFields [plug]
+          VarT plug         -> (" var | "++).pFields [plug]
+          _                 -> ierr "genEntryBox: unknown instruction"
+      ).("\"]"++).nl
+
+-- | Generates the port name used in a Graphviz record.
+portName :: PortID -> ShowS
+portName pID = ("p"++).shows pID
+
+-- | The name of the default firing port in a Graphviz record.
+nodePortName :: ShowS
+nodePortName = ("p"++)
 
 -- | Generates a name for a TTD instruction.
 instrName :: NodeID -> ShowS
@@ -84,5 +104,5 @@ connectEntries (nID, ConT _ pIDs)   = foldDot (createEdge nID) pIDs
 --   the opposite direction.
 createEdge :: NodeID -> Plug -> ShowS
 createEdge n1 (n2, p2) =
-  tab.instrName n1.(" -> "++).instrName n2.
-  ("[label=\""++).shows p2.("\"]"++).semi.nl
+  tab.instrName n1.(":"++).portName p2.(" -> "++).
+  instrName n2.(":"++).nodePortName.semi.nl
