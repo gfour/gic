@@ -1,9 +1,9 @@
--- | Transforms a ZOIL program to a program that can be executed by a dataflow
---   engine.
+-- | Transforms a 0-order program to a program that can be executed by a
+--   demand-driven dataflow engine.
 -- 
 
-module SLIC.TTD.ZItoTTD (NodeIDs, builtinNodeIDs, fromZOILtoTTD,
-                         maxBuiltinNodeID) where
+module SLIC.TTD.ZItoTTD (InstrIDs, builtinInstrIDs, fromZOILtoTTD,
+                         maxBuiltinInstrID) where
 
 import Data.Map (Map, elems, fromList, keys, lookup, union)
 import SLIC.AuxFun (ierr, threadfunc_l)
@@ -12,29 +12,31 @@ import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
 import SLIC.Types
 
--- | A mapping from qualified names to node identifiers, used to replace
+-- | A mapping from qualified names to instruction IDs, used to replace
 --   variables with their instruction entry.
-type NodeIDs = Map QName NodeID
+type InstrIDs = Map QName InstrID
 
 -- | Translates an intensional program to a TTD program containing labelled
 --   TTD instructions. Also returns the IDs assigned to the definitions.
-fromZOILtoTTD :: [DefZ] -> (ProgT, NodeIDs)
+fromZOILtoTTD :: [DefZ] -> (ProgT, InstrIDs)
 fromZOILtoTTD defsZ =
-  let -- Generate the node IDs corresponding to the defined variables.
-      defIDs :: NodeIDs
-      defIDs = fromList $ zip (map defVarZ defsZ) [(maxBuiltinNodeID+1)..]
+  let -- Generate the instruction IDs corresponding to the defined variables.
+      defIDs :: InstrIDs
+      defIDs = fromList $ zip (map defVarZ defsZ) [(maxBuiltinInstrID+1)..]
       maximumVarID = maximum $ elems defIDs
-      vIDs = union builtinNodeIDs defIDs
+      vIDs = union builtinInstrIDs defIDs
       (entries, _) = threadfunc_l maximumVarID defsZ (transD vIDs)
   in  (ProgT ((map fst entries)++(concatMap snd entries)), defIDs)
 
--- | Translate an intensional expression to a TTD expression containing node IDs.
---   Subexpressions are broken off as separate TTD instructions with their own
---   IDs. Takes the variable IDs table, the last used node ID and the expression
---   to translate.
---   Returns the new TTD instruction corresponding to the expression, any other
---   TTD sub-instructions generated, and the last used node ID.
-transE :: NodeIDs -> NodeID -> ExprZ -> ((EntryT, [EntryT]), NodeID)
+-- | Translate an intensional expression to an instruction entry. There is no
+--   nesting: subexpressions of the original expression are broken off as
+--   separate TTD instructions with their with their own IDs; these IDs are then
+--   filled in the parent expression's "Plug" ports.
+--   This function takes the variable IDs table, the last used instruction ID and 
+--   the expression to translate. It returns the new TTD instruction corresponding
+--   to the expression, any other TTD sub-instructions generated, and the last
+--   used instruction ID.
+transE :: InstrIDs -> InstrID -> ExprZ -> ((IEntryT, [IEntryT]), InstrID)
 transE _ n (ConZ i@(LitInt _) []) =
   let n' = n+1
   in (((n', ConT i []), []), n')
@@ -52,12 +54,12 @@ transE vIDs n (XZ (V qn)) =
   in  (((n', VarT (idOf vIDs qn, 0)), []), n')
 transE _ _ e = ierr $ "The ZItoTTD translator does not understand: "++(pprint e "")
   
--- | Translate an intensional definition to a TTD instruction containing node IDs.
---   Takes the variable IDs table, the last used node ID and the definition to
---   translate.
+-- | Translate an intensional definition to an instruction entry. See "transE"
+--   for details. This function takes the variable IDs table, the last used 
+--   instruction ID, and the definition to translate.
 --   Returns the new TTD instruction corresponding to the definition, any other
---   TTD sub-instructions generated, and the last used node ID.
-transD :: NodeIDs -> NodeID -> DefZ -> ((EntryT, [EntryT]), NodeID)
+--   TTD sub-instructions generated, and the last used instruction ID.
+transD :: InstrIDs -> InstrID -> DefZ -> ((IEntryT, [IEntryT]), InstrID)
 transD vIDs n (DefZ qn eD) = 
   let ((entry, others), nD) = transE vIDs n eD
   in  (((idOf vIDs qn, snd entry), others), nD)
@@ -68,7 +70,7 @@ transD vIDs n (ActualsZ qn _ el) =
 
 -- | Translates a list of expressions. Returns the list of top-level IDs,
 --   all the generated instruction entries, and the last used ID.
-transL :: NodeIDs -> NodeID -> [ExprZ] -> ([NodeID], [EntryT], NodeID)
+transL :: InstrIDs -> InstrID -> [ExprZ] -> ([InstrID], [IEntryT], InstrID)
 transL vIDs n el =
   let (el', n') = threadfunc_l n el (transE vIDs)
       topEntries = map fst el'
@@ -76,20 +78,20 @@ transL vIDs n el =
       others = concatMap snd el'
   in  (topEntriesIDs, topEntries++others, n')
 
--- | Returns the node ID assigned to one of the variables in the intensional      
---   program.
-idOf :: NodeIDs -> QName -> NodeID
+-- | Returns the instruction ID assigned to one of the variables in the
+--   intensional program.
+idOf :: InstrIDs -> QName -> InstrID
 idOf vIDs qn =
   case Data.Map.lookup qn vIDs of
     Just nID -> nID
-    Nothing  -> ierr $ "idOf: no node ID for "++(pprint qn "")
+    Nothing  -> ierr $ "idOf: no instruction ID for "++(pprint qn "")
 
--- | Returns the maximum node ID assigned to a built-in function.
-maxBuiltinNodeID :: NodeID
-maxBuiltinNodeID = maximum $ elems builtinNodeIDs
+-- | Returns the maximum instruction ID assigned to a built-in function.
+maxBuiltinInstrID :: InstrID
+maxBuiltinInstrID = maximum $ elems builtinInstrIDs
 
--- | Generate the node IDs for the built-in functions.
-builtinNodeIDs :: NodeIDs
-builtinNodeIDs = 
+-- | Contains the instruction IDs of the built-in functions.
+builtinInstrIDs :: InstrIDs
+builtinInstrIDs = 
   let builtinNames = keys builtinFuncSigs -- ++ (concat $ elems builtinFuncSigs)
   in  fromList $ zip builtinNames [0..]
