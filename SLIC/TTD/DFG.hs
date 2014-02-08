@@ -35,7 +35,7 @@ genLegend nIDs =
       makeCells (\x->pprint x "") nIDs_qns.("}\"];"++).nl
 
 -- | Returns the part of the built-in IDs table only for the IDs actually used.
-usedInstrMap :: [IEntryT] -> InstrIDs
+usedInstrMap :: [IEntry] -> InstrIDs
 usedInstrMap entries =
   let test nID = if nID > maxBuiltinInstrID then Nothing else Just nID
       findUsed (CallT _ (nID, _)) = [test nID]
@@ -54,7 +54,7 @@ genBuiltinEntryBox (qn, nID) =
   (" label=\""++).shows nID.(" | Built-in: "++).pprint qn.("\"]"++).nl
   
 -- | Generates a box for a TTD instruction entry.
-genEntryBox :: IEntryT -> ShowS
+genEntryBox :: IEntry -> ShowS
 genEntryBox (nID, instrT) =
   let -- Escape special characters that clash with the 'label' format of Graphviz.
       escape c = ((concatMap escapeChar (pprint c ""))++)
@@ -93,7 +93,7 @@ instrName :: InstrID -> ShowS
 instrName nID = ("instr_"++).shows nID
 
 -- | Connects instructions.
-connectEntries :: IEntryT -> ShowS
+connectEntries :: IEntry -> ShowS
 connectEntries (nID, CallT _ pID)   = createEdge nID pID
 connectEntries (nID, VarT pID)      = createEdge nID pID
 connectEntries (nID, ActualsT pIDs) = foldDot (createEdge nID) pIDs

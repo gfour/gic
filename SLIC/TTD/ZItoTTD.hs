@@ -36,7 +36,7 @@ fromZOILtoTTD defsZ =
 --   the expression to translate. It returns the new TTD instruction corresponding
 --   to the expression, any other TTD sub-instructions generated, and the last
 --   used instruction ID.
-transE :: InstrIDs -> InstrID -> ExprZ -> ((IEntryT, [IEntryT]), InstrID)
+transE :: InstrIDs -> InstrID -> ExprZ -> ((IEntry, [IEntry]), InstrID)
 transE _ n (ConZ i@(LitInt _) []) =
   let n' = n+1
   in (((n', ConT i []), []), n')
@@ -59,7 +59,7 @@ transE _ _ e = ierr $ "The ZItoTTD translator does not understand: "++(pprint e 
 --   instruction ID, and the definition to translate.
 --   Returns the new TTD instruction corresponding to the definition, any other
 --   TTD sub-instructions generated, and the last used instruction ID.
-transD :: InstrIDs -> InstrID -> DefZ -> ((IEntryT, [IEntryT]), InstrID)
+transD :: InstrIDs -> InstrID -> DefZ -> ((IEntry, [IEntry]), InstrID)
 transD vIDs n (DefZ qn eD) = 
   let ((entry, others), nD) = transE vIDs n eD
   in  (((idOf vIDs qn, snd entry), others), nD)
@@ -70,7 +70,7 @@ transD vIDs n (ActualsZ qn _ el) =
 
 -- | Translates a list of expressions. Returns the list of top-level IDs,
 --   all the generated instruction entries, and the last used ID.
-transL :: InstrIDs -> InstrID -> [ExprZ] -> ([InstrID], [IEntryT], InstrID)
+transL :: InstrIDs -> InstrID -> [ExprZ] -> ([InstrID], [IEntry], InstrID)
 transL vIDs n el =
   let (el', n') = threadfunc_l n el (transE vIDs)
       topEntries = map fst el'

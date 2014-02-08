@@ -49,10 +49,10 @@ data InstrT = CallT QOp Plug     -- ^ Call instruction using intensional index.
             | ConT Const [Plug]  -- ^ Built-in operator (including base values).
 
 -- | An instruction entry is an instruction labelled by an ID.
-type IEntryT = (InstrID, InstrT)
+type IEntry = (InstrID, InstrT)
 
 -- | A dataflow program is a list of instruction entries.
-data ProgT = ProgT [IEntryT]
+data ProgT = ProgT [IEntry]
 
 instance PPrint ProgT where
   pprint (ProgT entries) =
