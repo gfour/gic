@@ -27,12 +27,6 @@ import SLIC.Types
 
 -- * The TTD language
 
--- | Base values are just integers.
-type ValueT = Int
-
--- | A token (also a LAR ID).
-type Token = Int
-
 -- | The unique identifier characterizing every instruction.
 type InstrID = Int
 

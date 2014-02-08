@@ -8,8 +8,9 @@ import SLIC.ITrans.Syntax
 import SLIC.State
 import SLIC.SyntaxAux (Prog(..), Mod(..))
 import SLIC.TTD.DFG (generateDFG)
-import SLIC.TTD.ZItoTTD (fromZOILtoTTD)
-import SLIC.Types (mName, pprint)
+import SLIC.TTD.EvalTTD (evalTTD)
+import SLIC.TTD.ZItoTTD (fromZOILtoTTD, idOf)
+import SLIC.Types (mainDefQName, mName, pprint)
 
 -- | The entry point to the TTD back-end.
 callTTDBackend :: ModZ -> Options -> IO ()
@@ -28,7 +29,7 @@ callTTDBackend m opts =
           let file = "./dfg.dot"
           in  putStrLn ("Writing graph to file: "++file) >>
               writeFile file (generateDFG defIDs pTTD "")
-        ACompileTTD ->
-          let ttdCode = error "TODO: makeTTD pTTD"
-          in  putStrLn (ttdCode "")
+        AEvalTTD ->
+          let resultID = idOf defIDs (mainDefQName mn)
+          in  evalTTD resultID pTTD
         a -> ierr $ "The TTD back-end cannot handle action "++(show a)

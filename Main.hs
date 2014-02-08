@@ -98,8 +98,8 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -ecbn   : transform and evaluate the 0-order program (call-by-name)"
            putStrLn "             -v : trace the evaluation"
            putStrLn "* Tagged-Token Dataflow back-end: (EXPERIMENTAL)"
-           putStrLn "  -ttd    : transform and compile the 0-order program for tagged-token dataflow"
            putStrLn "  -dfg    : generate tagged-token dataflow graph for Graphviz"
+           putStrLn "  -ettd   : transform and evaluate the 0-order program for tagged-token dataflow"
            putStrLn "  -pttd   : transform and print the TTD program"
            putStrLn "* Compilation mode:"
            putStrLn "  -whole  : whole program defunctionalization and compilation"
@@ -127,7 +127,7 @@ processArgs cmdArgs =
         aux ("-e"     : args) opts = aux args opts{optAction = AEvalZOILLazy}
         aux ("-fl"    : args) opts = aux args opts{optAction = AEvalFL}
         aux ("-cm"    : args) opts = aux args opts{optAction = ACompileMaude}
-        aux ("-ttd"   : args) opts = aux args opts{optAction = ACompileTTD}
+        aux ("-ettd"  : args) opts = aux args opts{optAction = AEvalTTD}
         aux ("-erl"   : args) opts = aux args opts{optAction = AEvalErl}
         aux ("-df"    : args) opts = aux args opts{optAction = APrintDF}
         aux ("-debug" : args) opts = aux args opts{optDebug = True}

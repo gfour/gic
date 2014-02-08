@@ -222,7 +222,7 @@ processFL opts dfis inputModule =
                        return Nothing
 
                   -- Call the TTD back-end.
-                  ACompileTTD ->
+                  AEvalTTD ->
                     do callTTDBackend p3 opts
                        return Nothing
 

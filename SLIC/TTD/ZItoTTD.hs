@@ -3,7 +3,7 @@
 -- 
 
 module SLIC.TTD.ZItoTTD (InstrIDs, builtinInstrIDs, fromZOILtoTTD,
-                         maxBuiltinInstrID) where
+                         idOf, maxBuiltinInstrID) where
 
 import Data.Map (Map, elems, fromList, keys, lookup, union)
 import SLIC.AuxFun (ierr, threadfunc_l)
