@@ -42,18 +42,6 @@ type PortID = Int
 -- | A plug is a pair of an instruction ID and a port.
 type Plug = (InstrID, PortID)
 
--- | A demand chain.
-type DChain = [Plug]
-
--- | A message is the tuple (sender, receiver, token, payload, demand chain).
-type Message a = (InstrID, InstrID, Token, a, DChain)
-
--- | A demand is a message without a value.
-type Demand = Message ()
-
--- | A response is a message carrying a value.
-type Response = Message ValueT
-
 -- | A dataflow instruction.
 data InstrT = CallT QOp Plug     -- ^ Call instruction using intensional index.
             | VarT Plug          -- ^ Call instruction using current context.
@@ -82,4 +70,4 @@ instance PPrint InstrT where
 
 -- | Pretty printer for plugs.
 pprintPlug :: Plug -> ShowS
-pprintPlug (nId, pId) = ("~["++).shows nId.(":"++).shows pId.("]"++)
+pprintPlug (nId, pId) = ("~["++).shows pId.(":"++).shows nId.("]"++)
