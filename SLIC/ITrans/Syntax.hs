@@ -26,8 +26,9 @@ data ExprH =
   deriving (Eq,Read)
 
 -- | An intensional call(i) operator.
-data QOp = NOp                             -- ^ No index, used for CAFs.
-         | Call IIndex deriving (Eq,Read)  -- ^ Call with intensional index.
+data QOp = NOp               -- ^ no index (used for CAFs)
+         | Call IIndex       -- ^ call with intensional index
+         deriving (Eq,Read)
 
 -- | A HIL definition.
 data DefH = 
