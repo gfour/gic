@@ -131,47 +131,36 @@ sendMsg p (Msg src dest (token, dchain) Demand) =
         [ Msg dest src (token, dchain) (Response (VI i)) ]
       Just (ConT (CN CIf) [iID, _, _]) ->
         [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
-      Just instrT -> error $ "TODO: node dispatch (Demand): "++(pprint instrT "")
-      Nothing     -> ierr $ "no instruction #"++(show dest)++" in graph (Demand)")
+      Just instrT -> ierr $ "no dispatch for Demand: "++(pprint instrT "")
+      Nothing     -> ierr $ "no instruction #"++(show dest)++" for Demand")
 sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
-  let (src', br):dchain' = dchain      -- pop demand chain
+  let (src', br@(Branch brn)):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
-        Just (CallT (Call (_, i)) iID) | br==Branch 0 ->
+        Just (CallT (Call (_, i)) iID) | brn==0 ->
           let i':token' = token
           in  (checkResponseCall (i, i') iID src)
               Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (ActualsT iIDs) ->
-          let Branch iidx = br
-              token' = iidx:token
-          in  (checkResponseActuals iidx (length iIDs))
+          let token' = brn:token
+          in  (checkResponseActuals brn (length iIDs))
               Msgs [ Msg dest src' (token', dchain') rVal ]
-        Just (VarT iID) | br==Branch 0 ->
+        Just (VarT iID) | brn==0 ->
           (checkResponseVar iID src)
           Msgs [ Msg dest src' (token, dchain') rVal ]
-        Just (ConT (CN c) [_, _]) ->
-           case br of
-             -- Add 'join' entry for pending value.
-             Branch n -> 
-               if (n==0) || (n==1) then
-                 JoinUpdate (JD dest (token, dchain) br val)
-               else
-                 ierr $ (pprint c ": operator has no dependency ")++(show n)
-        Just (ConT (CN CIf) [_, iID0, iID1]) ->
-          case br of
-            Branch 0  ->
-              let VB cond = val
-                  m = if cond then
-                        Msg dest iID0 (token, (src', Branch 1):dchain') Demand
-                      else
-                        Msg dest iID1 (token, (src', Branch 2):dchain') Demand
-              in  Msgs [ m ]
-            Branch n | (n==1) || (n==2) ->
-              let msg = Msg dest src' (token, dchain') (Response val)
-              in  Msgs [ msg ]
-            Branch n -> ierr $ "'if' has no dependency "++(show n)
-        Just instrT ->
-          error $ "TODO: node dispatch (Response): "++(pprint instrT "")
-        Nothing -> ierr $ "no instruction "++(show dest)++" in graph (Response)"
+        Just (ConT (CN _) [_, _]) | (brn==0) || (brn==1) ->
+          -- Add 'join' entry for pending value.
+          JoinUpdate (JD dest (token, dchain) br val)
+        Just (ConT (CN CIf) [_, iID0, iID1]) | brn==0 ->
+          let VB cond = val
+          in  if cond then
+                Msgs [ Msg dest iID0 (token, (src', Branch 1):dchain') Demand ]
+              else
+                Msgs [ Msg dest iID1 (token, (src', Branch 2):dchain') Demand ]
+        Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
+          let msg = Msg dest src' (token, dchain') (Response val)
+          in  Msgs [ msg ]
+        Just instrT -> ierr $ "no dispatch for Response: "++(pprint instrT "")
+        Nothing     -> ierr $ "no instruction #"++(show dest)++" for Response"
 
 -- | Evaluates a binary constant operator.
 cBinOp :: COp -> ValueT -> ValueT -> ValueT
