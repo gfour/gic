@@ -31,7 +31,7 @@ fromZOILtoTTD defsZ =
 -- | Translate an intensional expression to an instruction entry. There is no
 --   nesting: subexpressions of the original expression are broken off as
 --   separate TTD instructions with their with their own IDs; these IDs are then
---   filled in the parent expression's "Plug" ports.
+--   filled in the parent expression's depending instructions' ports.
 --   This function takes the variable IDs table, the last used instruction ID and 
 --   the expression to translate. It returns the new TTD instruction corresponding
 --   to the expression, any other TTD sub-instructions generated, and the last
@@ -42,16 +42,15 @@ transE _ n (ConZ i@(LitInt _) []) =
   in (((n', ConT i []), []), n')
 transE vIDs n (ConZ cOp@(CN _) el) =
   let (topEntriesIDs, entries, n') = transL vIDs n el
-      plugs = zip topEntriesIDs [0..]
       n'' = n' + 1
-  in  (((n'', ConT cOp plugs), entries), n'')
+  in  (((n'', ConT cOp topEntriesIDs), entries), n'')
 transE _ _ (ConZ c _) = ierr $ "TODO: fromZOILtoTTD: unknown built-in constant"++(pprint c "")
 transE vIDs n (FZ qOp f) = 
   let n' = n+1
-  in  (((n', CallT qOp (idOf vIDs f, 0)), []), n')
+  in  (((n', CallT qOp (idOf vIDs f)), []), n')
 transE vIDs n (XZ (V qn)) =
   let n' = n+1
-  in  (((n', VarT (idOf vIDs qn, 0)), []), n')
+  in  (((n', VarT (idOf vIDs qn)), []), n')
 transE _ _ e = ierr $ "The ZItoTTD translator does not understand: "++(pprint e "")
   
 -- | Translate an intensional definition to an instruction entry. See "transE"
@@ -65,8 +64,7 @@ transD vIDs n (DefZ qn eD) =
   in  (((idOf vIDs qn, snd entry), others), nD)
 transD vIDs n (ActualsZ qn _ el) =
   let (topEntriesIDs, entries, n') = transL vIDs n el
-      plugs = zip topEntriesIDs [0..]
-  in  (((idOf vIDs qn, ActualsT plugs), entries), n')
+  in  (((idOf vIDs qn, ActualsT topEntriesIDs), entries), n')
 
 -- | Translates a list of expressions. Returns the list of top-level IDs,
 --   all the generated instruction entries, and the last used ID.

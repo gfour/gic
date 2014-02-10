@@ -13,8 +13,7 @@
 --   An instruction is a node in the dataflow graph and is connected to other
 --   instructions. If an instruction depends on N other instructions and M other
 --   instructions depend on it, it has N+1 ports: N ports for the dependencies
---   ('Plug' outlets) and one \"firing\" port multiplexing input from the M
---   dependent instructions.
+--   and one \"firing\" port multiplexing input from the M dependent instructions.
 -- 
 
 module SLIC.TTD.SyntaxTTD where
@@ -30,17 +29,11 @@ import SLIC.Types
 -- | The unique identifier characterizing every instruction.
 type InstrID = Int
 
--- | The identifier of a demand-receive port (unique per instruction).
-type PortID = Int
-
--- | A plug is a pair of an instruction ID and a port.
-type Plug = (InstrID, PortID)
-
 -- | A dataflow instruction.
-data InstrT = CallT QOp Plug     -- ^ Call instruction using intensional index.
-            | VarT Plug          -- ^ Call instruction using current context.
-            | ActualsT [Plug]    -- ^ Intensional /actuals/ operator.
-            | ConT Const [Plug]  -- ^ Built-in operator (including base values).
+data InstrT = CallT QOp InstrID     -- ^ Call instruction using intensional index.
+            | VarT InstrID          -- ^ Call instruction using current context.
+            | ActualsT [InstrID]    -- ^ Intensional /actuals/ operator.
+            | ConT Const [InstrID]  -- ^ Built-in operator (including base values).
 
 -- | An instruction entry is an instruction labelled by an ID.
 type IEntry = (InstrID, InstrT)
@@ -53,15 +46,15 @@ instance PPrint ProgT where
     foldDot (\(nID, instrT)->shows nID.(" | "++).pprint instrT.nl) entries
 
 instance PPrint InstrT where
-  pprint (CallT qOp plug) = pprint qOp.pprintPlug plug
-  pprint (VarT plug) = ("var"++).pprintPlug plug
-  pprint (ActualsT plugs) =
-    ("actuals("++).insCommIfMore (map pprintPlug plugs).(")"++)
+  pprint (CallT qOp iID) = pprint qOp.pprintInstrPtr iID
+  pprint (VarT iID) = ("var"++).pprintInstrPtr iID
+  pprint (ActualsT iIDs) =
+    ("actuals("++).insCommIfMore (map pprintInstrPtr iIDs).(")"++)
   pprint (ConT (LitInt i) []) = shows i
-  pprint (ConT (CN c) plugs) =
-    ("["++).pprint c.("]("++).insCommIfMore (map pprintPlug plugs).(")"++)
+  pprint (ConT (CN c) iIDs) =
+    ("["++).pprint c.("]("++).insCommIfMore (map pprintInstrPtr iIDs).(")"++)
   pprint _ = ierr "Unknown instruction, no pretty printer available."
 
--- | Pretty printer for plugs.
-pprintPlug :: Plug -> ShowS
-pprintPlug (nId, pId) = ("~["++).shows pId.(":"++).shows nId.("]"++)
+-- | Pretty printer for pointers to instructions.
+pprintInstrPtr :: InstrID -> ShowS
+pprintInstrPtr iId = ("~["++).shows iId.("]"++)

@@ -22,12 +22,12 @@ instance PPrint ValueT where
 -- | A token (also a LAR ID).
 type Token = [Int]
 
--- | Branches are used by instructions that depend on two instructions.
-data Branch = LeftB | RightB | Single
+-- | Branches are used by instructions that depend on other instructions.
+data Branch = Branch Int
             deriving (Eq, Ord, Show)
 
 -- | A demand chain.
-type DChain = [(Plug, Branch)]
+type DChain = [(InstrID, Branch)]
 
 -- | A message color is a token and a demand-chain for propagating demands and
 --   responses both ways.
@@ -116,57 +116,59 @@ sendMsg :: ProgT' -> Msg -> MsgResult
 sendMsg p (Msg src dest (token, dchain) Demand) =
   Msgs
   (case M.lookup dest p of
-      Just (CallT (Call (_, i)) (iID, pID)) ->
-        [ Msg dest iID (i:token, ((src, pID), Single):dchain) Demand ]
-      Just (VarT (iID, pID)) ->
-        [ Msg dest iID (token, ((src, pID), Single):dchain) Demand ]
-      Just (ActualsT plugs) ->
+      Just (CallT (Call (_, i)) iID) ->
+        [ Msg dest iID (i:token, (src, Branch 0):dchain) Demand ]
+      Just (VarT iID) ->
+        [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
+      Just (ActualsT iIDs) ->
         let i:token' = token
-            (iID, pID) = plugs !! i
-        in  [ Msg dest iID (token', ((src, pID), Single):dchain) Demand ]
-      Just (ConT (CN _) [(iID0, pID0), (iID1, pID1)]) ->
-        [ Msg dest iID0 (token, ((src, pID0), LeftB ):dchain) Demand
-        , Msg dest iID1 (token, ((src, pID1), RightB):dchain) Demand ]
+            iID = iIDs !! i
+        in  [ Msg dest iID (token', (src, Branch i):dchain) Demand ]
+      Just (ConT (CN _) [iID0, iID1]) ->
+        [ Msg dest iID0 (token, (src, Branch 0):dchain) Demand
+        , Msg dest iID1 (token, (src, Branch 1):dchain) Demand ]
       Just (ConT (LitInt i) []) ->
         [ Msg dest src (token, dchain) (Response (VI i)) ]
-      Just (ConT (CN CIf) [(iID, pID), _, _]) ->
-        [ Msg dest iID (token, ((src, pID), LeftB):dchain) Demand ]
+      Just (ConT (CN CIf) [iID, _, _]) ->
+        [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
       Just instrT -> error $ "TODO: node dispatch (Demand): "++(pprint instrT "")
       Nothing     -> ierr $ "no instruction #"++(show dest)++" in graph (Demand)")
-sendMsg p msg2@(Msg src dest (token, dchain) rVal@(Response val)) = 
-  let ((src', pID'), br):dchain' = dchain      -- pop demand chain
-      -- isPending (iID, color, _, _) =
-      --   (iID==dest) && (cTail color == cTail (token, dchain))
+sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
+  let (src', br):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
-        Just (CallT (Call (_, i)) (iID, pID)) | br==Single ->
+        Just (CallT (Call (_, i)) iID) | br==Branch 0 ->
           let i':token' = token
-          in  (checkResponseCall (i, i') (iID, pID) (src, pID'))
+          in  (checkResponseCall (i, i') iID src)
               Msgs [ Msg dest src' (token', dchain') rVal ]
-        Just (ActualsT plugs) ->
-          let token' = pID':token      -- this assumes pID'==intensional index
-          in  (checkResponseActuals pID' (length plugs))
+        Just (ActualsT iIDs) ->
+          let Branch iidx = br
+              token' = iidx:token
+          in  (checkResponseActuals iidx (length iIDs))
               Msgs [ Msg dest src' (token', dchain') rVal ]
-        Just (VarT (iID, pID)) | br==Single ->
-          (checkResponseVar (iID, pID) (src, pID'))
+        Just (VarT iID) | br==Branch 0 ->
+          (checkResponseVar iID src)
           Msgs [ Msg dest src' (token, dchain') rVal ]
         Just (ConT (CN c) [_, _]) ->
            case br of
-             Single -> ierr$(pprint c ": no single dependency ")++(pprint msg2 "")
              -- Add 'join' entry for pending value.
-             _ -> JoinUpdate (JD dest (token, dchain) br val)
-        Just (ConT (CN CIf) [_, (iID0, pID0), (iID1, pID1)]) ->
+             Branch n -> 
+               if (n==0) || (n==1) then
+                 JoinUpdate (JD dest (token, dchain) br val)
+               else
+                 ierr $ (pprint c ": operator has no dependency ")++(show n)
+        Just (ConT (CN CIf) [_, iID0, iID1]) ->
           case br of
-            Single -> ierr "'if' has no single dependency"
-            LeftB  ->
+            Branch 0  ->
               let VB cond = val
                   m = if cond then
-                        Msg dest iID0 (token, ((src', pID0), RightB):dchain') Demand
+                        Msg dest iID0 (token, (src', Branch 1):dchain') Demand
                       else
-                        Msg dest iID1 (token, ((src', pID1), RightB):dchain') Demand
+                        Msg dest iID1 (token, (src', Branch 2):dchain') Demand
               in  Msgs [ m ]
-            RightB ->
+            Branch n | (n==1) || (n==2) ->
               let msg = Msg dest src' (token, dchain') (Response val)
               in  Msgs [ msg ]
+            Branch n -> ierr $ "'if' has no dependency "++(show n)
         Just instrT ->
           error $ "TODO: node dispatch (Response): "++(pprint instrT "")
         Nothing -> ierr $ "no instruction "++(show dest)++" in graph (Response)"
@@ -194,7 +196,7 @@ unzipR msgResults =
 -- | Adds a set of join result updates in the join table.
 addJoins :: [JoinData] -> JoinTable -> JoinTable
 addJoins [] jt = jt
-addJoins ((JD iID (token, ((iID', _), _):dchain) br val):jds) jt =
+addJoins ((JD iID (token, (iID', _):dchain) br val):jds) jt =
   case M.lookup iID jt of
     Just iM ->
       let clr' = (token, dchain)
@@ -251,8 +253,8 @@ extractNextJoin (iID:iIDs) jt =
             let (bOp, bjs):_ = M.toList mJoins
                 [(br0, val0), (br1, val1)] = M.toList bjs
             in  case (br0, br1) of
-                  (LeftB, RightB) -> Just (iID, bOp, val0, val1)
-                  (RightB, LeftB) -> Just (iID, bOp, val1, val0)
+                  (Branch 0, Branch 1) -> Just (iID, bOp, val0, val1)
+                  (Branch 1, Branch 0) -> Just (iID, bOp, val1, val0)
                   brs             ->
                     ierr $ "These are not Left/Right branches: "++(show brs)
     Nothing -> ierr $ "extractNextJoin: no join table for "++(show iID)
@@ -285,25 +287,21 @@ pprintJoinT jt =
 
 -- * Invariant checkers
 
-checkResponseVar :: Plug -> Plug -> (a->a)
-checkResponseVar (iID, pID) (src, pID') =
-  (if pID /= pID' then
-     ierr $ "port="++(show pID')++"!="++(show pID)
-   else if src /= iID then
-          ierr $ "src="++(show src)++"!="++(show iID)
-        else id)
+checkResponseVar :: InstrID -> InstrID -> (a->a)
+checkResponseVar iID src =
+  if src /= iID then
+    ierr $ "src="++(show src)++"!="++(show iID)
+  else id
 
-checkResponseCall :: (Int, Int) -> Plug -> Plug -> (a->a)
-checkResponseCall (i, i') (iID, pID) (src, pID') =
-  if pID /= pID' then
-    ierr $ "port="++(show pID')++"!="++(show pID)
-  else if i /= i' then
-         ierr $ "idx="++(show i')++"!="++(show i)
-       else if src /= iID then
-              ierr $ "src="++(show src)++"!="++(show iID)
-            else id
+checkResponseCall :: (Int, Int) -> InstrID -> InstrID -> (a->a)
+checkResponseCall (i, i') iID src =
+  if i /= i' then
+    ierr $ "idx="++(show i')++"!="++(show i)
+  else if src /= iID then
+         ierr $ "src="++(show src)++"!="++(show iID)
+       else id
 
-checkResponseActuals :: PortID -> Int -> (a->a)
+checkResponseActuals :: Int -> Int -> (a->a)
 checkResponseActuals pID' ls =
   if pID' > ls then
     ierr $ "pID'="++(show pID')++">"++(show ls)

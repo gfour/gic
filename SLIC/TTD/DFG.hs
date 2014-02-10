@@ -38,10 +38,10 @@ genLegend nIDs =
 usedInstrMap :: [IEntry] -> InstrIDs
 usedInstrMap entries =
   let test nID = if nID > maxBuiltinInstrID then Nothing else Just nID
-      findUsed (CallT _ (nID, _)) = [test nID]
-      findUsed (VarT (nID, _))    = [test nID]
-      findUsed (ActualsT plugs)   = map (test.fst) plugs
-      findUsed (ConT _ plugs)     = map (test.fst) plugs
+      findUsed (CallT _ iID)   = [test iID]
+      findUsed (VarT iID)      = [test iID]
+      findUsed (ActualsT iIDs) = map test iIDs
+      findUsed (ConT _ iIDs)   = map test iIDs
       usedBuiltinIDs = catMaybes $ concatMap (findUsed.snd) entries
   in  Data.Map.filter (\i->i `elem` usedBuiltinIDs) builtinInstrIDs
 
@@ -64,7 +64,7 @@ genEntryBox (nID, instrT) =
       escapeChar '{' = "\\{"
       escapeChar '|' = "\\|"
       escapeChar c   = [c]
-      ports ps = map snd ps
+      ports ps = [0..(length ps)-1]
       pField p = (("<"++).portName p.("> ~"++).shows p) ""
       pFields ps = showStrings " | " $ map pField $ ports ps
   in  tab.instrName nID.
@@ -72,17 +72,17 @@ genEntryBox (nID, instrT) =
       (" color=black, fillcolor=lightgrey,"++).
       (" label=\"<"++).instrPortName.("> "++).shows nID.(" | "++).      
       (case instrT of
-          ConT (CN c) plugs -> ("["++).escape c.("] | "++).pFields plugs
+          ConT (CN c) iIDs  -> ("["++).escape c.("] | "++).pFields iIDs
           ConT (LitInt i) []-> shows i 
-          ActualsT plugs    -> (" actuals | "++).pFields plugs
-          CallT qOp plug    -> pprint qOp.(" | "++).pFields [plug]
-          VarT plug         -> (" var | "++).pFields [plug]
+          ActualsT iIDs     -> (" actuals | "++).pFields iIDs
+          CallT qOp iID     -> pprint qOp.(" | "++).pFields [iID]
+          VarT iID          -> (" var | "++).pFields [iID]
           _                 -> ierr "genEntryBox: unknown instruction"
       ).("\"]"++).nl
 
 -- | Generates the port name used in a Graphviz record.
-portName :: PortID -> ShowS
-portName pID = ("p"++).shows pID
+portName :: InstrID -> ShowS
+portName iID = ("p"++).shows iID
 
 -- | The name of the default firing port in a Graphviz record.
 instrPortName :: ShowS
@@ -90,19 +90,19 @@ instrPortName = ("p"++)
 
 -- | Generates a name for a TTD instruction.
 instrName :: InstrID -> ShowS
-instrName nID = ("instr_"++).shows nID
+instrName iID = ("instr_"++).shows iID
 
 -- | Connects instructions.
 connectEntries :: IEntry -> ShowS
-connectEntries (nID, CallT _ pID)   = createEdge nID pID
-connectEntries (nID, VarT pID)      = createEdge nID pID
-connectEntries (nID, ActualsT pIDs) = foldDot (createEdge nID) pIDs
-connectEntries (nID, ConT _ pIDs)   = foldDot (createEdge nID) pIDs
+connectEntries (nID, CallT _ pID)   = createEdge nID (pID, 0)
+connectEntries (nID, VarT pID)      = createEdge nID (pID, 0)
+connectEntries (nID, ActualsT pIDs) = foldDot (createEdge nID) $ zip pIDs [0..]
+connectEntries (nID, ConT _ pIDs)   = foldDot (createEdge nID) $ zip pIDs [0..]
 
 -- | Creates an edge between two instructions. The direction of the arrow is
 --   that of the demand messages, the response messages are assumed to have
 --   the opposite direction.
-createEdge :: InstrID -> Plug -> ShowS
+createEdge :: InstrID -> (InstrID, Int) -> ShowS
 createEdge n1 (n2, p2) =
   tab.instrName n1.(":"++).portName p2.(" -> "++).
   instrName n2.(":"++).instrPortName.semi.nl
