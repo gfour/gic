@@ -68,9 +68,10 @@ dfMod = "LibDef"
 
 -- * TTD back-end
 
--- | The prefix of merged operators in the TTD back-end.
-mopPre :: String
-mopPre = "op_"
+-- | The default number of workers to use for concurrent message dispatch and
+--   join operations.
+nWorkers :: Int
+nWorkers = 10
 
 -- * LAR/C constants
 
