@@ -70,8 +70,8 @@ dfMod = "LibDef"
 
 -- | The default number of workers to use for concurrent message dispatch and
 --   join operations.
-nWorkers :: Int
-nWorkers = 10
+defaultWorkers :: Int
+defaultWorkers = 10
 
 -- * LAR/C constants
 

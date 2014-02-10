@@ -7,7 +7,7 @@ module SLIC.State (Action(..), CompileMode(..), GC(..), GHCAPI(..),
                    opt) where
 
 import SLIC.Constants (defaultWhs, defaultMaxWHSize, defaultMemSize,
-                       defaultMaxCtxts, nl)
+                       defaultMaxCtxts, defaultWorkers, nl)
 import SLIC.Types
 
 -- | What the compiler is to do, according to the command-line parameters.
@@ -99,6 +99,7 @@ data Options = Options
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
   , optWhRedis :: Bool             -- ^ use the Redis-based warehouse for the Erlang back-end
   , optCompact :: Bool             -- ^ use the compact x86-64 representation
+  , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   }
 
 -- | The default options of the compiler. It is used as a default for
@@ -128,6 +129,7 @@ defaultOptions = Options
   , optCMode   = Whole
   , optWhRedis = False
   , optCompact = False
+  , optNWorkers= defaultWorkers
   }
 
 instance Show Options where

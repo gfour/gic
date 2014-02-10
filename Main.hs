@@ -100,6 +100,7 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "* Tagged-Token Dataflow back-end: (EXPERIMENTAL)"
            putStrLn "  -dfg    : generate tagged-token dataflow graph for Graphviz"
            putStrLn "  -ettd   : transform and evaluate the 0-order program for tagged-token dataflow"
+           putStrLn("             -workers W : use W workers (default="++(showNum defaultWorkers)++")")
            putStrLn "  -pttd   : transform and print the TTD program"
            putStrLn "* Compilation mode:"
            putStrLn "  -whole  : whole program defunctionalization and compilation"
@@ -171,6 +172,12 @@ processArgs cmdArgs =
                 ctxts = reads arg
             in  case ctxts of
                    [(n, "")] -> aux args opts{optMaxCtxts = n}
+                   _         -> usage >> return opts{optAction = ANone}
+        aux ("-workers":arg : args) opts =
+            let nmw :: [(Int, String)]
+                nmw = reads arg
+            in  case nmw of
+                   [(n, "")] -> aux args opts{optNWorkers = n}
                    _         -> usage >> return opts{optAction = ANone}
         aux ("-help"  : _) opts = usage >> return opts{optAction = ANone}
         aux (arg : args) opts = 

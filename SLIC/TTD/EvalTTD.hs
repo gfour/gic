@@ -5,7 +5,7 @@ module SLIC.TTD.EvalTTD (evalTTD) where
 
 import qualified Data.Map as M
 import SLIC.AuxFun (ierr)
-import SLIC.Constants (comma, nWorkers)
+import SLIC.Constants (comma)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
@@ -69,19 +69,21 @@ type JoinTable = M.Map InstrID (M.Map BlockedOp (M.Map Branch ValueT))
 
 -- | Evaluates a dataflow program. Takes the ID of the top instruction of the
 --   \"result\" definition, and the actual program.
-evalTTD :: InstrID -> ProgT -> IO ()
-evalTTD resultID (ProgT entries) =
+evalTTD :: Int -> InstrID -> ProgT -> IO ()
+evalTTD nWorkers resultID (ProgT entries) =
   let entriesTable = M.fromList entries
       initMsg = Msg (-1) resultID ([], []) Demand
       joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
-      (resVal, cycles) = runLoop 1 entriesTable joinTable [initMsg]
-  in  do putStrLn "Running..."
-         putStrLn ("Result = "++(pprint resVal "")++", Cycles: "++(show cycles))
+      (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
+  in  do -- putStrLn "Running..."
+         putStrLn ("Result = "++(pprint resVal "")++
+                   ", Cycles: "++(show cycles)++
+                   ", Workers: "++(show nWorkers))
 
 -- | Processes the messages until a value response to the root node is found.
 --   Returns the value and the cycles needed to compute it.
-runLoop :: Integer -> ProgT' -> JoinTable -> [Msg] -> (ValueT, Integer)
-runLoop counter entriesTable joins msgQ =
+runLoop :: Int -> Integer -> ProgT' -> JoinTable -> [Msg] -> (ValueT, Integer)
+runLoop nWorkers counter entriesTable joins msgQ =
   let msgsToRun = take nWorkers msgQ
       msgsNext  = drop nWorkers msgQ
       -- Run the workers and gather the results.
@@ -102,7 +104,7 @@ runLoop counter entriesTable joins msgQ =
               pendingMsgs = msgsR++msgsNext++newMessages
           in  case pendingMsgs of
                 [] -> ierr "Program ended with no result."
-                _  -> runLoop (counter+1) entriesTable joinsR pendingMsgs
+                _  -> runLoop nWorkers (counter+1) entriesTable joinsR pendingMsgs
         [Msg _ _ _ (Response valT)] -> (valT, counter)
         _ -> ierr $ "Cannot handle root msg:"++(pprintList comma msgsToRoot "")
 

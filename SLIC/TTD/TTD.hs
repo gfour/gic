@@ -31,5 +31,5 @@ callTTDBackend m opts =
               writeFile file (generateDFG defIDs pTTD "")
         AEvalTTD ->
           let resultID = idOf defIDs (mainDefQName mn)
-          in  evalTTD resultID pTTD
+          in  evalTTD (optNWorkers opts) resultID pTTD
         a -> ierr $ "The TTD back-end cannot handle action "++(show a)
