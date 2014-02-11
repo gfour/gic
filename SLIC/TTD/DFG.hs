@@ -24,17 +24,24 @@ fieldBG     :: ShowS ; fieldBG = ("deepskyblue"++)
 -- fieldBG = ("grey"++)
 
 -- | Generates a Graphviz graph for a TTD program.
-generateDFG :: InstrIDs -> ProgT -> ShowS
-generateDFG defIDs (ProgT entries) =
+generateDFG :: Bool -> InstrIDs -> ProgT -> ShowS
+generateDFG showWH defIDs (ProgT entries) =
   let usedIDs = usedInstrMap entries
   in  ("digraph G {splines=true"++).nl.  -- Another option: splines=ortho
       tab.("{"++).nl.
       foldDot genBuiltinEntryBox (toList usedIDs).
       foldDot genEntryBox entries.
       tab.("}"++).nl.
-      foldDot connectEntries entries.
+      foldDot (connectEntries showWH) entries.
+      (if showWH then genWH else id).
       genLegend (union defIDs usedIDs).
       ("}"++).nl.nl
+
+-- | Generates the warehouse node.
+genWH :: ShowS
+genWH =
+  ("warehouse [shape=house, style=\"filled\", color=black, fillcolor=\""++).
+  instrPortBG.("\", label=\"Warehouse\"];"++).nl
 
 -- | Generates the legend showing which instruction ID is assigned to a name.
 genLegend :: InstrIDs -> ShowS
@@ -68,7 +75,8 @@ genBuiltinEntryBox (qn, nID) =
   tab.instrName nID.
   (" ["++).("shape=record, style=\"rounded,filled\","++).
   (" color=black, fillcolor=white,"++).
-  (" label=\""++).shows nID.(" | Built-in: "++).pprint qn.("\"]"++).nl
+  (" label=\"<"++).instrPortName.("> "++).shows nID.
+  (" | Built-in: "++).pprint qn.("\"]"++).nl
   
 -- | Generates a box for a TTD instruction entry.
 genEntryBox :: IEntry -> ShowS
@@ -118,11 +126,11 @@ instrName :: InstrID -> ShowS
 instrName iID = ("instr_"++).shows iID
 
 -- | Connects instructions.
-connectEntries :: IEntry -> ShowS
-connectEntries (nID, CallT _ pID)   = createEdge nID (pID, 0)
-connectEntries (nID, VarT pID)      = createEdge nID (pID, 0)
-connectEntries (nID, ActualsT pIDs) = foldDot (createEdge nID) $ zip pIDs [0..]
-connectEntries (nID, ConT _ pIDs)   = foldDot (createEdge nID) $ zip pIDs [0..]
+connectEntries :: Bool -> IEntry -> ShowS
+connectEntries _ (nID, CallT _ pID)   = createEdge nID (pID, 0)
+connectEntries wh (nID, VarT pID)     = createWHEdge wh nID.createEdge nID (pID, 0)
+connectEntries _ (nID, ActualsT pIDs) = foldDot (createEdge nID) $ zip pIDs [0..]
+connectEntries _ (nID, ConT _ pIDs)   = foldDot (createEdge nID) $ zip pIDs [0..]
 
 -- | Creates an edge between two instructions. The direction of the arrow is
 --   that of the demand messages, the response messages are assumed to have
@@ -131,3 +139,9 @@ createEdge :: InstrID -> (InstrID, Int) -> ShowS
 createEdge n1 (n2, p2) =
   tab.instrName n1.(":"++).portName p2.(" -> "++).
   instrName n2.(":"++).instrPortName.semi.nl
+
+-- | Creates an edge between a variable instruction and the warehouse.
+createWHEdge :: Bool -> InstrID -> ShowS
+createWHEdge False _ = id
+createWHEdge True nID =
+  tab.instrName nID.(":"++).instrPortName.(" -> warehouse [style=dashed];"++).nl

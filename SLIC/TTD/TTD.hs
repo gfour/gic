@@ -28,7 +28,7 @@ callTTDBackend m opts =
         AGenerateDFG ->
           let file = "./dfg.dot"
           in  putStrLn ("Writing graph to file: "++file) >>
-              writeFile file (generateDFG defIDs pTTD "")
+              writeFile file (generateDFG False defIDs pTTD "")
         AEvalTTD ->
           let resultID = idOf defIDs (mainDefQName mn)
           in  evalTTD (optNWorkers opts) resultID pTTD
