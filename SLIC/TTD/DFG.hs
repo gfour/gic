@@ -5,12 +5,23 @@ module SLIC.TTD.DFG (generateDFG) where
 
 import Data.Map (filter, toList, union)
 import Data.Maybe (catMaybes)
-import SLIC.AuxFun (foldDot, ierr, showStrings)
+import SLIC.AuxFun (foldDot, ierr)
 import SLIC.Constants
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
 import SLIC.TTD.ZItoTTD (InstrIDs, builtinInstrIDs, maxBuiltinInstrID)
 import SLIC.Types
+
+-- * Blue theme.
+-- | Instruction background.
+instrBG     :: ShowS ; instrBG = ("white"++)
+instrPortBG :: ShowS ; instrPortBG = ("cyan2"++)
+fieldBG     :: ShowS ; fieldBG = ("deepskyblue"++)
+
+-- Grayscale theme.
+-- instrBG = ("white"++)
+-- instrPortBG = ("lightgrey"++)
+-- fieldBG = ("grey"++)
 
 -- | Generates a Graphviz graph for a TTD program.
 generateDFG :: InstrIDs -> ProgT -> ShowS
@@ -28,11 +39,17 @@ generateDFG defIDs (ProgT entries) =
 -- | Generates the legend showing which instruction ID is assigned to a name.
 genLegend :: InstrIDs -> ShowS
 genLegend nIDs =
-  let (nIDs_qns, nIDs_ids) = unzip $ toList nIDs
-      makeCells f sl = showStrings " | " $ map f sl
-  in  tab.("legend [shape=record, label=\"{ID|"++).
-      makeCells show nIDs_ids.("}| {Function|"++).
-      makeCells (\x->pprint x "") nIDs_qns.("}\"];"++).nl
+  let makeRow (f, nID) =
+        ("<TR>"++).
+        ("<TD BGCOLOR=\""++).instrPortBG.("\">"++).shows nID.("</TD>"++).
+        ("<TD>"++).pprint f.("</TD>"++).
+        ("</TR>"++)
+  in  tab.("legend [shape=\"plaintext\", label=<"++).nl.
+      ("<TABLE BORDER=\"1\"><TR>"++).
+      ("<TD BGCOLOR=\""++).instrPortBG.("\">Instruction ID</TD>"++).
+      ("<TD>Variable</TD></TR>"++).nl.
+      foldDot makeRow (toList nIDs).
+      ("</TABLE>>];"++).nl
 
 -- | Returns the part of the built-in IDs table only for the IDs actually used.
 usedInstrMap :: [IEntry] -> InstrIDs
@@ -58,27 +75,35 @@ genEntryBox :: IEntry -> ShowS
 genEntryBox (nID, instrT) =
   let -- Escape special characters that clash with the 'label' format of Graphviz.
       escape c = ((concatMap escapeChar (pprint c ""))++)
-      escapeChar '<' = "\\<"
-      escapeChar '>' = "\\>"
-      escapeChar '}' = "\\}"
-      escapeChar '{' = "\\{"
-      escapeChar '|' = "\\|"
+      escapeChar '<' = "&lt;"
+      escapeChar '>' = "&gt;"
+      -- The following escape codes are only valid for the "record" style.
+      -- escapeChar '<' = "\\<"
+      -- escapeChar '>' = "\\>"
+      -- escapeChar '}' = "\\}"
+      -- escapeChar '{' = "\\{"
+      -- escapeChar '|' = "\\|"
       escapeChar c   = [c]
       ports ps = [0..(length ps)-1]
-      pField p = (("<"++).portName p.("> ~"++).shows p) ""
-      pFields ps = showStrings " | " $ map pField $ ports ps
+      pField p = ("<TD BGCOLOR=\""++).fieldBG.("\" PORT=\""++).portName p.("\">"++).shows p.("</TD>"++)
+      pFields ps = foldDot pField $ ports ps
+      td s = ("<TD BGCOLOR=\""++).instrBG.("\">"++).s.("</TD>"++)
   in  tab.instrName nID.
-      (" ["++).("shape=record, style=\"rounded,filled\","++).
+      (" ["++).("shape=\"plaintext\", style=\"rounded\","++).
       (" color=black, fillcolor=lightgrey,"++).
-      (" label=\"<"++).instrPortName.("> "++).shows nID.(" | "++).      
+      (" label=<"++).nl.
+      ("<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLPADDING=\"2\" CELLSPACING=\"0\"><TR>"++).
+      ("<TD BORDER=\"0\" BGCOLOR=\""++).instrPortBG.
+      ("\" PORT=\""++).instrPortName.("\">"++).shows nID.(":</TD>"++).
       (case instrT of
-          ConT (CN c) iIDs  -> ("["++).escape c.("] | "++).pFields iIDs
-          ConT (LitInt i) []-> shows i 
-          ActualsT iIDs     -> (" actuals | "++).pFields iIDs
-          CallT qOp iID     -> pprint qOp.(" | "++).pFields [iID]
-          VarT iID          -> (" var | "++).pFields [iID]
+          ConT (CN c) iIDs  -> td (("["++).escape c.("]"++)).pFields iIDs
+          ConT (LitInt i) []-> td (shows i)
+          ActualsT iIDs     -> td ("actuals"++).pFields iIDs
+          CallT qOp iID     -> td (pprint qOp).pFields [iID]
+          VarT iID          -> td ("var"++).pFields [iID]
           _                 -> ierr "genEntryBox: unknown instruction"
-      ).("\"]"++).nl
+      ).
+      ("</TR></TABLE>>];"++).nl
 
 -- | Generates the port name used in a Graphviz record.
 portName :: InstrID -> ShowS
