@@ -4,7 +4,7 @@
 -- - HIL: the intermediate hybrid intensional language used in the transformation.
 -- 
 -- - ZOIL: the target 0-order intensional language.
---
+-- 
 
 module SLIC.ITrans.Syntax where
 
