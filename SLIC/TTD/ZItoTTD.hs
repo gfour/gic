@@ -34,7 +34,7 @@ fromZOILtoTTD defsZ =
       FProg fDefsZ aDefsZ_used = fProg defsZ
       (fEntries, maximumFuncID) =
         threadfunc_l maximumVarID (toList fDefsZ) (transDef vIDs)
-      (aEntries, maximumUsedActID) =
+      (aEntries, _) =
         let actNames  = nub $ map fst $ keys aDefsZ_used
             actsOf v  = filterWithKey (\(k, _) _->k==v) aDefsZ_used
             actuals v = map snd $ toList $ 
