@@ -3,24 +3,23 @@
 module SLIC.TTD.TTD (callTTDBackend) where
 
 import SLIC.AuxFun (ierr)
-import SLIC.Constants (dfMod)
+import SLIC.DFI (DFI)
 import SLIC.ITrans.Syntax
+import SLIC.ITrans.ZLinker (mergeAndLinkZ)
 import SLIC.State
 import SLIC.SyntaxAux (Prog(..), Mod(..))
 import SLIC.TTD.DFG (generateDFG)
 import SLIC.TTD.EvalTTD (evalTTD)
 import SLIC.TTD.ZItoTTD (fromZOILtoTTD, idOf)
-import SLIC.Types (mainDefQName, mName, pprint)
+import SLIC.Types (mainDefQName, pprint)
 
 -- | The entry point to the TTD back-end.
-callTTDBackend :: ModZ -> Options -> IO ()
-callTTDBackend m opts =
+callTTDBackend :: Options -> DFI -> ModZ -> IO ()
+callTTDBackend opts dfi m =
   let mn = fst $ modNameF m
-      Prog _ defsZ = modProg m
-      (pTTD, defIDs) = fromZOILtoTTD (filter isLocal defsZ)
-      isLocal def =
-        let Just mn' = mName $ defVarZ def
-        in  (mn'==mn) || (mn'==dfMod)
+      Prog _ defsZ = mergeAndLinkZ opts dfi [m]
+      (pTTD, defIDs) = fromZOILtoTTD defsZ
+      resultID = idOf defIDs (mainDefQName mn)
   in  case optAction opts of
         APrintTTD ->
           putStrLn "== Dataflow program ==" >>
@@ -28,8 +27,13 @@ callTTDBackend m opts =
         AGenerateDFG ->
           let file = "./dfg.dot"
           in  putStrLn ("Writing graph to file: "++file) >>
-              writeFile file (generateDFG False defIDs pTTD "")
+              writeFile file (generateDFG (True, False) defIDs resultID pTTD "")
         AEvalTTD ->
-          let resultID = idOf defIDs (mainDefQName mn)
-          in  evalTTD (optNWorkers opts) resultID pTTD
+          if optLink opts then
+            error "The TTD emulator does not support linking."
+          else
+            case optCMode opts of
+              CompileModule ->
+                error "The TTD emulator does not support separate compilation."
+              Whole -> evalTTD (optNWorkers opts) resultID pTTD
         a -> ierr $ "The TTD back-end cannot handle action "++(show a)

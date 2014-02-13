@@ -18,8 +18,10 @@
 
 module SLIC.TTD.SyntaxTTD where
 
+import Data.List (elemIndex)
+import Data.Map (Map, fromList)
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore)
-import SLIC.Constants (nl)
+import SLIC.Constants (nl, tab)
 import SLIC.ITrans.Syntax (QOp)
 import SLIC.SyntaxAux
 import SLIC.Types
@@ -29,11 +31,20 @@ import SLIC.Types
 -- | The unique identifier characterizing every instruction.
 type InstrID = Int
 
+-- | The actual values of formals in all program locations.
+type Acts = [(IIndex, InstrID)]
+
 -- | A dataflow instruction.
-data InstrT = CallT QOp InstrID     -- ^ Call instruction using intensional index.
-            | VarT InstrID          -- ^ Call instruction using current context.
-            | ActualsT [InstrID]    -- ^ Intensional /actuals/ operator.
-            | ConT Const [InstrID]  -- ^ Built-in operator (including base values).
+data InstrT = CallT QOp InstrID        -- ^ call instruction with intensional index
+            | VarT InstrID             -- ^ call instruction using current context
+            | BVarT InstrID CaseLoc    -- ^ call instruction using nested context
+            | ActualsT Acts            -- ^ intensional /actuals/ operator
+            | ConT Const [InstrID]     -- ^ built-in operator (including values)
+            | CaseT CaseLoc InstrID [PatT] -- ^ pattern matching expression
+            | ConstrT CstrName         -- ^ constructor
+
+-- | A pattern branch contains a constructor and an instruction dependency.
+data PatT = PatT CstrName InstrID
 
 -- | An instruction entry is an instruction labelled by an ID.
 type IEntry = (InstrID, InstrT)
@@ -48,13 +59,35 @@ instance PPrint ProgT where
 instance PPrint InstrT where
   pprint (CallT qOp iID) = pprint qOp.pprintInstrPtr iID
   pprint (VarT iID) = ("var"++).pprintInstrPtr iID
-  pprint (ActualsT iIDs) =
-    ("actuals("++).insCommIfMore (map pprintInstrPtr iIDs).(")"++)
+  pprint (ActualsT acts) =
+    let aux (iidx, iID) = ("({"++).pprintIdx iidx.("}: "++).
+                          pprintInstrPtr iID.(")"++).nl
+    in  ("actuals:"++).nl.foldDot aux acts
   pprint (ConT (LitInt i) []) = shows i
   pprint (ConT (CN c) iIDs) =
     ("["++).pprint c.("]("++).insCommIfMore (map pprintInstrPtr iIDs).(")"++)
+  pprint (ConstrT c) = pprintTH c
+  pprint (CaseT _ iID pats) =
+    let pprintPat (PatT cP iIDP) = tab.pprintTH cP.(" -> "++).pprintInstrPtr iIDP.nl
+    in  ("case "++).pprintInstrPtr iID.(" of"++).nl.
+        foldDot pprintPat pats
+  pprint (BVarT iID (Just d, _)) = pprintInstrPtr iID.("{"++).shows d.("}"++)
   pprint _ = ierr "Unknown instruction, no pretty printer available."
 
 -- | Pretty printer for pointers to instructions.
 pprintInstrPtr :: InstrID -> ShowS
 pprintInstrPtr iId = ("~["++).shows iId.("]"++)
+
+-- | Returns the position in the actuals list pointed to by an index.
+calcIdxBranch :: IIndex -> Acts -> Int
+calcIdxBranch iidx acts =
+  case elemIndex iidx (map fst acts) of
+    Just i  -> i
+    Nothing -> ierr $ "calcIdxBranch: no index "++(pprintIdx iidx "")
+
+-- | Program representation with a map for fast instruction lookup.
+type ProgT' = Map InstrID InstrT
+
+-- | Generates a ProgT' for fast lookup.
+mkProgT' :: ProgT -> ProgT'
+mkProgT' (ProgT entries) = fromList entries

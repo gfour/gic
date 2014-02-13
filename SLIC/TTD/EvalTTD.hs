@@ -9,7 +9,7 @@ import SLIC.Constants (comma)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
-import SLIC.Types (PPrint(pprint), pprintList)
+import SLIC.Types (IIndex, MName, PPrint(pprint), pprintIdx, pprintList)
 
 -- | Base values are just integers.
 data ValueT = VI Int | VB Bool
@@ -20,7 +20,7 @@ instance PPrint ValueT where
   pprint (VB b) = shows b
 
 -- | A token (also a LAR ID).
-type Token = [Int]
+type Token = [IIndex]
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
@@ -48,9 +48,6 @@ data Payload = Demand             -- ^ a demand carries no data
              | Response ValueT    -- ^ a response contains a value
              deriving (Eq)
 
--- | Program representation with a map for fast instruction lookup.
-type ProgT' = M.Map InstrID InstrT
-
 -- | A join structure for collecting results from fork-join operations.
 data JoinData = JD InstrID Color Branch ValueT
 
@@ -70,8 +67,8 @@ type JoinTable = M.Map InstrID (M.Map BlockedOp (M.Map Branch ValueT))
 -- | Evaluates a dataflow program. Takes the ID of the top instruction of the
 --   \"result\" definition, and the actual program.
 evalTTD :: Int -> InstrID -> ProgT -> IO ()
-evalTTD nWorkers resultID (ProgT entries) =
-  let entriesTable = M.fromList entries
+evalTTD nWorkers resultID p =
+  let entriesTable = mkProgT' p
       initMsg = Msg (-1) resultID ([], []) Demand
       joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
       (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
@@ -116,14 +113,16 @@ sendMsg :: ProgT' -> Msg -> MsgResult
 sendMsg p (Msg src dest (token, dchain) Demand) =
   Msgs
   (case M.lookup dest p of
-      Just (CallT (Call (_, i)) iID) ->
-        [ Msg dest iID (i:token, (src, Branch 0):dchain) Demand ]
+      Just (CallT (Call (m, i)) iID) ->
+        [ Msg dest iID ((m, i):token, (src, Branch 0):dchain) Demand ]
       Just (VarT iID) ->
         [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
-      Just (ActualsT iIDs) ->
+      Just (ActualsT acts) ->
         let i:token' = token
-            iID = iIDs !! i
-        in  [ Msg dest iID (token', (src, Branch i):dchain) Demand ]
+            b = calcIdxBranch i acts
+        in  case lookup i acts of
+              Just iID -> [ Msg dest iID (token', (src, Branch b):dchain) Demand ]
+              Nothing  -> ierr $ "No actual for idx="++(pprintIdx i "")
       Just (ConT (CN _) [iID0, iID1]) ->
         [ Msg dest iID0 (token, (src, Branch 0):dchain) Demand
         , Msg dest iID1 (token, (src, Branch 1):dchain) Demand ]
@@ -136,13 +135,14 @@ sendMsg p (Msg src dest (token, dchain) Demand) =
 sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
   let (src', br@(Branch brn)):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
-        Just (CallT (Call (_, i)) iID) | brn==0 ->
-          let i':token' = token
-          in  (checkResponseCall (i, i') iID src)
+        Just (CallT (Call (m, i)) iID) | brn==0 ->
+          let (m', i'):token' = token
+          in  (checkResponseCall (m, m') (i, i') iID src)
               Msgs [ Msg dest src' (token', dchain') rVal ]
-        Just (ActualsT iIDs) ->
-          let token' = brn:token
-          in  (checkResponseActuals brn (length iIDs))
+        Just (ActualsT acts) ->
+          let (i, _) = acts !! brn
+              token' = i:token
+          in  (checkResponseActuals i acts)
               Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (VarT iID) | brn==0 ->
           (checkResponseVar iID src)
@@ -282,16 +282,18 @@ checkResponseVar iID src =
     ierr $ "src="++(show src)++"!="++(show iID)
   else id
 
-checkResponseCall :: (Int, Int) -> InstrID -> InstrID -> (a->a)
-checkResponseCall (i, i') iID src =
-  if i /= i' then
-    ierr $ "idx="++(show i')++"!="++(show i)
-  else if src /= iID then
-         ierr $ "src="++(show src)++"!="++(show iID)
-       else id
+checkResponseCall :: (MName, MName) -> (Int, Int) -> InstrID -> InstrID -> (a->a)
+checkResponseCall (m, m') (i, i') iID src =
+  if m' /= m then
+    ierr $ "m'="++m'++"!="++m
+  else if i' /= i then
+         ierr $ "i'="++(show i')++"!="++(show i)
+       else if src /= iID then
+              ierr $ "src="++(show src)++"!="++(show iID)
+            else id
 
-checkResponseActuals :: Int -> Int -> (a->a)
-checkResponseActuals pID' ls =
-  if pID' > ls then
-    ierr $ "pID'="++(show pID')++">"++(show ls)
-  else id
+checkResponseActuals :: IIndex -> Acts -> (a->a)
+checkResponseActuals i acts =
+  case lookup i acts of
+    Just _  -> id
+    Nothing -> ierr $ "Response, Actuals, i="++(show i)++", not in "++(show acts)

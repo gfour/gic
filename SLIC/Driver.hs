@@ -192,12 +192,12 @@ processFL opts dfis inputModule =
                   APrintHIL2 -> printLn pTrans
                   APrintZOIL -> printLn p3
                   APrintTTD  ->
-                    do callTTDBackend p3 opts
+                    do callTTDBackend opts p0Dfi p3
                        return Nothing
 
                   -- generates the dataflow graph for the TTD program
                   AGenerateDFG ->
-                     do callTTDBackend p3 opts
+                     do callTTDBackend opts p0Dfi p3
                         return Nothing
 
                   -- interpreters: call-by-name, integrated lazy, Erlang-based
@@ -223,7 +223,7 @@ processFL opts dfis inputModule =
 
                   -- Call the TTD back-end.
                   AEvalTTD ->
-                    do callTTDBackend p3 opts
+                    do callTTDBackend opts p0Dfi p3
                        return Nothing
 
                   -- Call the LAR back-end.

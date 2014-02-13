@@ -660,7 +660,12 @@ builtinFuncSigs = Map.fromList $
                   , (bf_Nil, [])
                   , (bf_Unit, [])
                   ] ++ (map bf_TupleSig b_tupleSizes)
-                  
+
+-- | Checks if a name corresponds to a built-in function.
+isBuiltinFunc :: QName -> Bool
+isBuiltinFunc qn =
+  case Map.lookup qn builtinFuncSigs of Just _ -> True ; Nothing -> False
+       
 -- | Generate the signature of the built-in tuple constructor for a given arity.
 bf_TupleSig :: Arity -> FSig
 bf_TupleSig n = 
