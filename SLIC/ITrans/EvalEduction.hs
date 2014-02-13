@@ -18,7 +18,7 @@
 {-# LANGUAGE CPP #-}
 module SLIC.ITrans.EvalEduction (evalZOILLazy) where
 
-import Data.Map (Map, empty, elems, filter, filterWithKey, fromList,
+import Data.Map (Map, empty, elems, filter, filterWithKey,
                  insert, keys, lookup, size, toList, update)
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
@@ -326,35 +326,8 @@ evalZOILLazy opts dfi p3 =
       Whole ->
         let eOpts  = (optVerbose opts, optWhSize opts)
             p3'    = mergeAndLinkZ opts dfi [p3]
-            val    = evalEduction eOpts (fst $ modNameF p3) (fProg p3')
+            val    = evalEduction eOpts (fst $ modNameF p3) (fProg $ progDefs p3')
         in  putStrLn (pprint val "")
-
--- * 0-order program representation for fast lookup
-
-data FProg = FProg FunDefs ActDefs
-
-type FunDefs = Map QName ExprZ
-
-type ActDefs = Map (QName, IIndex) ExprZ
-
--- | Transform a list-based 0-order program to a map based 0-order program for
---   faster function/formal lookup.
-fProg :: ProgZ -> FProg
-fProg p =
-  let defsZ = progDefs p
-      fDefs = Data.Map.fromList $
-              Prelude.map (\(DefZ v e)->(v, e)) (Prelude.filter isDefZ defsZ)
-      aDefs = Data.Map.fromList $
-              concatMap (\(ActualsZ v m el) -> 
-                          [ ((v, (m, i)), el !! i) | i<-[0..(length el-1)] ]) $
-              Prelude.filter isActualsZ defsZ
-  in  FProg fDefs aDefs
-
-searchFunc :: QName -> FProg -> Maybe ExprZ
-searchFunc f (FProg fDefs _) = Data.Map.lookup f fDefs
-
-searchFormal :: (QName, IIndex) -> FProg -> Maybe ExprZ
-searchFormal frm (FProg _ aDefs) = Data.Map.lookup frm aDefs
 
 -- * Garbage collection
 

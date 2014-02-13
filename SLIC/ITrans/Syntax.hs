@@ -8,6 +8,7 @@
 
 module SLIC.ITrans.Syntax where
 
+import Data.Map (Map, fromList, lookup)
 import SLIC.AuxFun (ierr, showStrings, spaces)
 import SLIC.Constants (nl, space)
 import SLIC.SyntaxAux
@@ -184,3 +185,28 @@ isActualsZ (ActualsZ _ _ _) = True
 isDefZ :: DefZ -> Bool
 isDefZ (DefZ _ _)       = True
 isDefZ (ActualsZ _ _ _) = False
+
+-- * 0-order program representation for fast lookup
+
+data FProg = FProg FunDefs ActDefs
+
+type FunDefs = Map QName ExprZ
+
+type ActDefs = Map (QName, IIndex) ExprZ
+
+-- | Transform a list-based 0-order program to a map based 0-order program for
+--   faster function/formal lookup.
+fProg :: [DefZ] -> FProg
+fProg defsZ =
+  let fDefs = fromList $ map (\(DefZ v e)->(v, e)) (filter isDefZ defsZ)
+      aDefs = fromList $
+              concatMap (\(ActualsZ v m el) -> 
+                          [ ((v, (m, i)), el !! i) | i<-[0..(length el-1)] ]) $
+              filter isActualsZ defsZ
+  in  FProg fDefs aDefs
+
+searchFunc :: QName -> FProg -> Maybe ExprZ
+searchFunc f (FProg fDefs _) = Data.Map.lookup f fDefs
+
+searchFormal :: (QName, IIndex) -> FProg -> Maybe ExprZ
+searchFormal frm (FProg _ aDefs) = Data.Map.lookup frm aDefs
