@@ -59,6 +59,8 @@ instance PPrint ProgT where
 instance PPrint InstrT where
   pprint (CallT qOp iID) = pprint qOp.pprintInstrPtr iID
   pprint (VarT iID) = ("var"++).pprintInstrPtr iID
+  pprint (BVarT iID (Just d, _)) =
+    ("bvar"++).pprintInstrPtr iID.("{"++).shows d.("}"++)
   pprint (ActualsT acts) =
     let aux (iidx, iID) = ("({"++).pprintIdx iidx.("}: "++).
                           pprintInstrPtr iID.(")"++).nl
@@ -71,7 +73,6 @@ instance PPrint InstrT where
     let pprintPat (PatT cP iIDP) = tab.pprintTH cP.(" -> "++).pprintInstrPtr iIDP.nl
     in  ("case "++).pprintInstrPtr iID.(" of"++).nl.
         foldDot pprintPat pats
-  pprint (BVarT iID (Just d, _)) = pprintInstrPtr iID.("{"++).shows d.("}"++)
   pprint _ = ierr "Unknown instruction, no pretty printer available."
 
 -- | Pretty printer for pointers to instructions.
