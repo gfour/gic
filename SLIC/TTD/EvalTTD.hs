@@ -21,11 +21,11 @@ data Token = T [(IIndex, Nested)]
            deriving (Eq, Ord, Show)
 
 -- | The nested tokens inside another token.
-type Nested = [Token]
+type Nested = [Maybe Token]
 
 -- | Creates /n/ nested fields, not yet initialized.
 dummyNested :: Int -> Nested
-dummyNested n = take n $ repeat (error "empty nesting!")
+dummyNested n = take n $ repeat Nothing
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
@@ -129,8 +129,7 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
         [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
       Just (BVarT iID (Just d, _)) ->
         let T ((_, nested):_) = token
-            nestedToken = nested !! d
-        in  [ Msg dest iID (nestedToken, (src, Branch 0, Nothing):dchain) Demand ]
+        in  [ Msg dest iID (getN nested d, (src, Branch 0, Nothing):dchain) Demand]
       Just (ActualsT acts) ->
         let T ((i, nested):token') = token
             b = calcIdxBranch i acts
@@ -185,8 +184,7 @@ sendMsg p (Msg src dest (T token, dchain) rVal@(Response val)) =
           let VT (c, cToken) = val
               (brn', patID) = findPat c 1 pats
               (i, nested'):token'  = token
-              -- Update nested token at position 'd'.
-              updNested = (take d nested')++[cToken]++(drop (d+1) nested')
+              updNested = setN nested' d cToken
               color' = (T ((i, updNested):token'),
                         (src', Branch brn', Just updNested):dchain')
           in  Msgs [ Msg dest patID color' Demand ]
@@ -335,3 +333,27 @@ checkResponseActuals i acts =
   case lookup i acts of
     Just _  -> id
     Nothing -> ierr $ "Response, Actuals, i="++(show i)++", not in "++(show acts)
+
+-- * Auxiliary functions
+
+-- | Get token \#d from a nested field. The location must already be filled in.
+getN :: Nested -> Int -> Token
+getN nested d =
+  let nL = length nested
+  in  if d<nL then
+        case nested !! d of
+          Just nT -> nT
+          Nothing -> ierr $ "getN: nested["++(show d)++"] is empty"
+      else
+        ierr $ "getN: no position d="++(show d)++", nested has length "++(show nL)
+
+-- | Sets the token at position \#d in a nested field. The location must be empty.
+setN :: Nested -> Int -> Token -> Nested
+setN nested' d cToken =
+  let nL = length nested'
+  in  if d<nL then
+        case nested' !! d of
+          Nothing -> (take d nested')++[Just cToken]++(drop (d+1) nested')
+          Just nT -> ierr $ "setN: nested["++(show d)++"] exists: "++(show nT)
+      else
+        ierr $ "setN: no position d="++(show d)++", nested has length "++(show nL)
