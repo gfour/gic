@@ -10,8 +10,7 @@ import SLIC.DFI (DFI, getMainDepth)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
-import SLIC.Types (CstrName, IIndex, MName, PPrint(pprint), Value(..),
-                   pprintIdx, pprintList)
+import SLIC.Types (CstrName, IIndex, PPrint(..), Value(..), pprintIdx, pprintList)
 
 -- | Values.
 type ValueT = Value Token
@@ -152,9 +151,9 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
 sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
   let (src', br@(Branch brn), nested):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
-        Just (CallT (Call (m, i)) iID) | (brn==0) ->
-          let ((m', i'), _):token' = token
-          in  (checkResponseCall (m, m') (i, i') iID src)
+        Just (CallT (Call _) iID) | (brn==0) ->
+          let _:token' = token
+          in  (checkResponseIDs iID src)              
               Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (ActualsT acts) ->
           let (i, _)   = acts !! brn
@@ -163,10 +162,10 @@ sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) =
           in  (checkResponseActuals i acts)
               Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (VarT iID) | (brn==0) ->
-          (checkResponseVar iID src)
+          (checkResponseIDs iID src)
           Msgs [ Msg dest src' (token, dchain') rVal ]
         Just (BVarT iID _) ->
-          (checkResponseVar iID src)
+          (checkResponseIDs iID src)
           Msgs [ Msg dest src' (token, dchain') rVal ]          
         Just (ConT (CN _) [_, _]) | (brn==0) || (brn==1) ->
           -- Add 'join' entry for pending value.
@@ -311,21 +310,15 @@ pprintJoinT jt =
 
 -- * Invariant checkers
 
-checkResponseVar :: InstrID -> InstrID -> (a->a)
-checkResponseVar iID src =
+-- | Takes a dependent instruction ID and the ID of an instruction that sent
+--   a response. If the two IDs are the same, it is a real response and the
+--   result is the identity function, otherwise it produces an error. This is
+--   used as a wrapper for instruction responses.
+checkResponseIDs :: InstrID -> InstrID -> (a->a)
+checkResponseIDs iID src =
   if src /= iID then
-    ierr $ "src="++(show src)++"!="++(show iID)
+    ierr $ "Response sanity check failed: src="++(show src)++"!="++(show iID)
   else id
-
-checkResponseCall :: (MName, MName) -> (Int, Int) -> InstrID -> InstrID -> (a->a)
-checkResponseCall (m, m') (i, i') iID src =
-  if m' /= m then
-    ierr $ "m'="++m'++"!="++m
-  else if i' /= i then
-         ierr $ "i'="++(show i')++"!="++(show i)
-       else if src /= iID then
-              ierr $ "src="++(show src)++"!="++(show iID)
-            else id
 
 checkResponseActuals :: IIndex -> Acts -> (a->a)
 checkResponseActuals i acts =
