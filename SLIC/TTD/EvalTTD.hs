@@ -5,7 +5,7 @@ module SLIC.TTD.EvalTTD (evalTTD) where
 
 import qualified Data.Map as M
 import SLIC.AuxFun (ierr)
-import SLIC.Constants (comma)
+import SLIC.Constants (comma, modNoPath)
 import SLIC.DFI (DFI, getMainDepth)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
@@ -17,15 +17,15 @@ import SLIC.Types (CstrName, IIndex, MName, PPrint(pprint), Value(..),
 type ValueT = Value Token
 
 -- | A token (also a LAR ID).
-data Token = T [(IIndex, Nested)]
-           deriving (Eq, Ord, Show)
+type Token = [(IIndex, Nested)]
 
 -- | The nested tokens inside another token.
-type Nested = [Maybe Token]
+data Nested = N [Maybe Token]
+            deriving (Eq, Ord, Show)
 
 -- | Creates /n/ nested fields, not yet initialized.
 dummyNested :: Int -> Nested
-dummyNested n = take n $ repeat Nothing
+dummyNested n = N $ take n $ repeat Nothing
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
@@ -75,7 +75,7 @@ evalTTD :: DFI -> Int -> InstrID -> ProgT -> IO ()
 evalTTD dfi nWorkers resultID p =
   let entriesTable = mkProgT' p      
       mainDepth = getMainDepth [dfi]
-      color0 = (T [(error "top idx", dummyNested mainDepth)], [])
+      color0 = ([((modNoPath, 0), dummyNested mainDepth)], [])
       initMsg = Msg (-1) resultID color0 Demand
       joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
       (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
@@ -121,21 +121,20 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
   Msgs
   (case M.lookup dest p of
       Just (CallT (Call iidx) iID) ->
-        let T tokenL = token
-            token'   = T ((iidx, dummyNested 5):tokenL)
+        let token'   = (iidx, dummyNested 5):token
         in  -- TODO: hardcoded 5
             [ Msg dest iID (token', (src, Branch 0, Nothing):dchain) Demand ]
       Just (VarT iID) ->
         [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
       Just (BVarT iID (Just d, _)) ->
-        let T ((_, nested):_) = token
+        let (_, nested):_ = token
         in  [ Msg dest iID (getN nested d, (src, Branch 0, Nothing):dchain) Demand]
       Just (ActualsT acts) ->
-        let T ((i, nested):token') = token
+        let (i, nested):token' = token
             b = calcIdxBranch i acts
         in  case lookup i acts of
               Just iID ->
-                [ Msg dest iID (T token', (src, Branch b, Just nested):dchain) Demand ]
+                [Msg dest iID (token', (src, Branch b, Just nested):dchain) Demand]
               Nothing  -> ierr $ "No actual for idx="++(pprintIdx i "")
       Just (ConT (CN _) [iID0, iID1]) ->
         [ Msg dest iID0 (token, (src, Branch 0, Nothing):dchain) Demand
@@ -150,46 +149,44 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
         [ Msg dest src color (Response (VT (c, token))) ]
       Just instrT -> ierr $ "no dispatch for Demand: "++(pprint instrT "")
       Nothing     -> ierr $ "no instruction #"++(show dest)++" for Demand")
-sendMsg p (Msg src dest (T token, dchain) rVal@(Response val)) = 
+sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
   let (src', br@(Branch brn), nested):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
         Just (CallT (Call (m, i)) iID) | (brn==0) ->
           let ((m', i'), _):token' = token
           in  (checkResponseCall (m, m') (i, i') iID src)
-              Msgs [ Msg dest src' (T token', dchain') rVal ]
+              Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (ActualsT acts) ->
-          let (i, _)  = acts !! brn
-              Just nn = nested
-              token'  = (i, nn):token
+          let (i, _)   = acts !! brn
+              Just nn  = nested
+              token'   = (i, nn):token
           in  (checkResponseActuals i acts)
-              Msgs [ Msg dest src' (T token', dchain') rVal ]
+              Msgs [ Msg dest src' (token', dchain') rVal ]
         Just (VarT iID) | (brn==0) ->
           (checkResponseVar iID src)
-          Msgs [ Msg dest src' (T token, dchain') rVal ]
+          Msgs [ Msg dest src' (token, dchain') rVal ]
         Just (BVarT iID _) ->
           (checkResponseVar iID src)
-          Msgs [ Msg dest src' (T token, dchain') rVal ]          
+          Msgs [ Msg dest src' (token, dchain') rVal ]          
         Just (ConT (CN _) [_, _]) | (brn==0) || (brn==1) ->
           -- Add 'join' entry for pending value.
-          JoinUpdate (JD dest (T token, dchain) br val)
+          JoinUpdate (JD dest (token, dchain) br val)
         Just (ConT (CN CIf) [_, iID0, iID1]) | (brn==0) ->
           let VB cond = val
-          in  if cond then
-                Msgs [ Msg dest iID0 (T token, (src', Branch 1, Nothing):dchain') Demand ]
-              else
-                Msgs [ Msg dest iID1 (T token, (src', Branch 2, Nothing):dchain') Demand ]
+              (cID, b) = if cond then (iID0, 1) else (iID1, 2)
+          in  Msgs [Msg dest cID (token, (src', Branch b, Nothing):dchain') Demand]
         Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
-          Msgs [ Msg dest src' (T token, dchain') (Response val) ]
+          Msgs [ Msg dest src' (token, dchain') (Response val) ]
         Just (CaseT (Just d, _) _ pats) | (brn==0) ->
           let VT (c, cToken) = val
               (brn', patID) = findPat c 1 pats
-              (i, nested'):token'  = token
+              (i, nested'):token' = token
               updNested = setN nested' d cToken
-              color' = (T ((i, updNested):token'),
+              color' = ((i, updNested):token',
                         (src', Branch brn', Just updNested):dchain')
           in  Msgs [ Msg dest patID color' Demand ]
         Just (CaseT _ _ _) | (brn/=0) ->
-          Msgs [ Msg dest src' (T token, dchain') (Response val) ]
+          Msgs [ Msg dest src' (token, dchain') (Response val) ]
         Just instrT -> ierr $ "no dispatch for Response: "++(pprint instrT "")
         Nothing     -> ierr $ "no instruction #"++(show dest)++" for Response"
 
@@ -338,7 +335,7 @@ checkResponseActuals i acts =
 
 -- | Get token \#d from a nested field. The location must already be filled in.
 getN :: Nested -> Int -> Token
-getN nested d =
+getN (N nested) d =
   let nL = length nested
   in  if d<nL then
         case nested !! d of
@@ -349,11 +346,11 @@ getN nested d =
 
 -- | Sets the token at position \#d in a nested field. The location must be empty.
 setN :: Nested -> Int -> Token -> Nested
-setN nested' d cToken =
-  let nL = length nested'
+setN (N nested) d cToken =
+  let nL = length nested
   in  if d<nL then
-        case nested' !! d of
-          Nothing -> (take d nested')++[Just cToken]++(drop (d+1) nested')
+        case nested !! d of
+          Nothing -> N $ (take d nested)++[Just cToken]++(drop (d+1) nested)
           Just nT -> ierr $ "setN: nested["++(show d)++"] exists: "++(show nT)
       else
         ierr $ "setN: no position d="++(show d)++", nested has length "++(show nL)
