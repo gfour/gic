@@ -197,10 +197,19 @@ findPat c i ((PatT c' iID):pats) = if c==c' then (i, iID) else findPat c (i+1) p
 cBinOp :: COp -> ValueT -> ValueT -> ValueT
 cBinOp CPlus  (VI x) (VI y) = VI (x+y)
 cBinOp CMinus (VI x) (VI y) = VI (x-y)
+cBinOp CMult  (VI x) (VI y) = VI (x*y)
+cBinOp CDivide(VI x) (VI y) = VI (x `div` y)    -- we only do integer division
+cBinOp CMod   (VI x) (VI y) = VI (x `mod` y)
+cBinOp CDiv   (VI x) (VI y) = VI (x `div` y)
+cBinOp CAnd   (VB x) (VB y) = VB (x && y)
+cBinOp COr    (VB x) (VB y) = VB (x || y)
+cBinOp CEqu   (VI x) (VI y) = VB (x==y)
+cBinOp CNEq   (VI x) (VI y) = VB (x/=y)
 cBinOp CLt    (VI x) (VI y) = VB (x<y)
 cBinOp CGt    (VI x) (VI y) = VB (x>y)
 cBinOp CLe    (VI x) (VI y) = VB (x<=y)
 cBinOp CGe    (VI x) (VI y) = VB (x>=y)
+cBinOp CMulI  _ _ = error "The TTD emulator does not support big integers."
 cBinOp c _ _ = ierr $ "Unhandled cBinOp: "++(pprint c "")
 
 -- | Takes the results from sending messages to a number of instructions and
