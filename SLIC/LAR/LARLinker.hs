@@ -105,12 +105,6 @@ makeCLinker opts dfis modNames =
       prettyPrintersC.nl.
       epilogue opts.nl
 
-getMainDepth :: [DFI] -> PMDepth
-getMainDepth dfis =
-  case liDepth (mergeLARInfo dfis) of
-    Just d  -> d
-    Nothing -> 0
-
 -- | Whole program compilation: generates the defunctionalization module,
 --   links it with the current LAR code, and gives it to the LAR back-end.
 compileWholeL :: DFI -> ProgL -> ConfigLAR -> ImportedNames -> IO ()

@@ -35,5 +35,5 @@ callTTDBackend opts dfi m =
             case optCMode opts of
               CompileModule ->
                 error "The TTD emulator does not support separate compilation."
-              Whole -> evalTTD (optNWorkers opts) resultID pTTD
+              Whole -> evalTTD dfi (optNWorkers opts) resultID pTTD
         a -> ierr $ "The TTD back-end cannot handle action "++(show a)

@@ -7,7 +7,7 @@
 
 module SLIC.DFI (DfConstrs, DFI(..), DfInfo(..), DFC(..), ExtAppFuns,
                  LARInfo(..), addApp, calcExtDFInfo, dfiFile, dfiFor,
-                 dfiSuffix, emptyDfInfo, mergeDFIs, mergeLARInfo,
+                 dfiSuffix, emptyDfInfo, getMainDepth, mergeDFIs, mergeLARInfo,
                  mergeDfInfo, mergeEnvs, mergeExtAppArs, mergeSigs, noApps,
                  parseDFI, parseDFIs, restrictVEnvToProg, updExtTypesDFI) where
 
@@ -108,6 +108,14 @@ instance PPrint LARInfo where
         Just d  ->
           ("** Defines ["++).(mainDefName++).("] of depth: "++).
           shows d.nl)
+
+-- | Finds the depth of the main function in a set of DFIs. Returns 0 if
+--   nothing is found.
+getMainDepth :: [DFI] -> PMDepth
+getMainDepth dfis =
+  case liDepth (mergeLARInfo dfis) of
+    Just d  -> d
+    Nothing -> 0
 
 -- | A node in the module graph (module name, imported module names).
 type MGInfo = (MName, [MName])

@@ -6,6 +6,7 @@ module SLIC.TTD.EvalTTD (evalTTD) where
 import qualified Data.Map as M
 import SLIC.AuxFun (ierr)
 import SLIC.Constants (comma)
+import SLIC.DFI (DFI, getMainDepth)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
@@ -70,11 +71,11 @@ type JoinTable = M.Map InstrID (M.Map BlockedOp (M.Map Branch ValueT))
 
 -- | Evaluates a dataflow program. Takes the ID of the top instruction of the
 --   \"result\" definition, and the actual program.
-evalTTD :: Int -> InstrID -> ProgT -> IO ()
-evalTTD nWorkers resultID p =
+evalTTD :: DFI -> Int -> InstrID -> ProgT -> IO ()
+evalTTD dfi nWorkers resultID p =
   let entriesTable = mkProgT' p      
-      -- TODO: hardcoded 2
-      color0 = (T [(error "top idx", dummyNested 2)], [])
+      mainDepth = getMainDepth [dfi]
+      color0 = (T [(error "top idx", dummyNested mainDepth)], [])
       initMsg = Msg (-1) resultID color0 Demand
       joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
       (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
