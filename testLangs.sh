@@ -42,6 +42,17 @@ cat ${INTEGER_EXAMPLE} | sed -e "s/\`mulI\`/*/" > ${INTEGER_EXAMPLE2}
 echo "result"  | ghci ${GHCI_FLAGS} ${INTEGER_EXAMPLE2}
 rm ${INTEGER_EXAMPLE2}
 
+############# Tests the TTD emulator
+
+echo -- TTD emulator --
+for file in Examples/Num/exmh1.hs Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/example2.hs
+do
+  echo -n ${file}, TTD emulator:\ 
+  ./gic ${GICFLAGS} -ettd -workers 100 ${file}
+  echo -n ${file}, GHCi:\ 
+  echo "result" | ghci ${GHCI_FLAGS} ${file}
+done
+
 ############# Tests the call-by-name eduction interpreter
 
 echo -- Call-by-name eduction --
