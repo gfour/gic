@@ -200,6 +200,8 @@ cBinOp CPlus  (VI x) (VI y) = VI (x+y)
 cBinOp CMinus (VI x) (VI y) = VI (x-y)
 cBinOp CLt    (VI x) (VI y) = VB (x<y)
 cBinOp CGt    (VI x) (VI y) = VB (x>y)
+cBinOp CLe    (VI x) (VI y) = VB (x<=y)
+cBinOp CGe    (VI x) (VI y) = VB (x>=y)
 cBinOp c _ _ = ierr $ "Unhandled cBinOp: "++(pprint c "")
 
 -- | Takes the results from sending messages to a number of instructions and
