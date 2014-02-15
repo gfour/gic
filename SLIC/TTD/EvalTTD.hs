@@ -15,15 +15,16 @@ import SLIC.Types (CstrName, IIndex, MName, PPrint(pprint), Value(..),
 -- | Values.
 type ValueT = Value Token
 
-data Nested = N [Token]
-           deriving (Eq, Ord, Show)
-
-dummyNested :: Int -> Nested
-dummyNested n = N (take n $ repeat (error "empty nesting!"))
-
 -- | A token (also a LAR ID).
 data Token = T [(IIndex, Nested)]
            deriving (Eq, Ord, Show)
+
+-- | The nested tokens inside another token.
+type Nested = [Token]
+
+-- | Creates /n/ nested fields, not yet initialized.
+dummyNested :: Int -> Nested
+dummyNested n = take n $ repeat (error "empty nesting!")
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
@@ -126,7 +127,7 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
       Just (VarT iID) ->
         [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
       Just (BVarT iID (Just d, _)) ->
-        let T ((_, N nested):_) = token
+        let T ((_, nested):_) = token
             nestedToken = nested !! d
         in  [ Msg dest iID (nestedToken, (src, Branch 0, Nothing):dchain) Demand ]
       Just (ActualsT acts) ->
@@ -180,11 +181,11 @@ sendMsg p (Msg src dest (T token, dchain) rVal@(Response val)) =
         Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
           Msgs [ Msg dest src' (T token, dchain') (Response val) ]
         Just (CaseT (Just d, _) _ pats) | (brn==0) ->
-          let VT (c, color) = val
+          let VT (c, cToken) = val
               (brn', patID) = findPat c 1 pats
-              (i, N nested'):token'  = token
-              -- Update color at nested'[d].
-              updNested = N $ (take d nested')++[color]++(drop (d+1) nested')
+              (i, nested'):token'  = token
+              -- Update nested token at position 'd'.
+              updNested = (take d nested')++[cToken]++(drop (d+1) nested')
               color' = (T ((i, updNested):token'),
                         (src', Branch brn', Just updNested):dchain')
           in  Msgs [ Msg dest patID color' Demand ]
