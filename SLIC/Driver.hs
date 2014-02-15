@@ -121,7 +121,7 @@ processFL opts dfis inputModule =
       -- enable strictness mode if set with the command-line switch
       let p0DefStr = procModSource (\_ p->markStrict (optStrict opts) p) p0Def
       -- _ <- (putStrLn ("* Strictness marked") >> printLn p0Def)          
-      -- find & enumerate case expressionsa and bound variables
+      -- enumerate case expressions and bound variables
       let p0BVars = procModSource procBV p0DefStr
       -- _ <- (putStrLn ("* Bound variables processed") >> printLn p0BVars)
           
