@@ -9,25 +9,28 @@ import SLIC.Constants (comma)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
-import SLIC.Types (IIndex, MName, PPrint(pprint), pprintIdx, pprintList)
+import SLIC.Types (CstrName, IIndex, MName, PPrint(pprint), Value(..),
+                   pprintIdx, pprintList)
 
--- | Base values are just integers.
-data ValueT = VI Int | VB Bool
-            deriving (Eq, Show)
+-- | Values.
+type ValueT = Value Token
 
-instance PPrint ValueT where
-  pprint (VI i) = shows i
-  pprint (VB b) = shows b
+data Nested = N [Token]
+           deriving (Eq, Ord, Show)
+
+dummyNested :: Int -> Nested
+dummyNested n = N (take n $ repeat (error "empty nesting!"))
 
 -- | A token (also a LAR ID).
-type Token = [IIndex]
+data Token = T [(IIndex, Nested)]
+           deriving (Eq, Ord, Show)
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
             deriving (Eq, Ord, Show)
 
 -- | A demand chain.
-type DChain = [(InstrID, Branch)]
+type DChain = [(InstrID, Branch, Maybe Nested)]
 
 -- | A message color is a token and a demand-chain for propagating demands and
 --   responses both ways.
@@ -68,8 +71,10 @@ type JoinTable = M.Map InstrID (M.Map BlockedOp (M.Map Branch ValueT))
 --   \"result\" definition, and the actual program.
 evalTTD :: Int -> InstrID -> ProgT -> IO ()
 evalTTD nWorkers resultID p =
-  let entriesTable = mkProgT' p
-      initMsg = Msg (-1) resultID ([], []) Demand
+  let entriesTable = mkProgT' p      
+      -- TODO: hardcoded 2
+      color0 = (T [(error "top idx", dummyNested 2)], [])
+      initMsg = Msg (-1) resultID color0 Demand
       joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
       (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
   in  do -- putStrLn "Running..."
@@ -110,57 +115,87 @@ runLoop nWorkers counter entriesTable joins msgQ =
 --   A join update may also be produced, to update a join structure before the
 --   next cycle.
 sendMsg :: ProgT' -> Msg -> MsgResult
-sendMsg p (Msg src dest (token, dchain) Demand) =
+sendMsg p (Msg src dest color@(token, dchain) Demand) =
   Msgs
   (case M.lookup dest p of
-      Just (CallT (Call (m, i)) iID) ->
-        [ Msg dest iID ((m, i):token, (src, Branch 0):dchain) Demand ]
+      Just (CallT (Call iidx) iID) ->
+        let T tokenL = token
+            token'   = T ((iidx, dummyNested 5):tokenL)
+        in  -- TODO: hardcoded 5
+            [ Msg dest iID (token', (src, Branch 0, Nothing):dchain) Demand ]
       Just (VarT iID) ->
-        [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
+        [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
+      Just (BVarT iID (Just d, _)) ->
+        let T ((_, N nested):_) = token
+            nestedToken = nested !! d
+        in  [ Msg dest iID (nestedToken, (src, Branch 0, Nothing):dchain) Demand ]
       Just (ActualsT acts) ->
-        let i:token' = token
+        let T ((i, nested):token') = token
             b = calcIdxBranch i acts
         in  case lookup i acts of
-              Just iID -> [ Msg dest iID (token', (src, Branch b):dchain) Demand ]
+              Just iID ->
+                [ Msg dest iID (T token', (src, Branch b, Just nested):dchain) Demand ]
               Nothing  -> ierr $ "No actual for idx="++(pprintIdx i "")
       Just (ConT (CN _) [iID0, iID1]) ->
-        [ Msg dest iID0 (token, (src, Branch 0):dchain) Demand
-        , Msg dest iID1 (token, (src, Branch 1):dchain) Demand ]
+        [ Msg dest iID0 (token, (src, Branch 0, Nothing):dchain) Demand
+        , Msg dest iID1 (token, (src, Branch 1, Nothing):dchain) Demand ]
       Just (ConT (LitInt i) []) ->
-        [ Msg dest src (token, dchain) (Response (VI i)) ]
+        [ Msg dest src color (Response (VI i)) ]
       Just (ConT (CN CIf) [iID, _, _]) ->
-        [ Msg dest iID (token, (src, Branch 0):dchain) Demand ]
+        [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
+      Just (CaseT _ iID _) ->
+        [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
+      Just (ConstrT c) ->
+        [ Msg dest src color (Response (VT (c, token))) ]
       Just instrT -> ierr $ "no dispatch for Demand: "++(pprint instrT "")
       Nothing     -> ierr $ "no instruction #"++(show dest)++" for Demand")
-sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) = 
-  let (src', br@(Branch brn)):dchain' = dchain      -- pop demand chain
+sendMsg p (Msg src dest (T token, dchain) rVal@(Response val)) = 
+  let (src', br@(Branch brn), nested):dchain' = dchain      -- pop demand chain
   in  case M.lookup dest p of
-        Just (CallT (Call (m, i)) iID) | brn==0 ->
-          let (m', i'):token' = token
+        Just (CallT (Call (m, i)) iID) | (brn==0) ->
+          let ((m', i'), _):token' = token
           in  (checkResponseCall (m, m') (i, i') iID src)
-              Msgs [ Msg dest src' (token', dchain') rVal ]
+              Msgs [ Msg dest src' (T token', dchain') rVal ]
         Just (ActualsT acts) ->
-          let (i, _) = acts !! brn
-              token' = i:token
+          let (i, _)  = acts !! brn
+              Just nn = nested
+              token'  = (i, nn):token
           in  (checkResponseActuals i acts)
-              Msgs [ Msg dest src' (token', dchain') rVal ]
-        Just (VarT iID) | brn==0 ->
+              Msgs [ Msg dest src' (T token', dchain') rVal ]
+        Just (VarT iID) | (brn==0) ->
           (checkResponseVar iID src)
-          Msgs [ Msg dest src' (token, dchain') rVal ]
+          Msgs [ Msg dest src' (T token, dchain') rVal ]
+        Just (BVarT iID _) ->
+          (checkResponseVar iID src)
+          Msgs [ Msg dest src' (T token, dchain') rVal ]          
         Just (ConT (CN _) [_, _]) | (brn==0) || (brn==1) ->
           -- Add 'join' entry for pending value.
-          JoinUpdate (JD dest (token, dchain) br val)
-        Just (ConT (CN CIf) [_, iID0, iID1]) | brn==0 ->
+          JoinUpdate (JD dest (T token, dchain) br val)
+        Just (ConT (CN CIf) [_, iID0, iID1]) | (brn==0) ->
           let VB cond = val
           in  if cond then
-                Msgs [ Msg dest iID0 (token, (src', Branch 1):dchain') Demand ]
+                Msgs [ Msg dest iID0 (T token, (src', Branch 1, Nothing):dchain') Demand ]
               else
-                Msgs [ Msg dest iID1 (token, (src', Branch 2):dchain') Demand ]
+                Msgs [ Msg dest iID1 (T token, (src', Branch 2, Nothing):dchain') Demand ]
         Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
-          let msg = Msg dest src' (token, dchain') (Response val)
-          in  Msgs [ msg ]
+          Msgs [ Msg dest src' (T token, dchain') (Response val) ]
+        Just (CaseT (Just d, _) _ pats) | (brn==0) ->
+          let VT (c, color) = val
+              (brn', patID) = findPat c 1 pats
+              (i, N nested'):token'  = token
+              -- Update color at nested'[d].
+              updNested = N $ (take d nested')++[color]++(drop (d+1) nested')
+              color' = (T ((i, updNested):token'),
+                        (src', Branch brn', Just updNested):dchain')
+          in  Msgs [ Msg dest patID color' Demand ]
+        Just (CaseT _ _ _) | (brn/=0) ->
+          Msgs [ Msg dest src' (T token, dchain') (Response val) ]
         Just instrT -> ierr $ "no dispatch for Response: "++(pprint instrT "")
         Nothing     -> ierr $ "no instruction #"++(show dest)++" for Response"
+
+findPat :: CstrName -> Int -> [PatT] -> (Int, InstrID)
+findPat c _ [] = ierr $ "Pattern matching has no branch for "++(pprint c "")
+findPat c i ((PatT c' iID):pats) = if c==c' then (i, iID) else findPat c (i+1) pats
 
 -- | Evaluates a binary constant operator.
 cBinOp :: COp -> ValueT -> ValueT -> ValueT
@@ -185,7 +220,8 @@ unzipR msgResults =
 -- | Adds a set of join result updates in the join table.
 addJoins :: [JoinData] -> JoinTable -> JoinTable
 addJoins [] jt = jt
-addJoins ((JD iID (token, (iID', _):dchain) br val):jds) jt =
+addJoins ((JD iID (token, (iID', _, _):dchain) br val):jds) jt =
+  -- TODO: we ignore nesting here, is it ok?
   case M.lookup iID jt of
     Just iM ->
       let clr' = (token, dchain)
