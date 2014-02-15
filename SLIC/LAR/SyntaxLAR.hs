@@ -1,7 +1,10 @@
 -- | The syntax of the intermediate language used by the LAR back-end.
 -- 
 
-module SLIC.LAR.SyntaxLAR (ProgL, BlockL(..), CCstrName(..), ExprL(..), IsActuals, ModL, PatL(..), calcFuncArities, countPMDepth, countPMDepths, getBlockName, isFun, mkCC, printLAR) where
+module SLIC.LAR.SyntaxLAR (ProgL, BlockL(..), CCstrName(..), ExprL(..),
+                           IsActuals, ModL, PatL(..), calcFuncArities,
+                           countPMDepthL, countPMDepthsL, getBlockName,
+                           isFun, mkCC, printLAR) where
 
 import Data.Map (empty, insert, insertWithKey)
 import SLIC.AuxFun (ierr, showStrings, spaces)
@@ -93,26 +96,26 @@ getBlockName (ActualL vnm _ _) = vnm
 
 -- | Counts the maximum depth of nested pattern matching expressions
 --   in a LAR expression.
-countPMDepth :: ExprL -> Int
-countPMDepth (LARCall _ _) = 0
-countPMDepth (ConstrL _) = 0
-countPMDepth (BVL _ _) = 0
-countPMDepth (LARC _ []) = 0
-countPMDepth (LARC _ args) = maximum (map countPMDepth args)
+countPMDepthL :: ExprL -> Int
+countPMDepthL (LARCall _ _) = 0
+countPMDepthL (ConstrL _) = 0
+countPMDepthL (BVL _ _) = 0
+countPMDepthL (LARC _ []) = 0
+countPMDepthL (LARC _ args) = maximum (map countPMDepthL args)
 -- addition of dict arrays, to reuse/do any better we need some analysis
-countPMDepth (CaseL _ e pats) = 
+countPMDepthL (CaseL _ e pats) = 
   let patE (PatL _ eP _) = eP
       maxPatDepth [] = 0
-      maxPatDepth ps = maximum (map countPMDepth (map patE ps))
-  in  1 + (countPMDepth e) + (maxPatDepth pats)
+      maxPatDepth ps = maximum (map countPMDepthL (map patE ps))
+  in  1 + (countPMDepthL e) + (maxPatDepth pats)
 
 -- | Counts the maximum depths of nested pattern matching expressions
 --   in a LAR program, for every definition.
-countPMDepths :: ModL -> PMDepths
-countPMDepths mL = 
+countPMDepthsL :: ModL -> PMDepths
+countPMDepthsL mL = 
   let blocks = progDefs $ modProg mL
-      mUpd m (DefL v e _) = insert v (countPMDepth e) m
-      mUpd m (ActualL v _ e) = insert v (countPMDepth e) m
+      mUpd m (DefL v e _) = insert v (countPMDepthL e) m
+      mUpd m (ActualL v _ e) = insert v (countPMDepthL e) m
       aux m [] = m
       aux m (b : bs) = aux (mUpd m b) bs
   in  aux empty blocks

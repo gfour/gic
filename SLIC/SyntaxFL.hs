@@ -417,3 +417,23 @@ hasLs p =
       hasLE (LetF _ _ _) = True
       hasLE (LamF _ _ _) = True
   in  any hasLD defs
+      
+-- | Generates the pattern-matching-depth table for a list of FL definitions.
+countPMDepths :: [DefF] -> PMDepths
+countPMDepths defs =
+  let countD (DefF f _ e) = (f, countE e)
+      dOfLoc (Just d, _) = d+1
+      dOfLoc (Nothing, _) = ierr "dOfLoc: no depth found"
+      countV (V _) = 0
+      countV (BV _ loc) = dOfLoc loc
+      countE (XF v) = countV v
+      countE (FF v el) = maximum ((countV v):(map countE el))
+      countE (ConF _ el) = maximum (0:(map countE el))
+      countE (ConstrF _ el) = maximum (0:(map countE el))
+      countE (CaseF loc e _ pats) =
+        let countP (PatF _ eP) = countE eP
+        in  maximum ((dOfLoc loc):((countE e):(map countP pats)))
+      -- These constructs are not supported, we assume lambda lifted code.
+      countE (LetF _ _ _) = ierr "countE: found let"
+      countE (LamF _ _ _) = ierr "countE: found lambda"
+  in  fromList $ map countD defs

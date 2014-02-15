@@ -112,17 +112,19 @@ processFL opts dfis inputModule =
       let dfModFFinal = optEnums opts dfModF
       
       -- get the defunctionalized FL modules and defunctionalization interfaces
-      let ModD p0Def p0Dfi = dfModFFinal    
+      let ModD p0Def p0DefDfi = dfModFFinal    
       -- _ <- (putStrLn ("* Defunctionalized") >> printLn p0Def)
       
       -- get the total environment
-      let env = dfiTEnv $ p0Dfi
+      let env = dfiTEnv $ p0DefDfi
       
       -- enable strictness mode if set with the command-line switch
       let p0DefStr = procModSource (\_ p->markStrict (optStrict opts) p) p0Def
       -- _ <- (putStrLn ("* Strictness marked") >> printLn p0Def)          
       -- enumerate case expressions and bound variables
       let p0BVars = procModSource procBV p0DefStr
+      -- update the DFI with this new information
+      let p0Dfi = updPMDepths p0DefDfi p0BVars
       -- _ <- (putStrLn ("* Bound variables processed") >> printLn p0BVars)
           
       -- inline type classes for statically known instances
@@ -254,7 +256,7 @@ itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
       allImps  = unions $ map ideclINames $ modImports pLAR
       -- get the names of CAFs
       cafInfo = getCAFDcts p0Final
-      pmDepths = countPMDepths pLAR
+      pmDepths = countPMDepthsL pLAR
       allArities = unions [builtinArities, calcFuncArities pLAR]
       conf = ConfigLAR { getCBNVars   = cbnVars
                        , getStricts   = stricts

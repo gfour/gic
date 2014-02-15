@@ -9,7 +9,8 @@ module SLIC.DFI (DfConstrs, DFI(..), DfInfo(..), DFC(..), ExtAppFuns,
                  LARInfo(..), addApp, calcExtDFInfo, dfiFile, dfiFor,
                  dfiSuffix, emptyDfInfo, getMainDepth, mergeDFIs, mergeLARInfo,
                  mergeDfInfo, mergeEnvs, mergeExtAppArs, mergeSigs, noApps,
-                 parseDFI, parseDFIs, restrictVEnvToProg, updExtTypesDFI) where
+                 parseDFI, parseDFIs, restrictVEnvToProg, updExtTypesDFI,
+                 updPMDepths) where
 
 import Data.Char (isUpper)
 import Data.List as List (map)
@@ -338,3 +339,12 @@ preludeDFI =
       larInfo= ([], cids, builtinPmDepths, Nothing)
   in  DFI builtinTEnv builtinFuncSigs (dfcs, eApps) larInfo
 -}
+
+-- | Updates the pattern-matching depths field in a DFI, given its FL module.
+updPMDepths :: DFI -> ModF -> DFI
+updPMDepths dfi modF =
+  let pmds = countPMDepths $ progDefs $ modProg modF
+      (mn, _) = modNameF modF
+      rDep = Data.Map.lookup (mainDefQName mn) pmds
+      newLARInfo = (dfiLARInfo dfi){liPMDs=pmds}{liDepth=rDep}
+  in  dfi{dfiLARInfo=newLARInfo}

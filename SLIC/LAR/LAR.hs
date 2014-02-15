@@ -755,7 +755,7 @@ depthOfMainDef blocks =
       findRes (ActualL _ _ _) = False
       res = Prelude.filter findRes blocks
   in  case res of
-        [DefL _ e _] -> countPMDepth e
+        [DefL _ e _] -> countPMDepthL e
         _ -> ierr "No (unique) result definition was found."
 
 -- | Main entry point for separate module compilation from "SLIC.Driver".
