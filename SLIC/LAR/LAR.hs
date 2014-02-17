@@ -465,7 +465,7 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
   in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
       -- TODO: eliminate this when all patterns are nullary constructors
       -- (or are used as such, see 'bindsVars')
-      tab.mkNESTED (optGC opts) compact efunc depth argsN.(" = cl["++).dS.("].ctxt;"++).nl.
+      tab.mkNESTED (optGC opts) compact efunc depth argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
       logDict opts d.
       -- if debug mode is off, optimize away constructor choice when there is
       -- only one pattern (will segfault/misbehave if the constructor
