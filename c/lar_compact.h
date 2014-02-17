@@ -141,16 +141,16 @@ typedef struct T_ {
 #define CONSTR(p)                      ((int)(((uintptr_t)p.ctxt) >> 48))
 
 /* Primitive value read/create macros. These values use all high 61 bits. */
-#define PRIMVAL_R(p)                   ((unsigned long)(((uintptr_t)(p).ctxt) >> 3))
-#define PRIMVAL_C(i)                   ((Susp) { (TP_)(((uintptr_t)(i)) << 3) } )
+#define PRIMVAL_R(p)                   ((signed long)(((intptr_t)(p).ctxt) >> 3))
+#define PRIMVAL_C(i)                   ((Susp) { (TP_)(((intptr_t)(i)) << 3) } )
 
 /* Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p)                  ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
 
 /* ********** Simplified integer arithmetic ***** */
 
-#define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((uintptr_t)(p1).ctxt) + ((uintptr_t)(p2).ctxt)) })
-#define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((uintptr_t)(p1).ctxt) - ((uintptr_t)(p2).ctxt)) })
-// #define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((uintptr_t)(p1).ctxt) == ((uintptr_t)p2.ctxt)) << 3 ) })
-// #define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((unsigned long)p1.ctxt) != ((unsigned long)p2.ctxt)) << 3 ) })
+#define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) + ((intptr_t)(p2).ctxt)) })
+// #define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) - ((intptr_t)(p2).ctxt)) })
+// #define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
+// #define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
 
