@@ -511,7 +511,15 @@ mkBinOp c [e1, e2] env config =
       val2 = ("PRIMVAL_R("++).e2'.(")"++)
       cBin cOp tagFunc =
         ("(PRIMVAL_C("++).val1.(cOp++).val2.tagFunc config.("))"++)
+      compact = optCompact $ getOptions config
+      -- This is used by the fast arithmetic ops.
+      fastOp opN = (opN++).("(("++).e1'.("), ("++).e2'.("))"++)
   in  case c of
+        -- If using compact LARs, do faster integer arithmetic for some operators.
+        CPlus  | compact -> fastOp "PVAL_ADD"
+        CMinus | compact -> fastOp "PVAL_SUB"
+        -- CEqu   | compact -> fastOp "PVAL_EQU"
+        -- CNEq   | compact -> fastOp "PVAL_NEQ"
         -- C operators that are different from Haskell
         CMulI -> lparen.(pprint CMulI).lparen.e1'.comma.e2'.rparen.rparen
         CNEq  -> cBin "!=" mBoolTag

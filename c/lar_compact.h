@@ -146,3 +146,11 @@ typedef struct T_ {
 
 /* Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p)                  ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
+
+/* ********** Simplified integer arithmetic ***** */
+
+#define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((uintptr_t)(p1).ctxt) + ((uintptr_t)(p2).ctxt)) })
+#define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((uintptr_t)(p1).ctxt) - ((uintptr_t)(p2).ctxt)) })
+// #define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((uintptr_t)(p1).ctxt) == ((uintptr_t)p2.ctxt)) << 3 ) })
+// #define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((unsigned long)p1.ctxt) != ((unsigned long)p2.ctxt)) << 3 ) })
+
