@@ -4,28 +4,29 @@
 # 
 
 echo Compiling+running with GIC...
-export CC=clang
-export GICFLAGS="-gic-tc -mem 2200000000 -compact"
+export CC=gcc
+export GICFLAGS="-gic-tc -mem 220000000 -compact"
 # export CFLAGS2="-DSSTACK"
-# echo Ack:
-# ./run_lar.sh Examples/NewBench/ack.hs
-# echo Collatz:
-# ./run_lar.sh Examples/Data/collatz.hs
-# echo Digits:
-# ./run_lar.sh Examples/Data/digits_of_e1.hs
-# echo Fib:
-# ./run_lar.sh Examples/NewBench/fib.hs
-# echo Primes:
-# ./run_lar.sh Examples/NewBench/primes.hs
+echo Ack:
+./run_lar.sh Examples/NewBench/ack.hs
+echo Collatz:
+./run_lar.sh Examples/Data/collatz.hs
+echo Fib:
+./run_lar.sh Examples/NewBench/fib.hs
+echo Primes:
+./run_lar.sh Examples/NewBench/primes.hs
 echo Church:
 ./run_lar.sh Examples/NewBench/church.hs
+export GICFLAGS="-gic-tc -mem 2442800000 -compact"
+echo Digits:
+./run_lar.sh Examples/Data/digits_of_e1.hs
 echo Reverse:
 ./run_lar.sh Examples/Data/reverse.hs
-# export GICFLAGS="-gic-tc -mem 24428000000"
-# echo Ntak:
-# ./run_lar.sh Examples/NewBench/ntak.hs
-# echo Queens:
-# ./run_lar.sh Examples/NewBench/queens.hs
+export GICFLAGS="-gic-tc -mem 24428000000 -compact"
+echo Ntak:
+./run_lar.sh Examples/NewBench/ntak.hs
+echo Queens:
+./run_lar.sh Examples/NewBench/queens.hs
 
 # echo Compiling with GHC...
 # ghc -O3 Examples/NewBench/ack.hs -o Ack
