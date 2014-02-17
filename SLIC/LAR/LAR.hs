@@ -517,7 +517,7 @@ mkBinOp c [e1, e2] env config =
   in  case c of
         -- If using compact LARs, do faster integer arithmetic for some operators.
         CPlus  | compact -> fastOp "PVAL_ADD"
-        CMinus | compact -> fastOp "PVAL_SUB"
+        -- CMinus | compact -> fastOp "PVAL_SUB"
         -- CEqu   | compact -> fastOp "PVAL_EQU"
         -- CNEq   | compact -> fastOp "PVAL_NEQ"
         -- C operators that are different from Haskell
