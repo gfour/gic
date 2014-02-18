@@ -37,7 +37,7 @@ type ModL = Mod ProgL
 -- | Returns a compiled constructor using a CIDs table.
 mkCC :: CstrName -> CIDs -> CCstrName
 mkCC c cids =
-  let (cArity, cId) = findArId c cids
+  let (cArity, cId) = findArID c cids
   in CC c cId cArity 
 
 -- | A LAR expression.

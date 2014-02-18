@@ -476,19 +476,19 @@ constrT []     r = r
 constrT (t:tl) r = Tf t (constrT tl r)
 
 -- | Returns the arity of a constructor and its compiled ID.
-findArId :: CstrName -> CIDs -> (Arity, CID)
-findArId c cids =
+findArID :: CstrName -> CIDs -> (Arity, CID)
+findArID c cids =
   case Map.lookup c cids of
     Just (ar, cid) -> (ar, cid)
-    Nothing -> ierr ("findIDAR: constructor "++(qName c)++" not found in enum: "++(show cids))
+    Nothing -> ierr ("findArID: constructor "++(qName c)++" not found in enum: "++(show cids))
 
--- | First projection of findIDAR.
+-- | First projection of findArID.
 findID :: CstrName -> CIDs -> CID
-findID c cids = let (_, cId) = findArId c cids in cId
+findID c cids = let (_, cId) = findArID c cids in cId
 
--- | Second projection of findIDAR.
+-- | Second projection of findArID.
 findArity :: CstrName -> CIDs -> Arity
-findArity c cids = let (cAr, _) = findArId c cids in cAr
+findArity c cids = let (cAr, _) = findArID c cids in cAr
 
 -- * The pretty printing class (PPrint) and its helper functions
 
