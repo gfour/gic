@@ -64,12 +64,7 @@ t2st :: Type -> SType
 t2st (Tg g)   = STground g
 t2st (Tv tv)  = STvarV tv
 t2st (Tf a b) = STfunc (t2st a) (t2st b)
-t2st t@(Ta (Tg gList_) b) | gList_ == gList =
-  case b of
-    Tv _ -> STground gList                -- assume [a] is [Int]
-    Tg i | i == gInt -> STground gList    -- accept [Int]
-    _ ->
-      error $ "Built-in type inference does not support list "++(pprint t "")
+t2st (Ta (Tg gList_) b) | gList_ == gList = STground (T (onlyIntLists b))
 t2st t@(Ta (Ta tTuple2 t1) t2) | tTuple2 == tTuple 2 =
   case (t1, t2) of
     (Tg i1, Tg i2) | (i1 == gInt) && (i2 == gInt) ->
@@ -87,6 +82,13 @@ t2st t@(Ta (Ta (Ta tTuple3 t1) t2) t3) | tTuple3 == tTuple 3 =
     _ ->
       error $ "Built-in type inference does not support pair "++(pprint t "")
 t2st (Ta a _) = t2st a
+
+-- | Helper function used to accept the [Int] type.
+onlyIntLists :: Type -> DTName
+onlyIntLists (Tv _) = dtList                -- assume [a] is [Int]
+onlyIntLists (Tg i) | i == gInt = dtList    -- accept [Int]
+onlyIntLists t =
+  error $ "Built-in type inference does not support list "++(pprint t "")
 
 t2stEnv :: TEnv -> STEnv
 t2stEnv env = Map.map (\(t, _)->t2st t) env
@@ -635,7 +637,8 @@ typeCheckData hData ve =
               ftNames (Tv _)      = []
               ftNames (Tg (TDF _ _)) = ierr "typeCheckData found defunc. data type"
               ftNames (Tf a b) = (ftNames a)++(ftNames b)
-              ftNames (Ta _ _) = error "ftNames: found abstract data type"
+              ftNames (Ta (Tg a) b) | a==gList = [onlyIntLists b]
+              ftNames (Ta _ _) = error "ftNames: unknown abstract data type"
               dtToFTs (DT ft _ _) = ftNames ft
           in  concatMap dtToFTs (concatMap (\(DConstr _ dts _) -> dts) dtc)
         dtNames2 = (concatMap getTypesOf hData) ++ builtinDTypes ++ dtNames1
