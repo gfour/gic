@@ -147,10 +147,14 @@ typedef struct T_ {
 /* Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p)                  ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
 
-/* ********** Simplified integer arithmetic ***** */
+/* ********** Fast integer handling ***** */
+
+/* These operators are enabled when -fop is passed in the command line.
+   They should only be used for evaluation purposes. Addition and subtraction
+   only work for non-negative integers. */
 
 #define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) + ((intptr_t)(p2).ctxt)) })
-// #define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) - ((intptr_t)(p2).ctxt)) })
-// #define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
-// #define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
+#define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) - ((intptr_t)(p2).ctxt)) })
+#define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
+#define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
 

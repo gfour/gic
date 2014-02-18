@@ -99,6 +99,7 @@ data Options = Options
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
   , optWhRedis :: Bool             -- ^ use the Redis-based warehouse for the Erlang back-end
   , optCompact :: Bool             -- ^ use the compact x86-64 representation
+  , optFastOp  :: Bool             -- ^ use the fast integer operations
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   }
 
@@ -129,6 +130,7 @@ defaultOptions = Options
   , optCMode   = Whole
   , optWhRedis = False
   , optCompact = False
+  , optFastOp  = False
   , optNWorkers= defaultWorkers
   }
 
