@@ -76,6 +76,7 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "             -semigc  : enable semispace garbage collection (EXPERIMENTAL)"
            putStrLn "             -libgc   : use Boehm GC [libgc] (default)"
            putStrLn "             -compact : use the compact x86-64 mode"
+           putStrLn "                 -fop : use the fast integer operators (EXPERIMENTAL)"
            putStrLn("             -mem M   : use M bytes of memory (default="++(showNum defaultMemSize)++")")
            putStrLn "             -strict  : insert strictness annotations for all function" 
            putStrLn "                        formals and constructor args"           
@@ -138,6 +139,7 @@ processArgs cmdArgs =
         aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
         aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
         aux ("-compact":args) opts = aux args opts{optCompact = True}{optGC=SemiGC}
+        aux ("-fop"   : args) opts = aux args opts{optFastOp = True}
         aux ("-tag"   : args) opts = aux args opts{optTag = True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
         aux ("-gic-tc": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf True}
