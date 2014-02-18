@@ -620,6 +620,7 @@ fp2sp :: FullPat -> TState -> TInfo (SimplePat, [(SimplePat, QName)])
 -- simple variable patterns are illegal in let-expressions here
 -- fp2sp pat@(PatF pv@(FPatV _) e) st = (st, [pat])
 fp2sp (FPatV _) _ = ierr "fp2sp: found var"
+fp2sp (FPatI _) _ = ierr "fp2sp: found int literal"
 -- constructor patterns with just variables are not interesting
 fp2sp (FPatC c ps) st =
   if all isFPV ps then 
@@ -627,6 +628,7 @@ fp2sp (FPatC c ps) st =
   else
     let p2s :: FullPat -> TState -> TInfo (QName, [Maybe (SimplePat, QName)])
         p2s (FPatV v) st' = (st', (v, []))
+        p2s (FPatI i) _ = error $ "p2s: found int literal "++(show i)
         p2s (FPatC c0 ps0) st' = 
           let (st'', eName1) = freshName st'
               (st''', newBnds) = mapTI st'' p2s ps0
@@ -682,8 +684,8 @@ mkPat fm@(m, _) pat =
                     " elements are not supported"
           else
             FPatC (bf_Tuple elN) (map (mkPat fm) el)
-    _ ->
-      errM fm $ "Not supported pattern: "++(show pat)
+    S.PLit (S.Int i) -> FPatI i
+    _ -> errM fm $ "Pattern not supported: "++(show pat)
 
 -- | Extracts the name of a Haskell identifier or symbol.
 getName :: S.Name -> String

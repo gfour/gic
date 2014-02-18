@@ -96,16 +96,19 @@ instance PPrint SimplePat where
 -- | Full FL patterns.
 data FullPat = FPatC CstrName [FullPat]      -- ^ constructor pattern
              | FPatV QName                   -- ^ variable pattern
+             | FPatI Integer                 -- ^ integer
 
 -- | Filter for full pattern variables.
 isFPV :: FullPat -> Bool
-isFPV (FPatV _) = True              
+isFPV (FPatV _)   = True              
 isFPV (FPatC _ _) = False
+isFPV (FPatI _)   = False
               
 -- | Pretty printer for full patterns.
 instance PPrint FullPat where
   pprint (FPatV v) = pprint v
   pprint (FPatC c ps) = pprint c.(" "++).pprint ps
+  pprint (FPatI i) = shows i
 
 -- | Pattern branch (containing full patterns).
 type PatFH  = PatFL  FullPat

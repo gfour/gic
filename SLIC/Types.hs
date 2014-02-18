@@ -477,10 +477,17 @@ constrT (t:tl) r = Tf t (constrT tl r)
 
 -- | Returns the arity of a constructor and its compiled ID.
 findArID :: CstrName -> CIDs -> (Arity, CID)
-findArID c cids =
+findArID c@(QN cm cn) cids =
   case Map.lookup c cids of
     Just (ar, cid) -> (ar, cid)
-    Nothing -> ierr ("findArID: constructor "++(qName c)++" not found in enum: "++(show cids))
+    Nothing ->
+      -- Special case: built-in integers are their own ID and have no parameters.
+      if cm==bMod then
+        case reads cn :: [(Int, String)] of
+          [(n, "")] -> (0, n)
+          _         -> ierr $ "Unknown built-in: "++(pprint c "")
+      else
+        ierr ("findArID: constructor "++(qName c)++" not found in enum: "++(show cids))
 
 -- | First projection of findArID.
 findID :: CstrName -> CIDs -> CID
@@ -688,6 +695,10 @@ builtinPmDepths = Map.fromList $
                   , (bf_error, 0), (bf_runMainIO, 0)
                   , (bf_Cons, 0), (bf_Nil, 0), (bf_Unit, 0)
                   ] ++ (map (\i->(bf_Tuple i, 0)) b_tupleSizes)
+
+-- | Assigns a special built-in pseudo-constructor to integer literals.
+intConstrQN :: Integer -> QName
+intConstrQN i = QN bMod (show i)
 
 -- * Interpreter values
 

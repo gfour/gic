@@ -10,6 +10,7 @@ module SLIC.Front.Renamer (renInvNames, uniqueNames) where
 import qualified Data.Map as M (Map, empty, fromList, lookup, map, mapKeys,
                                 mapWithKey, toList, unions)
 import SLIC.AuxFun (ierr, mergeM)
+import SLIC.Constants (bMod)
 import SLIC.Front.Typeclass
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -221,6 +222,7 @@ uniqueNamesE m f ren (LamF d v e) =
 
 -- | Helper function for constructor renaming.
 renameConstr :: MName -> RenInfo -> CstrName -> CstrName
+renameConstr _ _ c@(QN m _) | m == bMod = c
 renameConstr m ren c =
   -- if the constructor is built-in, leave it unchanged
   case M.lookup c builtinTEnv of
@@ -319,3 +321,4 @@ instance RenameInvPat SimplePat where
 instance RenameInvPat FullPat where
   renameInvPat (FPatV v) = FPatV (prepQN v)
   renameInvPat (FPatC c ps) = FPatC (prepQN c) (map renameInvPat ps)
+  renameInvPat fpat@(FPatI _) = fpat

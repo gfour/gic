@@ -12,7 +12,7 @@ import Data.List (lookup, nub, sort)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (ierr, errM, trace2)
-import SLIC.Constants (space)
+import SLIC.Constants (bMod, space)
 import SLIC.Front.Preprocessor (genProjSelTEnv)
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -465,7 +465,7 @@ inferPats cs an (p : pl) =
 --   imported typed function. Returns the type of the branch and the type
 --   of the pattern constructor.
 inferPat :: [Data] -> STAnnot -> PatF -> STM (SType, SType)
-inferPat cs an (PatF (SPat c bs) e) =
+inferPat cs an (PatF (SPat c@(QN cm cn) bs) e) =
   getEnvST >>= \gamma ->
   let (newEnv, tConstr) =
         case findTypesOf c cs of
@@ -477,7 +477,13 @@ inferPat cs an (PatF (SPat c bs) e) =
                     stParams = init ts
                     stRes    = last ts
                 in  (Map.fromList $ zip bs stParams, stRes)
-              Nothing -> error $ "The type of constructor "++(qName c)++" does not appear in local data definitions or imported names in:\n"++(showSTEnv gamma)
+              Nothing ->
+                if cm==bMod then
+                  case reads cn :: [(Int, String)] of
+                    [(_, "")] -> (Map.empty, STground gInt)
+                    _         -> ierr $ "Unknown built-in: "++(pprint c "")
+                else
+                  error $ "The type of constructor "++(qName c)++" does not appear in local data definitions or imported names in:\n"++(showSTEnv gamma)
   in  setEnvST (Map.union newEnv gamma) >>
       inferE cs an e >>= \t ->
       return (t, tConstr)

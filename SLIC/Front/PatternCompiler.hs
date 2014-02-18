@@ -35,6 +35,7 @@ patComp (Prog dtsFL defsFH) tcInsts =
       pcD (DefF f fs e) = DefF f fs (pcE e)
       pcP :: FullPat -> SimplePat
       pcP (FPatC c vars) = SPat c (map (\(FPatV v)->v) vars)
+      pcP (FPatI i)      = SPat (intConstrQN i) []
       pcP _ = ierr "pcP: pattern not simple"
       pcTcI (TcInst tcn tv methods) = TcInst tcn tv (map pcD methods)
   in  (Prog dtsFL (map pcD defsFH), map pcTcI tcInsts)
@@ -42,9 +43,8 @@ patComp (Prog dtsFL defsFH) tcInsts =
 -- | Checks if all patterns are simple.
 allSimple :: [PatFH] -> Bool
 allSimple pats =
-  let isVar (FPatV _) = True
-      isVar _         = False
-      isSimple (FPatC _ ps) = all isVar ps
+  let isSimple (FPatC _ ps) = all isFPV ps
+      isSimple (FPatI _)    = True
       isSimple _            = False
   in  all (\(PatF fp _)->isSimple fp) pats
 
