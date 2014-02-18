@@ -4,43 +4,56 @@
 # 
 
 echo Compiling+running with GIC...
-export CC=gcc
-export GICFLAGS="-gic-tc -mem 220000000 -compact"
+if [ "$CC" == "" ]
+then
+  export CC=gcc
+fi
+
+export CFLAGS2="-Wno-#warnings"
 # export CFLAGS2="-DSSTACK"
-echo Ack:
+export GICFLAGS="-gic-tc -mem 220000000 -compact"
+ulimit -s 262144
+echo -n "Ack: "
 ./run_lar.sh Examples/NewBench/ack.hs
-echo Collatz:
+echo -n "Collatz: "
 ./run_lar.sh Examples/Data/collatz.hs
-echo Fib:
+echo -n "Fib: "
 ./run_lar.sh Examples/NewBench/fib.hs
-echo Primes:
+echo -n "Primes: "
 ./run_lar.sh Examples/NewBench/primes.hs
-echo Church:
+echo -n "Church: "
 ./run_lar.sh Examples/NewBench/church.hs
 export GICFLAGS="-gic-tc -mem 2442800000 -compact"
-echo Digits:
+echo -n "Digits: "
 ./run_lar.sh Examples/Data/digits_of_e1.hs
-echo Reverse:
+echo -n "Reverse: "
 ./run_lar.sh Examples/Data/reverse.hs
 export GICFLAGS="-gic-tc -mem 24428000000 -compact"
-echo Ntak:
+echo -n "Ntak: "
 ./run_lar.sh Examples/NewBench/ntak.hs
-echo Queens:
+export GICFLAGS="-mem 24428000000 -compact"
+echo -n "Queens: "
 ./run_lar.sh Examples/NewBench/queens.hs
 
-# echo Compiling with GHC...
-# ghc -O3 Examples/NewBench/ack.hs -o Ack
-# ghc -O3 Examples/Data/collatz.hs -o Collatz
-# ghc -O3 Examples/Data/digits_of_e1.hs -o Digits_of_e1
-# ghc -O3 Examples/NewBench/fib.hs -o Fib
-# ghc -O3 Examples/NewBench/ntak.hs -o Ntak
-# ghc -O3 Examples/NewBench/primes.hs -o Primes
-# ghc -O3 Examples/NewBench/church.hs -o Church
-# ghc -O3 Examples/NewBench/queens.hs -o Queens
-# ghc -O3 Examples/Data/reverse.hs -o Reverse
-# echo Running...
-# for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Reverse
-# do
-#     echo $p: 
-#     time ./$p
-# done
+if [ "$GHC" == "" ]
+then
+  export GHC=ghc
+fi
+echo Compiling with GHC:
+$GHC --version
+
+$GHC -fforce-recomp -O3 Examples/NewBench/ack.hs -o Ack
+$GHC -fforce-recomp -O3 Examples/Data/collatz.hs -o Collatz
+$GHC -fforce-recomp -O3 Examples/Data/digits_of_e1.hs -o Digits_of_e1
+$GHC -fforce-recomp -O3 Examples/NewBench/fib.hs -o Fib
+$GHC -fforce-recomp -O3 Examples/NewBench/ntak.hs -o Ntak
+$GHC -fforce-recomp -O3 Examples/NewBench/primes.hs -o Primes
+$GHC -fforce-recomp -O3 Examples/NewBench/church.hs -o Church
+$GHC -fforce-recomp -O3 Examples/NewBench/queens.hs -o Queens
+$GHC -fforce-recomp -O3 Examples/Data/reverse.hs -o Reverse
+echo Running...
+for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Reverse
+do
+    echo -n "$p: "
+    TIME="\t%E" time ./$p
+done
