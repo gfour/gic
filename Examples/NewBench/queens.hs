@@ -1,4 +1,4 @@
-module Main where
+module Queens where
 
 main :: IO ()
 main = putStrLn (show result)
@@ -12,24 +12,22 @@ result = count size
 count :: Int -> Int
 count n = length2 (queens n)
 
-data LList = LNil | LCons [Int] LList
-
-queens :: Int -> LList
+queens :: Int -> [[Int]]
 queens n = gen n n
 
-gen :: Int -> Int -> LList
-gen nq n = if n == 0 then LCons [] LNil else gen_1 nq (gen nq (n-1))
+gen :: Int -> Int -> [[Int]]
+gen nq n = if n == 0 then [[]] else gen_1 nq (gen nq (n-1))
 
-gen_1 :: Int -> LList -> LList
+gen_1 :: Int -> [[Int]] -> [[Int]]
 gen_1 nq bs =
   case bs of
-    LNil -> LNil
-    LCons b bs' -> gen_2 nq b 1 (gen_1 nq bs')
+    [] -> []
+    b:bs' -> gen_2 nq b 1 (gen_1 nq bs')
 
-gen_2 :: Int -> [Int] -> Int -> LList -> LList
+gen_2 :: Int -> [Int] -> Int -> [[Int]] -> [[Int]]
 gen_2 nq b q rest = if q <= nq then
                       if safe q 1 b then
-                        LCons (q:b) (gen_2 nq b (q+1) rest)
+                        (q:b) : (gen_2 nq b (q+1) rest)
                       else
                         gen_2 nq b (q+1) rest
                     else
@@ -41,8 +39,8 @@ safe x d qs =
     []  -> True
     q:l -> (x /= q) && (x /= (q+d)) && (x /= (q-d)) && (safe x (d+1) l)
 
-length2 :: LList -> Int
+length2 :: [[Int]] -> Int
 length2 bs =
   case bs of
-    LNil -> 0
-    LCons b bs' -> 1 + length2 bs'
+    [] -> 0
+    b : bs' -> 1 + length2 bs'
