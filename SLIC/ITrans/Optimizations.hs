@@ -14,13 +14,12 @@
 --   but can be evaluated as call-by-name.
 -- 
 
-module SLIC.ITrans.Optimizations (optEnums, findCBNVars, optimize) where
+module SLIC.ITrans.Optimizations (canOptEnums, optEnumsKernel,
+                                  findCBNVars, optimize) where
 
 import Data.List as List (map, nub)
 import Data.Map (Map, empty, fromList, map, toList, unionWith, unionsWith)
 import SLIC.AuxFun (ierr)
-import SLIC.DFI (DFI(..))
-import SLIC.Front.Defunc
 import SLIC.Types
 import SLIC.ITrans.Syntax
 import SLIC.State
@@ -82,8 +81,8 @@ gatherUsed v defs used =
 
 -- | Transforms data types having only nullary constructors into enumerations,
 --   isomorphic to integers.
-optimizeEnums :: ([Data], TEnv) -> ([Data], TEnv)
-optimizeEnums (dt, env) =
+optEnumsKernel :: ([Data], TEnv) -> ([Data], TEnv)
+optEnumsKernel (dt, env) =
     let enums     = filter isEnum dt        
         enumNames = List.map (\(Data d _ _) -> d) enums
         env'      = Data.Map.map (\(t, ar) -> (ifEnumThenInt enumNames t, ar)) env
@@ -94,21 +93,9 @@ optimizeEnums (dt, env) =
           List.map (\(Data d as dcs) -> Data d as (List.map enumDC dcs)) dt
     in  (dt', env')
 
--- | Transform enumerations to numbers.
-optimizeEnumsMD :: ModD -> ModD
-optimizeEnumsMD (ModD modF dfi) =
-  let Prog dts defs = modProg modF
-      (dts', env') = optimizeEnums (dts, dfiTEnv dfi)
-  in  ModD modF{modProg=(Prog dts' defs)} dfi{dfiTEnv=env'}
-
--- | Make 0-order data types equivalent to integers if the 'enum' mode is enabled.
---   This optimization breaks encapsulation (it may know if an imported data type 
---   has hidden nullary constructors), so it is only in whole program mode.
-optEnums :: Options -> ModD -> ModD
-optEnums opts modD =
-  if optOptEnums opts && optCMode opts == Whole then
-    optimizeEnumsMD modD
-  else modD
+-- | Test if the enumeration optimization and whole program compilation are set.
+canOptEnums :: Options -> Bool
+canOptEnums opts = optOptEnums opts && optCMode opts == Whole
 
 -- | Checks if a data definition qualifies as an enumeration.
 isEnum :: Data -> Bool
