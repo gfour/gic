@@ -1,4 +1,4 @@
-module Queens where
+module Main where
 
 main :: IO ()
 main = putStrLn (show result)
