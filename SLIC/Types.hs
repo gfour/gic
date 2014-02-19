@@ -111,7 +111,8 @@ type Arities = Map.Map QName Arity
 -- | Data type names.
 type DTName = QName
 
--- | Strictness annotations ("!").
+-- | The flag that indicates strictness. Used by the -strict command-line
+--   parameter and for strictness annotations ("!").
 type Strictness = Bool
 
 -- | The index used by the intensional operators
@@ -642,6 +643,10 @@ mkTupleT tts =
       aux [t] = Ta (tTuple (length tts)) t
       aux (t:ts) = Ta (aux ts) t
   in  aux $ reverse tts
+
+-- | Generate the ground type of a n-tuple.
+mkTupleTg :: Int -> Type
+mkTupleTg n = Tg (T (dtTuple n))
 
 -- | A table containing only the bulit-in constructors.
 builtinConstrs :: Arities

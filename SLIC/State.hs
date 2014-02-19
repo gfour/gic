@@ -2,7 +2,7 @@
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.State (Action(..), CompileMode(..), GC(..), GHCAPI(..),
+module SLIC.State (Action(..), CompileMode(..), DoNullDf, GC(..), GHCAPI(..),
                    Options(..), TypeChecker(..), Verb, defaultOptions,
                    opt) where
 
@@ -78,6 +78,9 @@ type Verb = Bool
 opt :: Verb -> IO () -> IO ()
 opt v x = if v then x else return ()
 
+-- | The flag that enables nullary defunctionalization.
+type DoNullDf = Bool
+
 -- | The state of the compiler, as defined by the user options.
 data Options = Options
   { optAction  :: Action           -- ^ what to do
@@ -88,12 +91,13 @@ data Options = Options
   , optGC      :: GC               -- ^ enable garbage collection
   , optTC      :: TypeChecker      -- ^ which type checker to use
   , optGHC     :: GHCAPI           -- ^ enable preprocessing using GHC
-  , optStrict  :: Bool             -- ^ enable automatic optrictness everywhere
+  , optStrict  :: Strictness       -- ^ enable automatic optrictness everywhere
   , optTag     :: Bool             -- ^ enable tags inside constructors
   , optMaxMem  :: Int              -- ^ size of total memory to use (in bytes)
   , optWhNum   :: Int              -- ^ the number of the warehouses to use for parallel eduction
   , optWhSize  :: Int              -- ^ maximum warehouse size before GC
   , optOptEnums:: Bool             -- ^ compile enums (datatypes wih nullary constructors) to integers
+  , optNullDf  :: DoNullDf         -- ^ do nullary defunctionalization
   , optMaxCtxts:: Int              -- ^ maximum number of contexts per warehouse
   , optLink    :: Bool             -- ^ linking mode
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
@@ -125,6 +129,7 @@ defaultOptions = Options
   , optGHC     = NoGHC
   , optHeap    = False
   , optOptEnums= False
+  , optNullDf  = False
   , optMaxCtxts= defaultMaxCtxts
   , optLink    = False
   , optCMode   = Whole
