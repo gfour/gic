@@ -594,7 +594,6 @@ prologue opts modName arityCAF =
            (case optCMode opts of
                Whole ->
                  ("/* Memory management */"++).nl.
-                 ("inline unsigned char *MM_allocLAR(size_t bytes, TP_ T0);"++).nl.
                  ("#define DEFAULT_MAXMEM "++).shows (optMaxMem opts).nl.
                  ("unsigned long MAXMEM = DEFAULT_MAXMEM;"++).nl.
                  ("unsigned long MAXMEMSPACE = DEFAULT_MAXMEM / 2;"++).nl.
