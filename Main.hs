@@ -59,7 +59,8 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "  -df     : defunctionalize and print resulting HIL program"
            putStrLn "             -v : print defunctionalized types"
            putStrLn "  -fl     : evaluate the FL program with the non-strict FL interpreter"
-           putStrLn "  -enum   : optimize enumeration datatypes (can do FL->FOFL without new data types)"
+           putStrLn "  -enum   : optimize enumeration datatypes"
+           putStrLn "  -null-df: do nullary defunctionalization (can do FL->FOFL without new data types)"
 #ifdef USE_GHC
            putStrLn "  -ghc-core   : use GHC as a front-end until Core"
            putStrLn "* Type inference:"
@@ -135,6 +136,7 @@ processArgs cmdArgs =
         aux ("-debug" : args) opts = aux args opts{optDebug = True}
         aux ("-v"     : args) opts = aux args opts{optVerbose = True}
         aux ("-enum"  : args) opts = aux args opts{optOptEnums = True}
+        aux ("-null-df":args) opts = aux args opts{optNullDf = True}
         aux ("-strict": args) opts = aux args opts{optStrict = True}
         aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
         aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
