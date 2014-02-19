@@ -23,6 +23,7 @@ import SLIC.Front.Defunc
 import SLIC.ITrans.HFtoHI (fromHFtoHI)
 import SLIC.ITrans.HItoZI (fromHItoZI)
 import SLIC.ITrans.ITrans (itransM)
+import SLIC.ITrans.Optimizations (canOptEnums, optEnumsKernel)
 import SLIC.LAR.ZItoLAR
 import SLIC.LAR.LAR
 import SLIC.LAR.LARAux
@@ -113,15 +114,18 @@ compileWholeL dfi finalProgLAR config allImports =
       opts = getOptions config
       (modFinal, (fsigs', (cbns', strs'), pmdepths')) =
         linkWithDf opts dfi finalProgLAR
-      finalProgLAR' = modProg modFinal
+      Prog dts blocks = modProg modFinal
       -- update the configuration with defunctionalization's usage information
       cbns    = Map.union (getCBNVars config) cbns'
       stricts = Map.union (getStricts config) strs'
       pmds    = Map.union (getPMDepths config) pmdepths'
       ars     = Map.union (getArities config) (Map.map length fsigs')
       config' = config{getCBNVars = cbns}{getStricts = stricts}{getPMDepths=pmds}{getArities=ars}
+      -- Do the enumeration transformation in the generated code.
+      (dts', eLAR') = (if canOptEnums opts then optEnumsKernel else id) (dts, eLAR)
+      finalProgLAR' = Prog dts' blocks 
   in  putOutput
-      (makeC finalProgLAR' eLAR config' (dfi, allImports, Map.empty) "")
+      (makeC finalProgLAR' eLAR' config' (dfi, allImports, Map.empty) "")
 
 -- | Prints a string to a file.
 putOutput :: String -> IO ()
