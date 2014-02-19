@@ -27,7 +27,8 @@ import Data.Map (unions)
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (ierr)
 import SLIC.DFI
-import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfiAppSigs, genModDFI, linkF)
+import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfiAppSigs, genModDFI, linkF,
+                          optEnums)
 import SLIC.Front.EvalFL (evalFL)
 import SLIC.Front.Preprocessor
 import SLIC.Front.Renamer
@@ -247,12 +248,13 @@ itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
       -- add function signatures for built-in and defunctionalization functions
       extSigs = unions [builtinFuncSigs, dfAppSigs, fSigs]
       allSigs = unions [extSigs, sigsF $ modProg p0Final]
+      dts     = progData $ modProg p3
+      -- calculate CIDs
       cidsExt   = unions (snd dfiExtInfo)
-      cidsLocal = calcCIDs dts'
+      cidsLocal = calcCIDs dts
       cids      = unions [cidsLocal, cidsExt, builtinCIDs]
       -- translates the ZOIL program to the LAR language      
       pLAR  = fromZOILtoLAR allSigs cids p3
-      Prog dts' _ = modProg pLAR    
       allImps  = unions $ map ideclINames $ modImports pLAR
       -- get the names of CAFs
       cafInfo = getCAFDcts p0Final
