@@ -34,7 +34,6 @@ import SLIC.Front.Preprocessor
 import SLIC.Front.Renamer
 import SLIC.Front.Typeclass (builtinTcInfo, inlineTcMethods)
 import SLIC.Front.TypeInfer
--- import SLIC.Front.TypeInfer2
 import SLIC.Distr.EvalErl
 import SLIC.ITrans.Eval (evalZOILCBN)
 import SLIC.ITrans.EvalEduction (evalZOILLazy)
