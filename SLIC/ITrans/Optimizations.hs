@@ -80,6 +80,8 @@ gatherUsed v defs used =
 
 -- * Enumerations optimization
 
+-- | Transforms data types having only nullary constructors into enumerations,
+--   isomorphic to integers.
 optimizeEnums :: ([Data], TEnv) -> ([Data], TEnv)
 optimizeEnums (dt, env) =
     let enums     = filter isEnum dt        
@@ -93,15 +95,11 @@ optimizeEnums (dt, env) =
     in  (dt', env')
 
 -- | Transform enumerations to numbers.
-optimizeEnumsP :: (Prog a, TEnv) -> (Prog a, TEnv)
-optimizeEnumsP (Prog dts defs, env) =
-  let (dts', env')  = optimizeEnums (dts, env)
-  in  (Prog dts' defs, env')
-
 optimizeEnumsMD :: ModD -> ModD
 optimizeEnumsMD (ModD modF dfi) =
-  let (p', env') = optimizeEnumsP (modProg modF, dfiTEnv dfi)
-  in  ModD modF{modProg=p'} dfi{dfiTEnv=env'}
+  let Prog dts defs = modProg modF
+      (dts', env') = optimizeEnums (dts, dfiTEnv dfi)
+  in  ModD modF{modProg=(Prog dts' defs)} dfi{dfiTEnv=env'}
 
 -- | Make 0-order data types equivalent to integers if the 'enum' mode is enabled.
 --   This optimization breaks encapsulation (it may know if an imported data type 
