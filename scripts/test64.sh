@@ -31,9 +31,15 @@ echo -n "Reverse: "
 export GICFLAGS="-gic-tc -mem 24428000000 -compact"
 echo -n "Ntak: "
 ./run_lar.sh Examples/NewBench/ntak.hs
+echo -n "Quick-sort: "
+./run_lar.sh Examples/NewBench/quick-sort.hs
+echo -n "Tree-sort: "
+./run_lar.sh Examples/NewBench/tree-sort.hs
 export GICFLAGS="-mem 24428000000 -compact"
 echo -n "Queens: "
 ./run_lar.sh Examples/NewBench/queens.hs
+echo -n "Queens-num: "
+./run_lar.sh Examples/NewBench/queens-num.hs
 
 if [ "$GHC" == "" ]
 then
@@ -50,9 +56,12 @@ $GHC -fforce-recomp -O3 Examples/NewBench/ntak.hs -o Ntak
 $GHC -fforce-recomp -O3 Examples/NewBench/primes.hs -o Primes
 $GHC -fforce-recomp -O3 Examples/NewBench/church.hs -o Church
 $GHC -fforce-recomp -O3 Examples/NewBench/queens.hs -o Queens
+$GHC -fforce-recomp -O3 Examples/NewBench/queens-num.hs -o Queens_num
+$GHC -fforce-recomp -O3 Examples/NewBench/quick-sort.hs -o Quick_sort
+$GHC -fforce-recomp -O3 Examples/NewBench/tree-sort.hs -o Tree_sort
 $GHC -fforce-recomp -O3 Examples/Data/reverse.hs -o Reverse
 echo Running...
-for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Reverse
+for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Queens_num Quick_sort Reverse Tree_sort
 do
     echo -n "$p: "
     TIME="\t%E" time ./$p
