@@ -599,7 +599,7 @@ prologue opts modName arityCAF =
                  ("unsigned long MAXMEM = DEFAULT_MAXMEM;"++).nl.
                  ("unsigned long MAXMEMSPACE = DEFAULT_MAXMEM / 2;"++).nl.
                  ("// Function prototypes for the allocator"++).nl.
-                 ("inline byte* MM_alloc(size_t bytes);"++).nl.
+                 ("static inline byte* MM_alloc(size_t bytes);"++).nl.
                  ("byte *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl
                CompileModule -> 
                  ("extern inline byte* MM_alloc(size_t bytes);"++).nl)
