@@ -39,3 +39,6 @@ distclean: clean
 
 haddock:
 	$(HADDOCK) Main.hs --optghc='-package ghc' -h -o doc/haddock
+
+doxygen:
+	doxygen
