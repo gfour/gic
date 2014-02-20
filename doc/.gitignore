@@ -2,4 +2,5 @@
 *
 # Except:
 !.gitignore
+!doxygen
 !haddock
