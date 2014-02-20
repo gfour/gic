@@ -129,7 +129,7 @@ typedef struct T_ {
 
 /* *********** Macros of the LAR API *********** */
 
-#define GETPREV(T0)   GETTPTR(T0->prev)
+#define GETPREV(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
 #define GETTPTR(p)    ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
 /* AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3) */
 #define ARITY(lar)    (unsigned char)(((uintptr_t)((TP_)lar)->prev) >> 56)
