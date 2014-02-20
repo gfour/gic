@@ -60,7 +60,7 @@ ERL_NIF_TERM enif_make_tuple3(ErlNifEnv* env, ERL_NIF_TERM e1, ERL_NIF_TERM e2, 
 
 #endif /* ERLANG_NIF_C */
 
-/// The free list that keeps all the context entries.
+/** The free list that keeps all the context entries. */
 struct free_list {
   int    remove;             // flag used for garbage collection
   struct free_list *next;    // the pointer to the next element in the list
@@ -78,7 +78,10 @@ static free_list** cat = 0;
 static free_list** catNextFreeID = 0;
 static int* catSize;
 
-/// Initialize the CAT free list.
+/** Initialize the CAT free list.
+    \param wh The warehouse ID.
+    \param maxSize The maximum warehouse size (before garbage collection is needed).
+*/
 void c_initCAT(int wh, int maxSize) {
   int i;
 
@@ -120,7 +123,10 @@ void c_initCAT(int wh, int maxSize) {
   
 }
 
-/// Returns the next free context ID.
+/** Returns the next free context ID that can be used by the allocator.
+    \param wh The warehouse ID.
+    \return The next free context ID.
+*/
 long c_getNextID(int wh) {
   free_list* tmp = catNextFreeID[wh];
   if (catNextFreeID[wh] == 0) {
@@ -131,7 +137,12 @@ long c_getNextID(int wh) {
   return (long)tmp;
 }
 
-/// Allocate a new context {i, warehouse, tail} in the CAT.
+/** Allocate a new context {i, warehouse, tail} in the CAT.
+    \param wh     The warehouse ID.
+    \param i      The intensional index to push into the context.
+    \param whPid  The warehouse Erlang PID.
+    \param tailId  The context ID of the tail.
+*/
 long c_allocCtxt(int wh, int i, ErlNifPid whPid, long tailId) {
   free_list *id = (free_list *)c_getNextID(wh);
 
@@ -152,7 +163,9 @@ long c_allocCtxt(int wh, int i, ErlNifPid whPid, long tailId) {
 }
 
 /** Marks a context ID as "live". Called by the garbage collector
-    each time it finds a Context that is visible from the roots. */
+    each time it finds a Context that is visible from the roots.
+    \param id The context ID.
+*/
 void c_markID(long id) {
   ((free_list*)id)->remove = 0;
 }
@@ -160,7 +173,9 @@ void c_markID(long id) {
 /** Recycles all elements of the list that have the 'remove' flag set.
     Should be used after using markID() to mark the elements to preserve.
     Scans the list to find blocks of contiguous elements that must be removed;
-    these blocks are moved to the end of the list and are considered free. */
+    these blocks are moved to the end of the list and are considered free.
+    \param wh The warehouse ID.
+*/
 void c_removeIDs(int wh) {
   // the last node that is not to be removed
   free_list *last_kept_node = 0;
@@ -290,7 +305,7 @@ static ERL_NIF_TERM initCAT_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
   return enif_make_int(env, 0);
 }
 
-/// Erlang wrapper for getNextID.
+/** Erlang wrapper for getNextID. */
 static ERL_NIF_TERM getNextID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   int wh;
   if (enif_get_int(env, argv[0], &wh)) {
@@ -299,7 +314,7 @@ static ERL_NIF_TERM getNextID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
   else { printf("ERROR: getNextID(), warehouse wh malformed\n"); exit(1); }
 }
 
-/// Erlang wrapper for markID.
+/** Erlang wrapper for markID. */
 static ERL_NIF_TERM markID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   long id;
   if (!enif_get_long(env, argv[0], &id)) {
@@ -309,7 +324,7 @@ static ERL_NIF_TERM markID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   return enif_make_int(env, 0);
 }
 
-/// Erlang wrapper for removeIDs.
+/** Erlang wrapper for removeIDs. */
 static ERL_NIF_TERM removeIDs_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   int wh;
   if (enif_get_int(env, argv[0], &wh)) {
