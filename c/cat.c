@@ -1,12 +1,15 @@
-/* 
+/** @file cat.c
+
    The Context Allocation Table (CAT) that each node has in distributed eduction.
 
-   A CAT is a linked list of context descriptors. To save space, no actual descriptor is
-   kept in each node, but its address in memory is used instead (cast to the long data type).
+   A CAT is a linked list of context descriptors. To save space, no actual
+   descriptor is kept in each node, but its address in memory is used instead
+   (cast to the long data type).
 
-   A CAT entry is a tuple {int remove, free_list *next, int i, ErlNifPid whPid, long *tailCtxtId}.
-   The first is the GC flag, the second is the linked list link, and the last 3 are the payload
-   (call index, warehouse PID, tail context).
+   A CAT entry is a tuple {int remove, free_list *next, int i, ErlNifPid whPid,
+   long *tailCtxtId}.
+   The first is the GC flag, the second is the linked list link, and the last 3
+   are the payload (call index, warehouse PID, tail context).
 
    The following functions are implemented:
    - initCAT(): initializes a CAT
@@ -45,7 +48,7 @@ extern void* getCtxt(long id);
 typedef struct
 {
     ERL_NIF_TERM pid;  /* internal, may change */
-}ErlNifPid;
+} ErlNifPid;
 
 int enif_get_int(ErlNifEnv* env , ERL_NIF_TERM i, int  *ip) { *ip=i; return 1; }
 int enif_get_local_pid(ErlNifEnv* env, ERL_NIF_TERM term, ErlNifPid* pid) { pid->pid = term; return 1; }
@@ -57,7 +60,7 @@ ERL_NIF_TERM enif_make_tuple3(ErlNifEnv* env, ERL_NIF_TERM e1, ERL_NIF_TERM e2, 
 
 #endif /* ERLANG_NIF_C */
 
-// The free list structure that keeps all the context entries.
+/// The free list that keeps all the context entries.
 struct free_list {
   int    remove;             // flag used for garbage collection
   struct free_list *next;    // the pointer to the next element in the list
@@ -68,13 +71,14 @@ struct free_list {
 
 typedef struct free_list free_list;
 
+/// The maximum allowed number for warehouses.
 #define MAX_WH 1000
 
 static free_list** cat = 0;
 static free_list** catNextFreeID = 0;
 static int* catSize;
 
-// Initialize the CAT free list
+/// Initialize the CAT free list.
 void c_initCAT(int wh, int maxSize) {
   int i;
 
@@ -116,6 +120,7 @@ void c_initCAT(int wh, int maxSize) {
   
 }
 
+/// Returns the next free context ID.
 long c_getNextID(int wh) {
   free_list* tmp = catNextFreeID[wh];
   if (catNextFreeID[wh] == 0) {
@@ -126,7 +131,7 @@ long c_getNextID(int wh) {
   return (long)tmp;
 }
 
-// Allocate a new context {i, warehouse, tail} in the CAT.
+/// Allocate a new context {i, warehouse, tail} in the CAT.
 long c_allocCtxt(int wh, int i, ErlNifPid whPid, long tailId) {
   free_list *id = (free_list *)c_getNextID(wh);
 
@@ -146,16 +151,16 @@ long c_allocCtxt(int wh, int i, ErlNifPid whPid, long tailId) {
   }
 }
 
-/* Marks a context ID as "not to remove". Called by the garbage collector
-   each time it finds a Context that is visible from the roots. */
+/** Marks a context ID as "live". Called by the garbage collector
+    each time it finds a Context that is visible from the roots. */
 void c_markID(long id) {
   ((free_list*)id)->remove = 0;
 }
 
-/* Recycles all elements of the list that have the 'remove' flag set.
-   Should be used after using markID() to mark the elements to preserve.
-   Scans the list to find blocks of contiguous elements that must be removed;
-   these blocks are moved to the end of the list and are considered free. */
+/** Recycles all elements of the list that have the 'remove' flag set.
+    Should be used after using markID() to mark the elements to preserve.
+    Scans the list to find blocks of contiguous elements that must be removed;
+    these blocks are moved to the end of the list and are considered free. */
 void c_removeIDs(int wh) {
   // the last node that is not to be removed
   free_list *last_kept_node = 0;
@@ -225,6 +230,9 @@ void c_removeIDs(int wh) {
 
 }
 
+/** Prints the CAT of a warehouse.
+    \param wh The warehouse ID.
+*/
 void c_printList(int wh) {
   free_list* tmp;
   for (tmp = cat[wh]; tmp!=0; tmp=tmp->next)
@@ -282,7 +290,7 @@ static ERL_NIF_TERM initCAT_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
   return enif_make_int(env, 0);
 }
 
-// Erlang wrapper for getNextID
+/// Erlang wrapper for getNextID.
 static ERL_NIF_TERM getNextID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   int wh;
   if (enif_get_int(env, argv[0], &wh)) {
@@ -291,7 +299,7 @@ static ERL_NIF_TERM getNextID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
   else { printf("ERROR: getNextID(), warehouse wh malformed\n"); exit(1); }
 }
 
-// Erlang wrapper for markID
+/// Erlang wrapper for markID.
 static ERL_NIF_TERM markID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   long id;
   if (!enif_get_long(env, argv[0], &id)) {
@@ -301,7 +309,7 @@ static ERL_NIF_TERM markID_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   return enif_make_int(env, 0);
 }
 
-// Erlang wrapper for removeIDs
+/// Erlang wrapper for removeIDs.
 static ERL_NIF_TERM removeIDs_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   int wh;
   if (enif_get_int(env, argv[0], &wh)) {
@@ -324,7 +332,7 @@ ERL_NIF_INIT(warehouse, nif_funcs, NULL, NULL, NULL, NULL)
 
 #endif /* ERLANG_NIF_C */
 
-/* main() function for testing */
+/** The main() function can be run to test the allocator. */
 #ifndef ERLANG_NIF_C
 int main(int argc, char **argv) {
   int i;

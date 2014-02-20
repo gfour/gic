@@ -32,7 +32,8 @@ erl-gic: gic
 
 clean:
 	$(RM) *.hi *.o SLIC/*.hi SLIC/*.o SLIC/*/*.hi SLIC/*/*.o SLIC/*/*/*.hi SLIC/*/*/*.o libcat.so main.c dfmod.c main-link.c main.erl main.beam gc.beam warehouse.beam warehouse_redis.beam test.maude a.out gmon.out *~ *.da graph.dot doc/haddock/* Examples/Modules/Example*/*.dfi Examples/Modules/Example*/*.ii Examples/Modules/Example*/*.o
- 
+	$(RM) -r doc/doxygen/* 
+
 distclean: clean
 	$(RM) gic
 
