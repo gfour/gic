@@ -72,7 +72,7 @@ renV m (QN _ f) (QN _ v) = QN (Just m) (f++"_"++v)
 renB :: QName -> Depth -> QName -> QName
 renB (QN m f) (Just d) (QN m' v) = 
   if m==m' then
-     QN m (f++"_LetJust"++(show d)++"_"++v)
+     QN m (f++"_Let"++(show d)++"_"++v)
   else
     ierr $ "Module consistency check failed in renB for : "++f++" and "++v
 renB _ Nothing _ = ierr "renB: error renaming with depth=Nothing"
