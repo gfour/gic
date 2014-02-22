@@ -158,3 +158,14 @@ typedef struct T_ {
 #define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
 #define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
 
+/* ********** Garbage collection ********** */
+
+#define ISFORWARDED(ar)   ((((uintptr_t)(ar->prev)) & 0x1) == 0x1)
+#define FORWARDED(p)       ((TP_)(((uintptr_t)p) | 0x1))
+#define CLEAR_GC(ar)       (((uintptr_t)(ar->prev)) & (~0x1))
+
+// TODO: these are redefined above, merge
+#define AR_a(p)           ((char)(((uintptr_t)p) >> 56))
+#define AR_n(p)           ((char)((((uintptr_t)p) >> 48) & 0xffff))
+#define AR_SIZE(ar)       ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
+#define IS_THUNK(p)       ((((uintptr_t)p) & 0x4) != (uintptr_t)NULL)
