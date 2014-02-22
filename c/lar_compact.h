@@ -40,6 +40,9 @@
 #warning Garbage collection is disabled for this build.
 #endif /* GC */
 
+/** Set macro used by LAR-specific C code (such as the garbage collector). */
+#define LAR_COMPACT
+
 // Types
 
 typedef unsigned char byte;
@@ -124,16 +127,9 @@ typedef struct T_ {
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
     { ARINFO(n_arity, n_nesting, T0), { __VA_ARGS__ } }))
 
-// Embeds arity/nesting/previous-pointer information in a single word.
-#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | (((uintptr_t)n_nesting) << 48) | (((uintptr_t)prev) & PTRMASK))
-
 /* *********** Macros of the LAR API *********** */
 
-#define GETPREV(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
 #define GETTPTR(p)    ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
-/* AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3) */
-#define ARITY(lar)    (unsigned char)(((uintptr_t)((TP_)lar)->prev) >> 56)
-#define NESTING(lar)  (unsigned char)((((uintptr_t)((TP_)lar)->prev) & 0xffffffffffff) >> 48)
 #define ARGC(arg)                      ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
 #define ARGS_FUNC(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)(~1)))
 
@@ -160,12 +156,26 @@ typedef struct T_ {
 
 /* ********** Garbage collection ********** */
 
-#define ISFORWARDED(ar)   ((((uintptr_t)(ar->prev)) & 0x1) == 0x1)
+#define IS_FORWARDED(ar)   ((((uintptr_t)(ar->prev)) & 0x1) == 0x1)
 #define FORWARDED(p)       ((TP_)(((uintptr_t)p) | 0x1))
 #define CLEAR_GC(ar)       (((uintptr_t)(ar->prev)) & (~0x1))
 
+/** Embeds arity/nesting/previous-pointer information in a single word.
+    \param n_arity   the arity of the LAR
+    \param n_nesting the nesting depth of the LAR
+    \param prev      the access-link pointer to the parent LAR
+    \return          the constructed "prev" field
+*/
+#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | (((uintptr_t)n_nesting) << 48) | (((uintptr_t)prev) & PTRMASK))
+/** Returns the access-link pointer of a LAR. */
+#define GETPREV(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
+#define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
+#define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xffff))
+
 // TODO: these are redefined above, merge
-#define AR_a(p)           ((char)(((uintptr_t)p) >> 56))
-#define AR_n(p)           ((char)((((uintptr_t)p) >> 48) & 0xffff))
-#define AR_SIZE(ar)       ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
-#define IS_THUNK(p)       ((((uintptr_t)p) & 0x4) != (uintptr_t)NULL)
+/* AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3) */
+#define ARITY(lar)    AR_a(((TP_)lar)->prev)
+#define NESTING(lar)  AR_n(((TP_)lar)->prev)
+
+#define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
+#define IS_THUNK(p)   ((((uintptr_t)p) & 0x4) != (uintptr_t)NULL)

@@ -659,15 +659,8 @@ mainFunc env opts mainNesting modules =
       tab.("// initial activation record"++).nl.
       tab.("TP_ T0=NULL;"++).nl.
       (case gc of
-          LibGC -> id
-          SemiGC ->
-            tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl.
-            if compact then
-              id
-            else
-              tab.("#ifdef GC"++).nl.
-              tab.("t0->magic = MAGIC;"++).nl.
-              tab.("#endif"++).nl).
+          LibGC  -> id
+          SemiGC -> tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.

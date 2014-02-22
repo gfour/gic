@@ -11,6 +11,9 @@
 #include <time.h>
 #include "gc.h"
 
+/** Set macro used by LAR-specific C code (such as the garbage collector). */
+#define LAR
+
 // Types
 
 typedef unsigned char byte;
@@ -32,7 +35,6 @@ typedef struct Susp {
 typedef Susp (*LarArg)(TP_);
 
 typedef struct T_ {
-  unsigned long magic;   // the 'magic' marker for GC
   TP_ prev;              // link to parent LAR (also GC forwarded pointer)
   byte arity;            // the number of arguments in this LAR
   byte nesting;          // the number of nesting links
@@ -45,7 +47,6 @@ typedef struct T_ {
 /** A LAR holding a number of thunks and a number of nested fields. */
 #define LAR_STRUCT(n_arity, n_nesting)             \
   struct {                                         \
-    unsigned long magic;                           \
     TP_ prev;                                      \
     byte arity, nesting;                           \
     LarArg the_args[n_arity];                      \
@@ -126,7 +127,6 @@ typedef struct T_ {
       lar->prev = T0;				                \
       lar->arity = n_arity;                                     \
       lar->nesting = n_nesting;                                 \
-      lar->magic = MAGIC;                                       \
       AR_CAT(AR_COPY_, n_arity)(lar, 0, ## __VA_ARGS__);        \
       AR_CAT(AR_CLEAR_, n_nesting)(lar, 0);                     \
       lar;                                                      \
@@ -137,7 +137,7 @@ typedef struct T_ {
     \param ... The thunks passed to the called function. */
 #define AR_S(n_arity, n_nesting, ...)                   \
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
-    { MAGIC, T0, n_arity, n_nesting, { __VA_ARGS__ } }))
+    { T0, n_arity, n_nesting, { __VA_ARGS__ } }))
 
 /* *********** Macros of the LAR API *********** */
 
@@ -182,3 +182,14 @@ typedef struct T_ {
 /** Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p)      ((Susp) {c, p})
 #endif /* USE_TAGS */
+
+/* ********** Garbage collection ********** */
+
+/** For compatibility with the "compact" representation. */
+#define ARINFO(n_arity, n_nesting, prev) prev
+#define FORWARDED(p)     ({ printf("FORWARDED(p) missing"); exit(-1); (TP_)0; })
+#define IS_FORWARDED(ar) ({ printf("IS_FORWARDED(ar) missing"); exit(-1); (TP_)0; })
+#define ARGS_FLAG(x, T)  ARGS(x, T)
+
+#define AR_SIZE(ar)   (sizeof(TP_) + 2 + (ar->arity*(sizeof(LarArg)+sizeof(Susp))) + (ar->nesting*sizeof(TP_)))
+#define IS_THUNK(p)      ({ printf("IS_THUNK(ar) missing"); exit(-1); 0; })
