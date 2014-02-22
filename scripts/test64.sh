@@ -3,6 +3,12 @@
 # Test script for the greedy tests.
 # 
 
+function testRun {
+  ./run_lar.sh $1
+  # Run using the local LTO-enabled Clang build.
+  # ./compile-clang-flto.sh && ./a.out
+}
+
 echo Compiling+running with GIC...
 if [ "$CC" == "" ]
 then
@@ -14,32 +20,32 @@ export CFLAGS2="-Wno-#warnings"
 export GICFLAGS="-gic-tc -mem 220000000 -compact"
 ulimit -s 262144
 echo -n "Ack: "
-./run_lar.sh Examples/NewBench/ack.hs
+testRun Examples/NewBench/ack.hs
 echo -n "Collatz: "
-./run_lar.sh Examples/Data/collatz.hs
+testRun Examples/Data/collatz.hs
 echo -n "Fib: "
-./run_lar.sh Examples/NewBench/fib.hs
+testRun Examples/NewBench/fib.hs
 echo -n "Primes: "
-./run_lar.sh Examples/NewBench/primes.hs
+testRun Examples/NewBench/primes.hs
 echo -n "Church: "
-./run_lar.sh Examples/NewBench/church.hs
+testRun Examples/NewBench/church.hs
 export GICFLAGS="-gic-tc -mem 2442800000 -compact"
 echo -n "Digits: "
-./run_lar.sh Examples/Data/digits_of_e1.hs
+testRun Examples/Data/digits_of_e1.hs
 echo -n "Reverse: "
-./run_lar.sh Examples/Data/reverse.hs
+testRun Examples/Data/reverse.hs
 export GICFLAGS="-gic-tc -mem 24428000000 -compact"
 echo -n "Ntak: "
-./run_lar.sh Examples/NewBench/ntak.hs
+testRun Examples/NewBench/ntak.hs
 echo -n "Quick-sort: "
-./run_lar.sh Examples/NewBench/quick-sort.hs
+testRun Examples/NewBench/quick-sort.hs
 echo -n "Tree-sort: "
-./run_lar.sh Examples/NewBench/tree-sort.hs
+testRun Examples/NewBench/tree-sort.hs
 export GICFLAGS="-mem 24428000000 -compact"
 echo -n "Queens: "
-./run_lar.sh Examples/NewBench/queens.hs
+testRun Examples/NewBench/queens.hs
 echo -n "Queens-num: "
-./run_lar.sh Examples/NewBench/queens-num.hs
+testRun Examples/NewBench/queens-num.hs
 
 if [ "$GHC" == "" ]
 then
