@@ -178,7 +178,8 @@ instance PPrint a => PPrint (ExprFL a) where
          pprintDefs dep bs (spaces (spc+2)).
          spaces spc.("} in  "++).pprintPrec p e)
    pprintPrec p (LamF d v e) =
-     lparen.("\\"++).pprint v.spaces 1.lcurl.shows d.rcurl.spaces 1.hyph.rangle.spaces 1.
+     let dep = case d of Nothing -> id; Just i -> shows i
+     in  lparen.("\\"++).pprint v.spaces 1.lcurl.dep.rcurl.spaces 1.hyph.rangle.spaces 1.
      pprintPrec p e.rparen
 
 instance PPrint a => PPrint (PatFL a) where
