@@ -10,7 +10,8 @@ import SLIC.DFI (DFI, getMainDepth)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
-import SLIC.Types (CstrName, IIndex, PPrint(..), Value(..), pprintIdx, pprintList)
+import SLIC.Types (Counter, CstrName, IIndex, PPrint(..), Value(..),
+                   pprintIdx, pprintList)
 
 -- | Values.
 type ValueT = Value Token
@@ -125,9 +126,9 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
             [ Msg dest iID (token', (src, Branch 0, Nothing):dchain) Demand ]
       Just (VarT iID) ->
         [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
-      Just (BVarT iID (Just d, _)) ->
+      Just (BVarT iID (Just (c, _), _)) ->
         let (_, nested):_ = token
-        in  [ Msg dest iID (getN nested d, (src, Branch 0, Nothing):dchain) Demand]
+        in  [ Msg dest iID (getN nested c, (src, Branch 0, Nothing):dchain) Demand]
       Just (ActualsT acts) ->
         let (i, nested):token' = token
             b = calcIdxBranch i acts
@@ -176,11 +177,11 @@ sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) =
           in  Msgs [Msg dest cID (token, (src', Branch b, Nothing):dchain') Demand]
         Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
           Msgs [ Msg dest src' (token, dchain') (Response val) ]
-        Just (CaseT (Just d, _) _ pats) | (brn==0) ->
+        Just (CaseT (Just (cID, _), _) _ pats) | (brn==0) ->
           let VT (c, cToken) = val
               (brn', patID) = findPat c 1 pats
               (i, nested'):token' = token
-              updNested = setN nested' d cToken
+              updNested = setN nested' cID cToken
               color' = ((i, updNested):token',
                         (src', Branch brn', Just updNested):dchain')
           in  Msgs [ Msg dest patID color' Demand ]
@@ -338,7 +339,7 @@ checkResponseActuals i acts =
 -- * Auxiliary functions
 
 -- | Get token \#d from a nested field. The location must already be filled in.
-getN :: Nested -> Int -> Token
+getN :: Nested -> Counter -> Token
 getN (N nested) d =
   let nL = length nested
   in  if d<nL then
@@ -349,7 +350,7 @@ getN (N nested) d =
         ierr $ "getN: no position d="++(show d)++", nested has length "++(show nL)
 
 -- | Sets the token at position \#d in a nested field. The location must be empty.
-setN :: Nested -> Int -> Token -> Nested
+setN :: Nested -> Counter -> Token -> Nested
 setN (N nested) d cToken =
   let nL = length nested
   in  if d<nL then

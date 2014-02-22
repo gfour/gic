@@ -132,7 +132,7 @@ transFL p =
       transE vs (SFL.XF (T.V v)) =
         let vn = (T.lName v)
         in  if vn `elem` vs then (V vn) else (FApp vn [])
-      transE _ (SFL.XF (T.BV v (Just cId, _))) =
+      transE _ (SFL.XF (T.BV v (Just (cId, _), _))) =
         let bvName = T.lName v
         in  -- ugly hack to find the position of a constructor component
             case elemIndexR '_' (Data.Sequence.fromList bvName) of
@@ -151,7 +151,8 @@ transFL p =
               Just cStr -> BApp cStr el'
               Nothing   -> error $ "missing bop "++(T.pprint cn "")
       transE vs (SFL.ConstrF qn el) = CApp (T.lName qn) (map (transE vs) el)
-      transE vs (SFL.CaseF (Just cid, _) e _ brs) = Case cid (transE vs e) (map (transB vs) brs)
+      transE vs (SFL.CaseF (Just (cid, _), _) e _ brs) =
+        Case cid (transE vs e) (map (transB vs) brs)
       transE _ _ = error "transE: unhandled construct"
       transB vs (SFL.PatF (SFL.SPat c _) e) = (T.lName c, transE vs e)
   in  (map transD fdefs)++builtinDefsFL

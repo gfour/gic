@@ -124,12 +124,32 @@ pprintIdx :: IIndex -> ShowS
 pprintIdx (m, i) = ("("++).(m++).(":"++).shows i.(")"++)
 
 -- | The nesting depth of a bound variable in pattern matching.
-type Depth = Maybe Int
+type DepthID = Int
+type Depth = Maybe DepthID
 
--- | Spacing function (for depths).
-spacing :: Depth -> ShowS
-spacing (Nothing) = id 
-spacing (Just d)  = spaces d
+-- | A counter showing the unique position of a case/let/lambda expression
+--   inside a function.
+type Counter = Int
+
+-- | The location of a case/let expression.
+type Loc = Maybe (Counter, DepthID)
+
+-- | Pretty printer for expression locations.
+pprintLoc :: Loc -> ShowS
+pprintLoc Nothing = ("??"++)
+pprintLoc (Just (c, d)) = ("#"++).shows c.("/"++).shows d
+
+-- | Spacing function (for depths in locations).
+spacing :: Loc -> ShowS
+spacing (Nothing)     = id 
+spacing (Just (_, d)) = spaces d
+
+-- | A \"case ... of\" location inside an enclosing function.
+type CaseLoc = (Loc, QName)
+
+-- | The default value for code where no enumeration has taken place yet.
+noCaseLoc :: CaseLoc 
+noCaseLoc = (Nothing, noEFunc)
 
 -- | The indexes of strict formals for a function signature.
 type StrictInds = [Int]
@@ -239,14 +259,6 @@ paramsOf qn fsigs =
     Just ps -> ps
     Nothing -> ierr $ "No parameters found in signatures table for "++(qName qn)
 
--- | A \"case ... of\" location: inside a case expression of some
---   depth and inside an enclosing function.
-type CaseLoc = (Depth, QName)
-
--- | The default value for code where no enumeration has taken place yet.
-noCaseLoc :: CaseLoc 
-noCaseLoc = (Nothing, noEFunc)
-
 -- | Program variables.
 data V = V QName           -- ^ normal (free or local) variable
        | BV QName CaseLoc    -- ^ pattern-bound variable
@@ -254,7 +266,8 @@ data V = V QName           -- ^ normal (free or local) variable
              
 instance PPrint V where
   pprint (V v) = pprint v
-  pprint (BV v (d, f)) = pprint v.("{"++).pprint f.(":"++).shows d.("}"++)
+  pprint (BV v (loc, f)) =
+    pprint v.("{"++).pprint f.(":"++).pprintLoc loc.("}"++)
   
 -- | Modifies the name of a variable.
 modifyV :: (QName -> QName) -> V -> V

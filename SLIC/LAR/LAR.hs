@@ -362,7 +362,7 @@ mkCFuncBody config env f e =
       patD  = case Data.Map.lookup f pmds of
                 Just d -> d
                 Nothing -> ierr $ "Function "++(qName f)++" has no depth in:\n"++(pprintPD pmds "")
-      patDS = showsDep $ Just patD
+      patDS = shows patD
   in  -- keep the nested pointers in the heap if the function is data,
       -- else keep it in the stack (important for GC)
       -- allocate space for patDepth * suspensions
@@ -429,11 +429,11 @@ mkCExp env config (LARCall n acts) =
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)
   else makeActs n acts env config
-mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
+mkCExp env config (CaseL (d@(Just (counter, _)), efunc) e pats) =
   let matchedExpr = mkCExp env config e
       cases       = foldDot mkCPat pats      
       opts        = getOptions config
-      dS          = shows depth
+      dS          = shows counter
       defaultCase = tab.("default: printf(\"Pattern matching on "++).pprint e.
                     (" failed: constructor %d encountered.\\n\", CONSTR(cl["++).
                     dS.("])); exit(0);"++)
@@ -465,7 +465,7 @@ mkCExp env config (CaseL (d@(Just depth), efunc) e pats) =
   in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
       -- TODO: eliminate this when all patterns are nullary constructors
       -- (or are used as such, see 'bindsVars')
-      tab.mkNESTED (optGC opts) compact efunc depth argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
+      tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
       logDict opts d.
       -- if debug mode is off, optimize away constructor choice when there is
       -- only one pattern (will segfault/misbehave if the constructor
@@ -487,11 +487,11 @@ mkCExp _ _ e@(CaseL (Nothing, _) _ _) =
   ierr $ "mkCExp: found non-enumerated case expression: "++(pprint e "")
 mkCExp _ _ (ConstrL _) =
   ierr "LAR: ConstrL can only occur as the first symbol of a definition"
-mkCExp _ config (BVL v (Just depth, fname)) =
+mkCExp _ config (BVL v (Just (counter, _), fname)) =
   let gc = optGC $ getOptions config
       compact = optCompact $ getOptions config
       argsN = getFuncArity fname (getArities config)
-  in  pprint v.("("++).mkNESTED gc compact fname depth argsN.(")"++)
+  in  pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
 mkCExp _ _ e@(BVL _ (Nothing, _)) =
     ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
 

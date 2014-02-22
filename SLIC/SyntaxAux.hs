@@ -115,15 +115,15 @@ concatProgs progs =
 concatCode :: [Mod (Prog a)] -> (Prog a)
 concatCode mods = concatProgs (map modProg mods)
 
--- | Pretty printer that takes a "depth" arg to insert whitespace.
-pprint_tab :: (PPrint a) => Depth -> a -> ShowS
-pprint_tab d pat = (case d of Just i -> spaces (2*i); _ -> id).pprint pat
+-- | Pretty printer that takes a \"location\" arg to insert whitespace.
+pprint_tab :: (PPrint a) => Loc -> a -> ShowS
+pprint_tab l pat = (case l of Just (_, d) -> spaces (2*d); _ -> id).pprint pat
 
 -- | Pretty printer of semicolon-terminated tabbed lists. Used for patterns.
-pprint_tab_l :: (PPrint a) => Depth -> [a] -> ShowS
+pprint_tab_l :: (PPrint a) => Loc -> [a] -> ShowS
 pprint_tab_l _ []         = ("{- nothing -}"++).nl
-pprint_tab_l d [pat]      = pprint_tab d pat.nl
-pprint_tab_l d (pat : ps) = pprint_tab d pat.semi.nl.pprint_tab_l d ps
+pprint_tab_l l [pat]      = pprint_tab l pat.nl
+pprint_tab_l l (pat : ps) = pprint_tab l pat.semi.nl.pprint_tab_l l ps
 
 -- | Shows a bound variable name.
 pprintBV :: QName -> ShowS

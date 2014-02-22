@@ -148,10 +148,10 @@ findCBNComps defs =
 findCBNbvs :: QName -> ExprF -> Map QName Int
 findCBNbvs _ (XF _) = empty
 findCBNbvs _ (ConstrF _ _) = empty
-findCBNbvs f (CaseF (d, _) _ _ pats) =
+findCBNbvs f (CaseF loc _ _ pats) =
   let findBVUses (PatF (SPat _ bs) e) = 
         let bvUses  =
-              fromList $ zip bs $ List.map (\v->countVarUses (BV v (d, f)) e) bs
+              fromList $ zip bs $ List.map (\v->countVarUses (BV v loc) e) bs
             bvInner = findCBNbvs f e
         in  unionWith max bvUses bvInner
   in  unionsWith max (List.map findBVUses pats)

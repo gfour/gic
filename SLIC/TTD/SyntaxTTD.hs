@@ -59,8 +59,8 @@ instance PPrint ProgT where
 instance PPrint InstrT where
   pprint (CallT qOp iID) = pprint qOp.pprintInstrPtr iID
   pprint (VarT iID) = ("var"++).pprintInstrPtr iID
-  pprint (BVarT iID (Just d, _)) =
-    ("bvar"++).pprintInstrPtr iID.("{"++).shows d.("}"++)
+  pprint (BVarT iID (Just (c, _), _)) =
+    ("bvar"++).pprintInstrPtr iID.("{"++).shows c.("}"++)
   pprint (ActualsT acts) =
     let aux (iidx, iID) = ("({"++).pprintIdx iidx.("}: "++).
                           pprintInstrPtr iID.(")"++).nl

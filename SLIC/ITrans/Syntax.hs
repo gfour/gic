@@ -67,13 +67,13 @@ instance PPrint ExprH where
    pprint (FH NOp vn ps)   = pprint vn.pprintList space ps
    pprint (FH qOp vn ps)   =
        pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
-   pprint (CaseH (d, _) e pats) =
+   pprint (CaseH (loc, _) e pats) =
       let pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatH c0 e0 b0) =
-            ("\n  "++).spacing d.("| "++).pprint c0.(" -> "++).pprint e0.
+            ("\n  "++).spacing loc.("| "++).pprint c0.(" -> "++).pprint e0.
             pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).shows d.("}"++).
+      in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
           pprintPats pats
                 
 instance PPrint DefH where
@@ -112,13 +112,13 @@ instance PPrint ExprZ where
    pprint (ConZ cn el) = prettyConst 0 cn el
    pprint (FZ NOp e) = pprint e
    pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
-   pprint (CaseZ (d, _) e pats) =
+   pprint (CaseZ (loc, _) e pats) =
       let pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatZ c0 e0 b0) =
-            nl.(" "++).spacing d.(" | "++).pprint c0.(" -> "++).
+            nl.(" "++).spacing loc.(" | "++).pprint c0.(" -> "++).
             pprint e0.pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).shows d.("}"++).
+      in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
           pprintPats pats
    pprint (ConstrZ c) = pprintTH c
 

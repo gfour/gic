@@ -67,12 +67,10 @@ renV m (QN _ f) (QN _ v) = QN (Just m) (f++"_"++v)
   -- else ierr "renV: what to do with the imports?"
 
 -- | The renaming function for binding names.
---renB :: QName -> Depth -> QName -> QName
---renB f d v = f++"_Let"++(show d)++"_"++v
-renB :: QName -> Depth -> QName -> QName
-renB (QN m f) (Just d) (QN m' v) = 
+renB :: QName -> Loc -> QName -> QName
+renB (QN m f) (Just (c, _)) (QN m' v) = 
   if m==m' then
-     QN m (f++"_Let"++(show d)++"_"++v)
+     QN m (f++"_Let"++(show c)++"_"++v)
   else
     ierr $ "Module consistency check failed in renB for : "++f++" and "++v
 renB _ Nothing _ = ierr "renB: error renaming with depth=Nothing"
@@ -103,15 +101,14 @@ enumLetLamE (st, ConF c el) =
 enumLetLamE (st, ConstrF c el) =
   let (st2, el2) = procWithState enumLetLamE st el
   in  (st2, ConstrF c el2)
-enumLetLamE (st, LetF d defs e) =
-  let d' = (fst st) + 1
-      st1 = (d', snd st)
+enumLetLamE (st, LetF loc defs e) =
+  let c' = (fst st) + 1
+      st1 = (c', snd st)
       (stE, e') = enumLetLamE (st1, e)
       (st', defs') = procWithState enumLetLamD stE defs            
-  in  if d==Nothing then        
-        (st', LetF (Just d') defs' e')
-      else
-        ierr "the renamer found already enumerated let"
+  in  case loc of
+        Nothing -> (st', LetF (Just (c', c')) defs' e')
+        _ -> ierr "the renamer found already enumerated let"
 enumLetLamE (st, CaseF d e b pats) =
   let enumLetLamP :: ((Int, Int), PatF) -> ((Int, Int), PatF)
       enumLetLamP (st1, PatF sPat e1) =

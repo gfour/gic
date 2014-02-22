@@ -14,11 +14,11 @@ module SLIC.LAR.LARGraph (logConstr, logDict, logGraphStart, logGraphEnd,
 import SLIC.AuxFun (ierr)
 import SLIC.Constants (nl, tab)
 import SLIC.State (Options(optVerbose))
-import SLIC.Types (CstrName, Depth, PPrint(pprint))
+import SLIC.Types (CstrName, Loc, PPrint(pprint))
 
 -- | Logs a dictionary connection.
-logDict :: Options -> Depth -> ShowS
-logDict opts (Just depth) =
+logDict :: Options -> Loc -> ShowS
+logDict opts (Just (_, depth)) =
   if optVerbose opts then
     tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, cl["++).shows depth.("].ctxt); "++)
   else id

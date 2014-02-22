@@ -34,8 +34,8 @@ import SLIC.SyntaxAux
 import SLIC.SyntaxFL
 import SLIC.Types
 
--- | A bound variable aliased to a constructor variable of some depth.
-type Alias = (QName, (QName, (Int, QName)))
+-- | A bound variable aliased to a constructor variable of some counter/depth.
+type Alias = (QName, (QName, CaseLoc))
 -- | Aliased variables of the program become bound variables of a specific name,
 --   depth, and enclosing function.
 type BVInfo = [Alias]
@@ -99,7 +99,7 @@ newDataDefsDC (DConstr c dTypes _) =
           let (pn, [px]) = projCSig c i
               cPat = SPat c bvs
               selBody func arg =
-                CaseF (Just 0, func) (XF (V arg)) underscoreVar
+                CaseF (Just (0, 0), func) (XF (V arg)) underscoreVar
                 [ PatF cPat (XF (V (bvs !! i))) ]
               recFields =
                 case sel of
@@ -112,7 +112,8 @@ newDataDefsDC (DConstr c dTypes _) =
                         ux1 = procLName (++"$_1") updName
                         updFields = (take i bvs) ++ [ux1] ++ (drop (i+1) bvs)
                         updater  = DefF updName [Frm ux0 s, Frm ux1 s]
-                                   (CaseF (Just 0, updName) (XF (V ux0)) underscoreVar
+                                   (CaseF (Just (0, 0), updName)
+                                    (XF (V ux0)) underscoreVar
                                     [PatF cPat
                                      (FF (V c) (map (\v->XF(V v)) updFields))]
                                    )
@@ -207,21 +208,21 @@ procBV m (Prog dts defs) =
 --   by different case expressions that are at the same level but under different
 --   branches (and are therefore mutually exclusive).
 procBVE :: MName -> QName -> BVInfo -> Int -> ExprF -> ExprF
-procBVE m func al d (CaseF dep e b pats) =
+procBVE m func al d (CaseF loc e b pats) =
   let procBVPat (PatF (SPat c vs) eP) = 
-        let al' = getBVAliasesPat func (d+1) c vs
+        let al' = getBVAliasesPat loc' c vs
             vs' = cArgsC c (length vs)
         in  PatF (SPat c vs') (procBVE m func (al++al') (d+1) eP)
-      case' =
-        CaseF (Just $ d+1, func) (procBVE m func al d e) b (map procBVPat pats)
-  in  case dep of
+      loc'  = (Just (d+1, d+1), func)
+      case' = CaseF loc' (procBVE m func al d e) b (map procBVPat pats)
+  in  case loc of
         (Nothing, _) -> case'
-        (Just i, ef) ->
-          if (i == d+1) || (ef == noEFunc) || (ef == func) then 
+        (Just (_, d'), ef) ->
+          if (d' == d+1) || (ef == noEFunc) || (ef == func) then 
             case'
           else
-            if i /= d+1 then
-              ierr $ "preprocessor: found pattern matching with depth already set, value="++(show i)++", but it was going to be "++(show (d+1))
+            if d' /= d+1 then
+              ierr $ "preprocessor: found pattern matching with depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
             else if ef /= noEFunc && ef /= func then
                    ierr $ "preprocessor: found pattern matching with different enclosing function already set: "++(qName ef)++" /= "++(qName func)
                  else
@@ -244,16 +245,16 @@ procBVEV :: BVInfo -> QName -> V
 procBVEV al v =
   case (filter (\(v', _) -> (v'==v)) al) of
     [] -> V v
-    [(_, (cVar, (dep, func)))] -> BV cVar (Just dep, func)
+    [(_, (cVar, loc))] -> BV cVar loc
     _ -> error $ "found more than one pattern bindings for bound variable: "++(pprint v "")
 
 -- | In a pattern that binds variables, it returns a set of aliases
 --   for the bound variables. Underscore binders are ignored.
 --   For example, pattern 'Cons x y' of depth 1 produces the following mapping:
 --   [(x, (cons_0, 1)), (y, (cons_1, 1))]
-getBVAliasesPat :: QName -> Int -> CstrName -> [QName] -> [Alias]
-getBVAliasesPat func curDepth c vs = 
-  let cVars = map (\v -> (v, (curDepth, func))) (cArgsC c (length vs))
+getBVAliasesPat :: CaseLoc -> CstrName -> [QName] -> [Alias]
+getBVAliasesPat loc c vs = 
+  let cVars = map (\v -> (v, loc)) (cArgsC c (length vs))
       aliases = zip vs cVars
   in  filter (\(v, _)->v/=underscoreVar) aliases
 

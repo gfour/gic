@@ -533,7 +533,7 @@ genDfInfo opts defs =
 genDfModFinal :: Options -> DFI -> (ModF, ProgInfo)
 genDfModFinal opts dfi =
   let dfModF = constrToFuncs opts $ genDfMod (dfFlags opts) dfi
-      Prog dts defs = modProg dfModF
+      Prog _ defs = modProg dfModF
       -- -- do the -enum transformation in the generated code
       -- (dts', env') = error "(if canOptEnums opts then optEnumsKernel else id) (dts, env)"
       -- -- finalProgLAR' = Prog dts' blocks 
@@ -545,8 +545,10 @@ genDfModFinal opts dfi =
 genAppCBNs :: [DefF] -> CBNVars
 genAppCBNs defs =
   let cbnDef (DefF f _ (ConstrF _ _)) = (f, [])
-      cbnDef (DefF f fs (CaseF (Just 0, _) (XF (V _)) _ _)) = (f, frmsToNames fs)
-      cbnDef def@(DefF _ _ _) = ierr $ "cbnDef: this doesn't look like defunctionalization code: "++(pprint def "")
+      cbnDef (DefF f fs (CaseF (Just (0, 0), _) (XF (V _)) _ _)) =
+        (f, frmsToNames fs)
+      cbnDef def@(DefF _ _ _) =
+        ierr $ "cbnDef: strange defunctionalization code: "++(pprint def "")
   in  Map.fromList $ List.map cbnDef defs
   
 -- | Generate strictness information for defunctionalization code. If full
@@ -562,7 +564,7 @@ genAppStricts opts defs =
 genAppPMDepths :: [DefF] -> PMDepths
 genAppPMDepths defs =
   let pmdDef (DefF f _ (ConstrF _ _)) = (f, 0)
-      pmdDef (DefF f _ (CaseF (Just 0, _) (XF (V _)) _ _)) = (f, 1)
+      pmdDef (DefF f _ (CaseF (Just (0, 0), _) (XF (V _)) _ _)) = (f, 1)
       pmdDef def@(DefF _ _ _) = ierr $ "pmdDef: this doesn't look like defunctionalization code: "++(pprint def "")
   in  Map.fromList $ List.map pmdDef defs
 
@@ -583,7 +585,7 @@ mkApplyFuns (ndf, strictness) dfcs extApps =
             frms     = List.map (\v->Frm v strictness) frmNames
             appFunc  = genNApp ar
         in  DefF appFunc frms
-            (CaseF (Just 0, appFunc) (XF (V (genCl ar))) underscoreVar pats)
+            (CaseF (Just (0, 0), appFunc) (XF (V (genCl ar))) underscoreVar pats)
       -- Create dispatchers for inhabited closure residual types.
       aux 0  = 
         ierr "mkApplyFuns: cannot create a dispatcher for 0 parameters"
@@ -625,7 +627,7 @@ type PatGen = QName -> [QName] -> DFC -> PatF
 mkPatFull :: PatGen
 mkPatFull app frms (DFC c ar _ (f, _)) =
   let bns = cArgsC c ar
-      bvs = List.map (\v->XF $ BV v (Just 0, app)) bns
+      bvs = List.map (\v->XF $ BV v (Just (0, 0), app)) bns
   in  PatF (SPat c bns) (FF (V f) (bvs ++ (List.map (\v->XF $ V v) frms)))
 
 -- | Take a list of apply_T()-formals and a closure constructor and generate
@@ -633,7 +635,7 @@ mkPatFull app frms (DFC c ar _ (f, _)) =
 mkPatPartial :: PatGen
 mkPatPartial app frms (DFC c ar _ (f, _)) =
   let bns  = cArgsC c ar
-      bvs  = List.map (\v->XF $ BV v (Just 0, app)) bns
+      bvs  = List.map (\v->XF $ BV v (Just (0, 0), app)) bns
   in  PatF (SPat c bns) $
       ConstrF (genNC f (ar + length frms)) (bvs ++ (List.map (\v->XF $ V v) frms))
 

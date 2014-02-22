@@ -64,16 +64,16 @@ instance PPrint ExprL where
     pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
     pprint (LARC cn el) = prettyConst 0 cn el
     pprint (ConstrL c) = pprint c
-    pprint (BVL v (d, f)) = pprintBVD v d.("{"++).pprint f.("}"++)
-    pprint (CaseL (d, _) e pats) =
+    pprint (BVL v (loc, f)) = pprintBVC v loc.("{"++).pprint f.("}"++)
+    pprint (CaseL (loc, _) e pats) =
         let pprintPats []             = id
             pprintPats (pat : ps)     = showPat pat.pprintPats ps
             showPat (PatL c0 e0 b)= 
                 nl.(" "++).
                 (if b then ("#"++) else spaces 1).
-                spacing d.("| "++).pprint c0.(" -> "++).pprint e0.
+                spacing loc.("| "++).pprint c0.(" -> "++).pprint e0.
                 pprintBinds b
-        in  ("case "++).pprint e.(" of{"++).showsDep d.("}"++).
+        in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
             pprintPats pats
             
 -- | Pretty printer for LAR modules. The typing environment is also given.
