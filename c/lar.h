@@ -91,7 +91,7 @@ typedef struct T_ {
 /** The C prototype of a LAR function definition. */
 #define FUNC(x)       Susp x(TP_ T0)
 /** The intensional "actuals" operator. */
-#define ACTUAL        T0 = (TP_)(GETPREV(T0))
+#define ACTUAL        T0 = (TP_)(AR_prev(T0))
 
 /** Return the value of a thunk (forcing it if it is not evaluated).
     \param x The position of the thunk in the LAR.
@@ -142,7 +142,7 @@ typedef struct T_ {
 /* *********** Macros of the LAR API *********** */
 
 /** The previous LAR link. */
-#define GETPREV(T0)      T0->prev
+#define AR_prev(T0)      T0->prev
 /** Reads a pointer from a field. */
 #define GETPTR(p)        p
 /** The arity of a LAR. */

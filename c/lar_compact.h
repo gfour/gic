@@ -95,7 +95,7 @@ typedef struct T_ {
 
 #define VAR(x)        FUNC(x)
 #define FUNC(x)       Susp x(TP_ T0)
-#define ACTUAL        T0 = (TP_)(GETPREV(T0))
+#define ACTUAL        T0 = (TP_)(AR_prev(T0))
 
 #define GETARG(x, T)  ({                  \
       if (ARGS_FLAG(x, T) != NULL) {	  \
@@ -168,7 +168,7 @@ typedef struct T_ {
 */
 #define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | (((uintptr_t)n_nesting) << 48) | (((uintptr_t)prev) & PTRMASK))
 /** Returns the access-link pointer of a LAR. */
-#define GETPREV(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
+#define AR_prev(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
 #define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
 #define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xffff))
 
