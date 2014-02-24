@@ -9,6 +9,16 @@ function testRun {
   # ./compile-clang-flto.sh && ./a.out
 }
 
+function testCache {
+    echo $1 vs $2
+    local CFILE=$1.cache.txt
+    echo > CFILE
+    echo $1 >> CFILE
+    valgrind --tool=cachegrind --main-stacksize=262144000 ./$1 >> $CFILE 2>&1
+    echo $2 >> CFILE
+    valgrind --tool=cachegrind --main-stacksize=262144000 ./$2 >> $CFILE 2>&1
+}
+
 echo Compiling+running with GIC...
 if [ "$CC" == "" ]
 then
@@ -21,31 +31,43 @@ export GICFLAGS="-gic-tc -mem 220000000 -compact"
 ulimit -s 262144
 echo -n "Ack: "
 testRun Examples/NewBench/ack.hs
+cp a.out gic_ack
 echo -n "Collatz: "
 testRun Examples/Data/collatz.hs
+cp a.out gic_collatz
 echo -n "Fib: "
 testRun Examples/NewBench/fib.hs
+cp a.out gic_fib
 echo -n "Primes: "
 testRun Examples/NewBench/primes.hs
+cp a.out gic_primes
 echo -n "Church: "
 testRun Examples/NewBench/church.hs
+cp a.out gic_church
 export GICFLAGS="-gic-tc -mem 2442800000 -compact"
 echo -n "Digits: "
 testRun Examples/Data/digits_of_e1.hs
+cp a.out gic_digits_of_e1
 echo -n "Reverse: "
 testRun Examples/Data/reverse.hs
+cp a.out gic_reverse
 export GICFLAGS="-gic-tc -mem 24428000000 -compact"
 echo -n "Ntak: "
 testRun Examples/NewBench/ntak.hs
+cp a.out gic_ntak
 echo -n "Quick-sort: "
 testRun Examples/NewBench/quick-sort.hs
+cp a.out gic_quick_sort
 echo -n "Tree-sort: "
 testRun Examples/NewBench/tree-sort.hs
+cp a.out gic_tree_sort
 export GICFLAGS="-mem 24428000000 -compact"
 echo -n "Queens: "
 testRun Examples/NewBench/queens.hs
+cp a.out gic_queens
 echo -n "Queens-num: "
 testRun Examples/NewBench/queens-num.hs
+cp a.out gic_queens_num
 
 if [ "$GHC" == "" ]
 then
@@ -72,3 +94,17 @@ do
     echo -n "$p: "
     TIME="\t%E" time ./$p
 done
+
+echo Testing cache behavior:
+testCache Ack gic_ack
+testCache Collatz gic_collatz
+testCache Digits_of_e1 gic_digits_of_e1
+testCache Fib gic_fib
+testCache Ntak gic_ntak
+testCache Primes gic_primes
+testCache Church gic_church
+testCache Queens gic_queens
+testCache Queens_num gic_queens_num
+testCache Quick_sort gic_quick_sort
+testCache Tree_sort gic_tree_sort
+testCache Reverse gic_reverse
