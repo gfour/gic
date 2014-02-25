@@ -12,10 +12,10 @@ function testRun {
 function testCache {
     echo $1 vs $2
     local CFILE=$1.cache.txt
-    echo > CFILE
-    echo $1 >> CFILE
+    echo > $CFILE
+    echo $1 >> $CFILE
     valgrind --tool=cachegrind --main-stacksize=262144000 ./$1 >> $CFILE 2>&1
-    echo $2 >> CFILE
+    echo $2 >> $CFILE
     valgrind --tool=cachegrind --main-stacksize=262144000 ./$2 >> $CFILE 2>&1
 }
 
