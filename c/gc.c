@@ -168,7 +168,7 @@ static TP_ MM_forward (TP_ lar)
   space += sz;
   // printf("Copied the LAR (%ld bytes) to %p\n", sz, fw_lar);
 
-  lar->prev = ARINFO(lar_a, lar_n, FORWARDED(fw_lar));
+  lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(fw_lar));
 
 #if GC_STATS
   lar_count++;
@@ -192,7 +192,7 @@ static void MM_scan (TP_ lar) {
   TP_ lar_prev = GETTPTR(lar->prev);
   // TODO: can this happen in a single byte-update?
   if (MM_heap_ptr(lar_prev))
-    lar->prev = ARINFO(lar_a, lar_n, FORWARDED(MM_forward(lar_prev)));
+    lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(MM_forward(lar_prev)));
 
   int n;
   for (n=0; n<lar_a; n++) {

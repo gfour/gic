@@ -157,8 +157,7 @@ typedef struct T_ {
 /* ********** Garbage collection ********** */
 
 #define IS_FORWARDED(ar)   ((((uintptr_t)(ar->prev)) & 0x1) == 0x1)
-#define FORWARDED(p)       ((TP_)(((uintptr_t)p) | 0x1))
-#define CLEAR_GC(ar)       (((uintptr_t)(ar->prev)) & (~0x1))
+#define FORWARDED_ADDR(p)  ((TP_)(((uintptr_t)p) & ~1))
 
 /** Embeds arity/nesting/previous-pointer information in a single word.
     \param n_arity   the arity of the LAR
@@ -172,8 +171,6 @@ typedef struct T_ {
 #define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
 #define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xffff))
 
-// TODO: these are redefined above, merge
-/* AR info field (prev): arity (63...57), nesting (56...48), pointer (47...3) */
 #define ARITY(lar)    AR_a(((TP_)lar)->prev)
 #define NESTING(lar)  AR_n(((TP_)lar)->prev)
 
