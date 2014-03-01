@@ -23,7 +23,7 @@ cp SLIC/LAR/*.hs $TARGET_DIR/SLIC/LAR
 cp SLIC/Maude/*.hs $TARGET_DIR/SLIC/Maude
 cp SLIC/TTD/*.hs $TARGET_DIR/SLIC/TTD
 cp SLIC/Front/LLifter/*.hs $TARGET_DIR/SLIC/Front/LLifter
-cp c/gc.h c/gc.c c/cat.c c/lar.h c/lar_opt.h c/gic_builtins.h \
+cp c/gc.h c/gc.c c/cat.c c/lar.h c/lar_opt.h c/lar_compact.h c/gic_builtins.h \
    $TARGET_DIR/c
 cp maude/full-maude26.maude maude/eduction.maude \
    $TARGET_DIR/maude
