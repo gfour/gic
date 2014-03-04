@@ -88,7 +88,7 @@ msTEnv methods = fromList $ map (\((f, fs), t)->(f, (t, length fs))) methods
 
 -- | All the built-in type class declarations.
 builtinTcDecls :: [TcDecl]
-builtinTcDecls = [ tc_Monad, tc_Num, tc_Show ]
+builtinTcDecls = [ tc_Monad, tc_Num, tc_Ord, tc_Show ]
 
 -- | The built-in 'Num' type class.
 tc_Num :: TcDecl
@@ -100,6 +100,18 @@ tc_Num = TcDecl "Num" v_a
          , (("abs", ["x"]), Tf tv_a tv_a)
          , (("signum", ["x"]), Tf tv_a tv_a)
          , (("fromInteger", ["x"]), Tf tInteger tv_a)
+         ]
+
+-- | The built-in 'Ord' type class.
+tc_Ord :: TcDecl
+tc_Ord = TcDecl "Ord" v_a
+         [ (("compare", ["x", "y"]), Tf tv_a (Tf tv_a tInt))
+         , (("(<)",  ["x", "y"]), Tf tv_a (Tf tv_a tBool))
+         , (("(>=)", ["x", "y"]), Tf tv_a (Tf tv_a tBool))
+         , (("(>)",  ["x", "y"]), Tf tv_a (Tf tv_a tBool))
+         , (("(<=)", ["x", "y"]), Tf tv_a (Tf tv_a tBool))
+         , (("max",  ["x", "y"]), Tf tv_a (Tf tv_a tv_a))
+         , (("min",  ["x", "y"]), Tf tv_a (Tf tv_a tv_a))
          ]
 
 -- | The built-in 'Show' type class.
@@ -126,10 +138,13 @@ tc_Monad =
 
 -- | Built-in type class instances.
 builtinTcInsts :: [TcInstSig]
-builtinTcInsts = [ tc_Num_Int, tc_Show_Int ]
+builtinTcInsts = [ tc_Num_Int, tc_Ord_Int, tc_Show_Int ]
 
 -- | Built-in instance of 'Num' for 'Int'.
 tc_Num_Int :: TcInstSig       ; tc_Num_Int = (("Num", tInt), bModN)
+
+-- | Built-in instance of 'Ord' for 'Int'.
+tc_Ord_Int :: TcInstSig       ; tc_Ord_Int = (("Ord", tInt), bModN)
 
 -- | Built-in instance of 'Show' for 'Int'.
 tc_Show_Int :: TcInstSig      ; tc_Show_Int = (("Show", tInt), bModN)
