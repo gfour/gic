@@ -16,10 +16,10 @@ import Literal
 import Name (nameOccName)
 import TyCon (tyConName)
 import Type (isTyVar, pprType)
-import Var (varName)
+import Var (varName, varType)
 import System.Exit (ExitCode(ExitSuccess), exitWith)
 
-import Data.Map (empty, elems)
+import Data.Map (empty, elems, fromList, mapKeys)
 import SLIC.AuxFun (ierr, trace2)
 import SLIC.Constants
 import SLIC.Driver (processFL)
@@ -39,14 +39,43 @@ transfCore dfs binds tyCons =
       datatypes = map (transTyCon dfs) tyCons
       fm        = (defaultMod, modNoPath)
       exports   = empty
-      tAnnot    = empty
+      tAnnot    = getVTypesCore dfs defaultMod binds
       tcs       = TcInfo [] []     -- TODO: handle type classes in this back-end
-      moduleFL  = (Mod fm exports [] (Prog datatypes defs)) tAnnot tcs
-  in  -- trace2 (showPPr dfs binds) (
-      -- trace2 "========================" (
+      moduleFL  = (Mod fm exports [] (Prog datatypes defs)) tAnnot tcs      
+  in  -- trace2 (showPPr dfs binds) $
+      -- trace2 "========================" $
       trace2 (pprint moduleFL "") $
       processFL defaultOptions [] moduleFL >>
       exitWith ExitSuccess
+
+-- | Reads the type annotations from a GHC Core program. Takes the
+--   compilation flags, the current module name, and the Core program.
+--   Returns the typing environment.
+getVTypesCore :: DynFlags -> MName -> CoreProgram -> TEnv
+getVTypesCore dfs mn binds =
+  let v2qn f = mapGHCtoGICName $ stringToQName $ showPPr dfs f
+      vtBinder f ar = (v2qn f, (transT dfs (varType f), ar))
+      vtBindExpr (f, e) = (vtBinder f (Just $ lamArity e)):(vtExpr e)
+      vtBind (NonRec b e) = vtBindExpr (b, e)
+      vtBind (Rec bs) = concatMap vtBindExpr bs
+      vtExpr (Var _) = []
+      vtExpr (Lit _) = []
+      vtExpr (App e a) = (vtExpr e)++(vtExpr a)
+      vtExpr (Lam b e) = (vtBinder b Nothing):(vtExpr e)
+      vtExpr (Let bind e) = (vtBind bind)++(vtExpr e)
+      vtExpr (Case e bnd _ alts) =
+        (vtExpr e)++[vtBinder bnd Nothing]++(concatMap vtAlt alts)
+      vtExpr (Cast _ _) = error "getVTypesCore: Casts are not supported."
+      vtExpr (Coercion _) = error "getVTypesCore: Coercions are not supported."
+      vtExpr (Tick _ e) = vtExpr e
+      vtExpr (Type _) = [] -- error "'Type's are not supported by the Core interface."
+      vtAlt (_, bs, eAlt) = (map (\b->vtBinder b Nothing) bs)++(vtExpr eAlt)
+      lamArity (Lam _ e) = 1 + (lamArity e)
+      lamArity _ = 0
+      tEnv = fromList $ concatMap vtBind binds
+      fillMName qn@(QN (Just _) _) = qn
+      fillMName (QN Nothing  f) = QN (Just mn) f
+  in  mapKeys fillMName tEnv
 
 -- | Translates GHC Core bindings to FL definitions.
 transBind :: DynFlags -> CoreBind -> [DefF]
@@ -59,7 +88,7 @@ transBind dfs bind =
       body (Lam _ eL) = body eL
       body e = e
       transBind' (b, e) =
-        let bQN = (stringToQName $ showPPr dfs b)
+        let bQN = stringToQName $ showPPr dfs b
         in  DefF bQN (namesToFrms (frms b e) False) (transExpr dfs (body e))
   in  case bind of
         NonRec b e -> [transBind' (b, e)]
@@ -309,8 +338,6 @@ const_GHC_Types_True :: QName
 const_GHC_Types_True = QN (Just "GHC.Types") "True"
 const_GHC_Types_False :: QName
 const_GHC_Types_False = QN (Just "GHC.Types") "False"
-
--- * GHC interfaces
 
 -- | Runs a source file through GHC, until GHC Core is emitted.
 coreGHC :: GhcMonad m => DynFlags -> FPath -> [MName] -> [MName] ->
