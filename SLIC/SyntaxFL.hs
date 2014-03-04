@@ -201,8 +201,7 @@ cBuiltinOps = elems cOps
 
 -- | Built-in functions and constructors of GHC.
 cBuiltinFuncsGHC :: [QName]
-cBuiltinFuncsGHC = [ QN bMod "I#", QN bMod "unpackCString#"
-                   , QN bMod "$fShowInt", QN bMod "$fNumInt"] 
+cBuiltinFuncsGHC = [ QN bMod "I#", QN bMod "unpackCString#" ] 
                    
 -- | The built-in functions that are implemented directly by the back-end.
 cBuiltinFuncsC :: [QName]
