@@ -34,7 +34,8 @@ import DynFlags (ExtensionFlag(..), defaultFatalMessager, defaultFlushOut, xopt_
 import DynFlags (ExtensionFlag(..), defaultLogAction, xopt_set)
 #endif /* __GLASGOW_HASKELL__ version check */
 import Outputable (Outputable, ppr)
-import SLIC.Front.GHCBackEnd (coreGHC, getVTypes, showPPr, tcGHC, transfCore)
+import SLIC.Front.GHCFrontEnd (getVTypes, showPPr, tcGHC)
+import SLIC.Front.GHCBackEnd (coreGHC, transfCore)
 #endif /* USE_GHC */
 
 import Data.List (isPrefixOf, map)
@@ -275,8 +276,9 @@ runThroughGHC mNames fPath mg opts =
         NoGHC -> ierr "runThroughGHC: the GHC API is not selected"
         GHCTc ->
           do (dflags, tMod) <- wrapper tcGHC
+             -- let tEnv = getVTypes dflags (tm_typechecked_source tMod)
              -- putStrLn "---------------------------"
-             -- putStr   (pprintE (getVTypes dflags (tm_typechecked_source tMod)) "")
+             -- putStr   (pprintE tEnv "")
              -- putStrLn "---------------------------"
              -- force the result (and therefore type checking)
              return $ (length (showPPr dflags tMod)) >= 42
