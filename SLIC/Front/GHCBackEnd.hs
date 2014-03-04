@@ -1,10 +1,9 @@
--- | The GHC back-end connector. To be used together with a source tree of GHC.
+-- | The GHC back-end that translates GHC Core to FL.
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.Front.GHCBackEnd (coreGHC, getVTypes, showPPr, tcGHC, transfCore) where
+module SLIC.Front.GHCBackEnd (coreGHC, transfCore) where
 
-import Bag (bagToList)
 import BasicTypes (isBanged)
 import CorePrep (corePrepPgm)
 import CoreSyn (Alt, Bind(..), CoreBind, CoreBndr, CoreExpr, CoreProgram, 
@@ -14,18 +13,17 @@ import FastString (unpackFS)
 import GHC 
 import Id (idName)
 import Literal
-import Name (nameOccName, occNameString)
-import Outputable (Outputable, SDoc, ppr, showSDoc)
+import Name (nameOccName)
 import TyCon (tyConName)
-import Type (Type, isTyVar, pprType, splitFunTys)
-import Var (varName, varType)
+import Type (isTyVar, pprType)
+import Var (varName)
 import System.Exit (ExitCode(ExitSuccess), exitWith)
 
-import Data.List ((\\))
-import Data.Map (empty, elems, fromList)
-import SLIC.AuxFun (ierr, pathOf, trace2)
+import Data.Map (empty, elems)
+import SLIC.AuxFun (ierr, trace2)
 import SLIC.Constants
 import SLIC.Driver (processFL)
+import SLIC.Front.GHCFrontEnd (showPPr, showSDoc', transT)
 import SLIC.State (defaultOptions)
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -128,18 +126,6 @@ transPat _ (DEFAULT, _, _) = error "GHC Core DEFAULT branches not yet supported"
 nm :: DynFlags -> Id -> String
 nm dfs id0 = showPPr dfs (nameOccName (idName id0))
 
--- | Calls the GHC pretty printer for an Outputable argument.
-showPPr :: DynFlags -> (Outputable a) => a -> String
-showPPr dfs s = showSDoc' dfs (ppr s)
-
-showSDoc' :: DynFlags -> Outputable.SDoc -> String
--- showSDoc' :: DynFlags -> (Outputable a) => a -> String
-#if __GLASGOW_HASKELL__ >= 706
-showSDoc' dfs s = showSDoc dfs s
-#else
-showSDoc' _ s = showSDoc s
-#endif
-
 -- | Identifies the constructor of an expression, used for debugging.
 ident :: forall a. CoreExpr -> a
 ident (Var _) = error "@@Var@@"
@@ -229,19 +215,6 @@ transTyCon dfs tyCon =
               ierr $ "TODO: found strict components for data type: " ++ (qName dCName)
             else DConstr dCName dCArgs Nothing
   in  Data dtName as dcons
-
--- | Translates a GHC type to a GIC type.
-transT :: DynFlags -> Type.Type -> SLIC.Types.Type
-transT dfs ty =
-  let (tArgs, tRes) = splitFunTys ty
-      ftRes = Tg (T (stringToQName $ showPPr dfs tRes))     -- TODO: does this work with h.o. types?
-  in  case tArgs of
-        [] -> ftRes
-        _  -> let aux [] = ftRes
-                  aux (t:ts) = Tf (transT dfs t) (aux ts)
-              in  aux tArgs
-
-      -- case (\a-> FTypeS (showPPr dfs a)) (\a-> FTypeS (showPPr dfs a))
 
 -- | Processes pattern matching expressions to make them more FL-like:
 --   removes scrutinee binders, translates boolean pattern matching 
@@ -339,34 +312,6 @@ const_GHC_Types_False = QN (Just "GHC.Types") "False"
 
 -- * GHC interfaces
 
--- | Runs a source file through the GHC parser/type inference engine.
-tcGHC :: GhcMonad m => DynFlags -> FPath -> [MName] -> [MName] ->
-         m (DynFlags, TypecheckedModule)
-tcGHC _ file mNames mg =
-  do let mn = if length mNames == 1 then (mNames!!0) else "Main"
-     let fPath = pathOf file
-     let fNames = map (\m->fPath++[dirSeparator]++m++".hs") mg
-     -- TODO: handle whole program compilation here
-     targets <- mapM (\f -> guessTarget f Nothing) fNames
-     setTargets targets
-     dflags <- getSessionDynFlags
-     -- TODO: is this needed?
-     let inclPaths' = (includePaths dflags)++[fPath]
-     _ <- setSessionDynFlags dflags{includePaths=inclPaths'}{hscOutName="/dev/null"}
-     let ctxtMods = map (\x -> IIDecl $ (simpleImportDecl . mkModuleName) x)
-                    ((\\) mg [mn])
-     setContext ctxtMods
-     Succeeded <- load LoadAllTargets
-     modSum <- getModSummary $ mkModuleName mn
-     p <- GHC.parseModule modSum
-     tMod <- typecheckModule p
-     -- d <- desugarModule t
-     -- l <- loadModule d
-     -- n <- getNamesInScope
-     -- c <- return $ coreModule d
-     dflagsFinal <- getSessionDynFlags
-     return $ (dflagsFinal, tMod)
-
 -- | Runs a source file through GHC, until GHC Core is emitted.
 coreGHC :: GhcMonad m => DynFlags -> FPath -> [MName] -> [MName] ->
            m (DynFlags, IO CoreProgram)
@@ -381,23 +326,3 @@ coreGHC dflags file _ _ =
 #endif       
        dflagsFinal <- getSessionDynFlags
        return $ (dflagsFinal, corePrep)
-
--- | Reads type information contained in source typechecked by GHC.
-getVTypes :: DynFlags -> TypecheckedSource -> TEnv
-getVTypes dflags prog =
-  let progBinds = map unLoc $ bagToList prog
-      vt ab@(AbsBinds {}) =
-        let binds = map unLoc $ bagToList $ abs_binds ab
-        in  concatMap vtBind binds
-      vt fb@(FunBind {}) = vtBind fb
-      vt _ = error "vt: unknown binding"          
-      vtBind fb@(FunBind {}) =
-        let -- function name
-            f    = unLoc $ fun_id fb
-            f_vn = varName f
-            f_qn = QN Nothing (occNameString (nameOccName f_vn))
-            f_t  = transT dflags (varType f)
-            fI   = (f_qn, (f_t, Just 0))
-        in  [fI]
-      vtBind _ = ierr "vtBind: unknown binding"
-  in  fromList $ concatMap vt progBinds
