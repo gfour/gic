@@ -44,11 +44,12 @@ transfCore dfs binds tyCons =
       tAnnot    = empty
       tcs       = TcInfo [] []     -- TODO: handle type classes in this back-end
       moduleFL  = (Mod fm exports [] (Prog datatypes defs)) tAnnot tcs
-  in  trace2 (pprint moduleFL "") (
+  in  -- trace2 (showPPr dfs binds) (
+      -- trace2 "========================" (
+      trace2 (pprint moduleFL "") $
       processFL defaultOptions [] moduleFL >>
       exitWith ExitSuccess
-      )
-      
+
 -- | Translates GHC Core bindings to FL definitions.
 transBind :: DynFlags -> CoreBind -> [DefF]
 transBind dfs bind =
@@ -69,7 +70,7 @@ transBind dfs bind =
 -- | Translates a GHC Core expression to an FL expression.
 transExpr :: DynFlags -> CoreExpr -> ExprF
 transExpr dfs (Var vId) = 
-  case nm dfs vId of
+  case showPPr dfs vId of
     "True"  -> ConF (CN CTrue) []
     "False" -> ConF (CN CFalse) []
     iName   ->
@@ -77,7 +78,6 @@ transExpr dfs (Var vId) =
       in  --    "GHC.Show.$fShowInt" -> error "$fShowInt in var"
           if isConstr iName then ConstrF iNameQN []
           else XF (V iNameQN)
-           
 transExpr _ (Lit literal) = 
   let mInt i = ConF (LitInt i) []
   in  case literal of
@@ -104,7 +104,7 @@ transExpr dfs (Case e bnd _ alts) =
       pats = map (transPat dfs) (filter notDEFAULT alts)
       -- keepPat (PatF _ _ (FF (V (QN Nothing "patError")) _)) = False
       keepPat _ = True
-      bndName = stringToQName $ nm dfs bnd
+      bndName = stringToQName $ showPPr dfs bnd
   in  -- if take 4 bndName == noBinder then 
         CaseF (Nothing, noEFunc) e' bndName (filter keepPat pats)
       -- else
@@ -119,7 +119,7 @@ transExpr _ (Coercion _) = error "Coercion!"
 transPat :: DynFlags -> Alt CoreBndr -> PatF
 transPat dfs (DataAlt altCon, bvs, e) =
   let cstr' = stringToQName $ showPPr dfs (dataConName altCon)
-      bvs'  = map (stringToQName.nm dfs) bvs      
+      bvs'  = map (stringToQName.showPPr dfs) bvs      
   in  PatF (SPat cstr' bvs') (transExpr dfs e)
 transPat _ (LitAlt _, _, _) = error "GHC Core literal patterns not yet supported"
 transPat _ (DEFAULT, _, _) = error "GHC Core DEFAULT branches not yet supported"
@@ -160,20 +160,34 @@ flatten dfs (App f (Type _)) args = flatten dfs f args
 flatten dfs (App f e) args = flatten dfs f (e:args)
 flatten dfs (Var f) args = 
   let transArgs = map (transExpr dfs) args
-      appName = nm dfs f
-      appNameQN = stringToQName appName
+      appNameS = nm dfs f                 -- simple name
+      appNameF = showPPr dfs f            -- full name
+      appNameQN = mapGHCtoGICName $ stringToQName appNameF
       ff f' args' = FF (V f') args'
-  in  if appName `elem` cBuiltinOps then
-        -- TODO: drop dictionary arguments
-        if appName `elem` (elems cOps) then
-          ConF (CN $ cOpForStr appName) transArgs
+  in  if appNameS `elem` cBuiltinOps then
+        if appNameS `elem` (elems cOps) then
+          case (length args) of
+            2 -> ConF (CN $ cOpForStr appNameS) transArgs
+            3 -> -- Constant operator taking dictionary, examine.
+              case args !! 0 of
+                Var arg0 ->
+                  let arg0Name = showPPr dfs arg0
+                      intClasses = ["GHC.Num.$fNumInt", "GHC.Classes.$fOrdInt"]
+                  in  if arg0Name `elem` intClasses then
+                        ConF (CN $ cOpForStr appNameS) (drop 1 transArgs)
+                      else
+                        ierr $ "Unknown first parameter: "++arg0Name
+                _ -> ierr $ "Cannot handle first parameter to constant "++appNameS
+            _ -> ierr $ "Unknown GHC built-in: "++appNameS
         else
-          error $ "missing implementation of builtin op "++appName++" with arity: "++(show (length transArgs))
-      else if appName `elem` (map lName cBuiltinFuncs) then
-             case appName of
-               "I#" -> if length args /= 1 then 
-                         error "I# should be applied to one integer"
-                       else transArgs !! 0 -- ConF (pprint (transArgs !! 0) "") []
+          error $ "missing implementation of builtin op "++appNameS++
+                  " with arity: "++(show (length transArgs))
+      else if appNameS `elem` (map lName cBuiltinFuncs) then
+             case appNameS of
+               "I#" ->
+                 if length args /= 1 then 
+                   error "I# should be applied to one integer"
+                 else transArgs !! 0 -- ConF (pprint (transArgs !! 0) "") []
                -- "unpackCString#" -> 
                --   case args of {
                --     [Lit (MachStr str)] -> mkStrList $ unpackFS str ;
@@ -184,12 +198,19 @@ flatten dfs (Var f) args =
                "show" -> ff appNameQN [last transArgs]
                "runMainIO" -> ff appNameQN transArgs
                _   ->
-                 error $ "GHCBackend: builtin function not supported: "++appName
-           else if isConstr appName then
+                 error $ "GHCBackend: builtin function not supported: "++appNameS
+           else if isConstr appNameS then
                   ConstrF appNameQN transArgs
                 else
                   ff appNameQN transArgs
 flatten _ x _ = ierr $ "error flattening -- "++ ident x
+
+-- | Maps functions of the GHC API to functions implemented by GIC.
+mapGHCtoGICName :: QName -> QName
+mapGHCtoGICName (QN (Just "GHC.Show") "show") = bf_show
+mapGHCtoGICName (QN (Just "System.IO") "putStrLn") = bf_putStrLn
+mapGHCtoGICName (QN (Just "GHC.TopHandler") "runMainIO") = bf_runMainIO
+mapGHCtoGICName qn = qn
 
 -- | Translates a GHC TyCon to a data definition.
 transTyCon :: DynFlags -> TyCon -> Data
