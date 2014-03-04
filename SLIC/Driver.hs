@@ -85,7 +85,7 @@ processFL opts dfis inputModule =
       let p0Lifted = lambdaLiftMod opts p0Checked
       -- final preprocessed source
       let p1 = p0Lifted
-      -- _ <- (putStrLn ("-- * Original") >> printLn inputModules)
+      -- _ <- (putStrLn ("-- * Original") >> printLn inputModule)
       -- _ <- (putStrLn ("-- * Syntax") >> printLn p0Syntax)
       -- _ <- (putStrLn ("-- * Alpha") >> printLn p0Alpha)
       -- _ <- (putStrLn ("-- * Lifted") >> printLn p0Lifted)
