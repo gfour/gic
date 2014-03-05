@@ -31,42 +31,54 @@ export GICFLAGS="-gic-tc -mem 220000000 -compact"
 ulimit -s 262144
 echo -n "Ack: "
 testRun Examples/NewBench/ack.hs
+cp main.c gic_ack.c
 cp a.out gic_ack
 echo -n "Collatz: "
 testRun Examples/Data/collatz.hs
+cp main.c gic_collatz.c
 cp a.out gic_collatz
 echo -n "Fib: "
 testRun Examples/NewBench/fib.hs
+cp main.c gic_fib.c
 cp a.out gic_fib
 echo -n "Primes: "
 testRun Examples/NewBench/primes.hs
+cp main.c gic_primes.c
 cp a.out gic_primes
 echo -n "Church: "
 testRun Examples/NewBench/church.hs
+cp main.c gic_church.c
 cp a.out gic_church
 export GICFLAGS="-gic-tc -mem 2442800000 -compact"
 echo -n "Digits: "
 testRun Examples/Data/digits_of_e1.hs
+cp main.c gic_digits_of_e1.c
 cp a.out gic_digits_of_e1
 echo -n "Reverse: "
 testRun Examples/Data/reverse.hs
+cp main.c gic_reverse.c
 cp a.out gic_reverse
 export GICFLAGS="-gic-tc -mem 24428000000 -compact"
 echo -n "Ntak: "
 testRun Examples/NewBench/ntak.hs
+cp main.c gic_ntak.c
 cp a.out gic_ntak
 echo -n "Quick-sort: "
 testRun Examples/NewBench/quick-sort.hs
+cp main.c gic_quick_sort.c
 cp a.out gic_quick_sort
 echo -n "Tree-sort: "
 testRun Examples/NewBench/tree-sort.hs
+cp main.c gic_tree_sort.c
 cp a.out gic_tree_sort
 export GICFLAGS="-mem 24428000000 -compact"
 echo -n "Queens: "
 testRun Examples/NewBench/queens.hs
+cp main.c gic_queens.c
 cp a.out gic_queens
 echo -n "Queens-num: "
 testRun Examples/NewBench/queens-num.hs
+cp main.c gic_queens_num.c
 cp a.out gic_queens_num
 
 if [ "$GHC" == "" ]
