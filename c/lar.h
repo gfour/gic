@@ -186,10 +186,10 @@ typedef struct T_ {
 /* ********** Garbage collection ********** */
 
 /** For compatibility with the "compact" representation. */
-#define ARINFO(n_arity, n_nesting, prev) prev
-#define FORWARDED(p)     ({ printf("FORWARDED(p) missing"); exit(-1); (TP_)0; })
-#define IS_FORWARDED(ar) ({ printf("IS_FORWARDED(ar) missing"); exit(-1); (TP_)0; })
-#define ARGS_FLAG(x, T)  ARGS(x, T)
+#define ARINFO(a, n, prev) (prev)
+#define FORWARDED_ADDR(p)  (TP_)({ printf("FORWARDED(p) missing"); exit(-1); (TP_)0; })
+#define IS_FORWARDED(ar)   ({ printf("IS_FORWARDED(ar) missing"); exit(-1); (TP_)0; })
+#define ARGS_FLAG(x, T)    ARGS(x, T)
 
 #define AR_SIZE(ar)   (sizeof(TP_) + 2 + (ar->arity*(sizeof(LarArg)+sizeof(Susp))) + (ar->nesting*sizeof(TP_)))
-#define IS_THUNK(p)      ({ printf("IS_THUNK(ar) missing"); exit(-1); 0; })
+#define IS_THUNK(p)       ({ printf("IS_THUNK(ar) missing"); exit(-1); 0; })
