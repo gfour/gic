@@ -161,4 +161,4 @@ defaultMaxWHSize = 20000
 
 -- | The maximum size of the explicit stack (in machine words).
 defaultEStackSize :: Int
-defaultEStackSize = 10000000
+defaultEStackSize = 5000000
