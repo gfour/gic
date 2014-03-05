@@ -76,12 +76,13 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "             -debug   : keep extra debugging information"
            putStrLn "             -v       : produce a graph trace file after program execution"
            putStrLn "             -semigc  : enable semispace garbage collection (EXPERIMENTAL)"
+           putStrLn("                 -estack S : use an explicit stack of at most S words (default="++(showNum defaultEStackSize)++")")
            putStrLn "             -libgc   : use Boehm GC [libgc] (default)"
            putStrLn "             -compact : use the compact x86-64 mode"
            putStrLn "                 -fop : use the fast integer operators (EXPERIMENTAL)"
            putStrLn("             -mem M   : use M bytes of memory (default="++(showNum defaultMemSize)++")")
            putStrLn "             -strict  : insert strictness annotations for all function" 
-           putStrLn "                        formals and constructor args"           
+           putStrLn "                         formals and constructor args"           
            putStrLn "             -tag     : embed tags in constructors"
            putStrLn("             -pdfi    : print information about a "++dfiSuffix++" file")
            putStrLn "* Eduction back-end:"
@@ -171,6 +172,12 @@ processArgs cmdArgs =
                 mem = reads arg
             in  case mem of
                    [(memSz, "")] -> aux args opts{optMaxMem = memSz}
+                   _             -> usage >> return opts{optAction = ANone}
+        aux ("-estack": arg : args) opts =
+            let estack :: [(Int, String)]
+                estack = reads arg
+            in  case estack of
+                   [(estackSz, "")] -> aux args opts{optEStackSz = estackSz}
                    _             -> usage >> return opts{optAction = ANone}
         aux ("-ctxts" : arg : args) opts =
             let ctxts :: [(Int, String)]

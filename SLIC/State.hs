@@ -6,8 +6,8 @@ module SLIC.State (Action(..), CompileMode(..), DoNullDf, GC(..), GHCAPI(..),
                    Options(..), TypeChecker(..), Verb, defaultOptions,
                    opt) where
 
-import SLIC.Constants (defaultWhs, defaultMaxWHSize, defaultMemSize,
-                       defaultMaxCtxts, defaultWorkers, nl)
+import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
+                       defaultMemSize, defaultMaxCtxts, defaultWorkers, nl)
 import SLIC.Types
 
 -- | What the compiler is to do, according to the command-line parameters.
@@ -105,6 +105,7 @@ data Options = Options
   , optCompact :: Bool             -- ^ use the compact x86-64 representation
   , optFastOp  :: Bool             -- ^ use the fast integer operations
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
+  , optEStackSz:: Int              -- ^ explicit stack size
   }
 
 -- | The default options of the compiler. It is used as a default for
@@ -137,6 +138,7 @@ defaultOptions = Options
   , optCompact = False
   , optFastOp  = False
   , optNWorkers= defaultWorkers
+  , optEStackSz= defaultEStackSize
   }
 
 instance Show Options where

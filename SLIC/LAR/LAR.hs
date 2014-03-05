@@ -129,23 +129,25 @@ macrosC opts modName arities pmDepths arityCAF =
           ("#error you must enable the USE_TAGS macro for tags to work"++).nl. 
           ("#endif /* USE_TAGS */"++).nl
        else id).
-      wrapIfSSTACK
-      -- Use a shadow stack for function calls (use with the semi-space collector).
-      (("// shadow stack maximum size"++).nl.
-       ("#define SSTACK_MAX_SIZE 100000000"++).nl.
-       ("// push activation record to shadow stack"++).nl.
-       (if optDebug opts then
-          ("#define PUSHAR(a) ({ if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Shadow stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr++ = a; })"++).nl
-        else
-          ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl).
-       ("// get call result and pop activation record"++).nl.
-       ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
-      -- No shadow stack, dummy macros (use with libgc).
-      (("#define PUSHAR(a) a"++).nl.
-       ("#define RETVAL(x) x"++).nl).
       (case gc of
-          SemiGC -> ("#define GC_MALLOC MM_alloc"++)
-          LibGC  -> id).nl.
+          SemiGC ->
+            -- The memory allocator used by the semi-space collector.
+            ("#define GC_MALLOC MM_alloc"++).nl.
+            -- Use an explicit stack for function calls.
+            wrapIfSSTACK
+            (("// shadow stack maximum size"++).nl.
+             ("#define SSTACK_MAX_SIZE "++).shows (optEStackSz opts).nl.
+             ("// push activation record to shadow stack"++).nl.
+             (if optDebug opts then
+                ("#define PUSHAR(a) ({ if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Shadow stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr++ = a; })"++).nl
+              else
+                ("#define PUSHAR(a) (*sstack_ptr++ = a)"++).nl).
+             ("// get call result and pop activation record"++).nl.
+             ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
+            -- No shadow stack, dummy macros (use with libgc).
+            (("#define PUSHAR(a) a"++).nl.
+             ("#define RETVAL(x) x"++).nl)
+          LibGC    -> id).nl.
       defineGCAF modName gc arityCAF.nl.
       (case gc of
           LibGC  -> createLibGCARInfra opts modName pmDepths.nl
@@ -706,18 +708,17 @@ initMod :: MName -> ConfigLAR -> ShowS
 initMod m config =
   let arityCAF = length (getCAFnmsids config)
       opts     = getOptions config
-      gc       = optGC opts
       nms      = map pprint $ nmsids2nms (getCAFnmsids config)
   in  ("void "++).genInitMod m.("(TP_ T0) {"++).nl.
       (if arityCAF > 0 then
-         tab.namegenv m.(" = PUSHAR("++).
-         (case gc of
+         tab.namegenv m.(" = "++).
+         (case optGC opts of
              SemiGC ->
-               ("AR("++).shows arityCAF.
-               (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++)
+               ("PUSHAR(AR("++).shows arityCAF.
+               (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++).
+               ("));"++)
              LibGC ->
-               (nameGCAF m).("_AR("++).insCommIfMore nms).
-         ("));"++).nl
+               (nameGCAF m).("_AR("++).insCommIfMore nms.(");"++)).nl
        else id).
       ("}"++).nl.nl
       
