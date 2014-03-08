@@ -40,7 +40,7 @@ data ExprFL a =
   | ConF Const [ExprFL a]            -- ^ constant operator
   | FF V [ExprFL a]                  -- ^ function application
   | ConstrF CstrName [ExprFL a]      -- ^ constructor call
-  | CaseF CaseLoc (ExprFL a) QName [PatFL a]
+  | CaseF CaseNested (ExprFL a) QName [PatFL a]
     -- ^ pattern matching expression, /case e as v of patterns/
   | LetF Loc [DefFL a] (ExprFL a)  -- ^ let ... in ...
   | LamF Depth QName (ExprFL a)      -- ^ lambda abstraction
@@ -138,22 +138,13 @@ data PatFL a =
 -- | FL modules.
 type ModF = Mod ProgF
 
--- | Shows a variable.
-pprintVar :: V -> ShowS
-pprintVar (V v) = pprint v
-pprintVar (BV v (loc, _)) =
-  pprint v.if comments then comment (pprintBVC v loc) else id
--- | Shows a bound variable name at a given pattern matching nesting depth.
-pprintBVC :: QName -> Loc -> ShowS
-pprintBVC v l = pprintBV v.("{"++).pprintLoc l.("}"++)
-
 -- | Shows the enumerated counter or depth of an expression.
 showsLoc :: Maybe Int -> ShowS
 showsLoc (Just i)  = shows i
 showsLoc (Nothing) = ("??"++)
 
 instance PPrint a => PPrint (ExprFL a) where
-   pprintPrec _ (XF vn) = pprintVar vn
+   pprintPrec _ (XF vn) = pprint vn
    pprintPrec p (ConF cn el) = 
      let l = length el
          s = prettyConst p cn el
@@ -163,13 +154,14 @@ instance PPrint a => PPrint (ExprFL a) where
    pprintPrec p (FF vn ps) =
      showParen (p>0) (pprint vn.spaces 1.pprintList space ps)
    pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprintList space el
-   pprintPrec p (CaseF (l, _) e bind pats) =
-     ("case "++).pprintPrec p e.
-     (if bind==underscoreVar then id else (" as '"++).pprint bind.("'"++)).
-     (" of "++).
-     comment (("Location="++).pprintLoc l.(", Bind="++).pprint bind.spaces 1).
-     lbracket.nl.
-     pprint_tab_l l pats.rbracket
+   pprintPrec p (CaseF cn e bind pats) =
+     let dep = tabIdxOf cn
+     in  ("case "++).pprintPrec p e.
+         (if bind==underscoreVar then id else (" as '"++).pprint bind.("'"++)).
+         (" of "++).
+         comment (("Nested="++).pprint cn.(", Bind="++).pprint bind.spaces 1).
+         lbracket.nl.
+         pprint_tab_l dep pats.rbracket
    pprintPrec p (LetF loc bs e) =
      let -- if the let is not enumerated, don't do indentation
          (d', spc) = (case loc of Nothing -> (0, 0); Just (_, i) -> (i, d'+p))
@@ -368,7 +360,7 @@ countVarUses v (LetF _ binds e) =
 countVarUses v (LamF _ _ e) = countVarUses v e
 
 -- | Checks if the bound variables of the list are used by an expression.
-areBound :: [(QName, CaseLoc)] -> ExprF -> Bool
+areBound :: [(QName, CaseNested)] -> ExprF -> Bool
 areBound [] _ = False
 -- assumption: free variables are not bound
 areBound _ (XF (V _)) = False
@@ -426,8 +418,9 @@ hasLs p =
 countPMDepths :: [DefF] -> PMDepths
 countPMDepths defs =
   let countD (DefF f _ e) = (f, countE e)
-      dOfLoc (Just (c, _), _) = c+1
-      dOfLoc (Nothing, _) = ierr "dOfLoc: no location data found"
+      dOfLoc (CLoc (Just (c, _), _)) = c+1
+      dOfLoc (CLoc (Nothing, _)) = ierr "dOfLoc: no location data found"
+      dOfLoc (CFrm _) = 0
       countV (V _) = 0
       countV (BV _ loc) = dOfLoc loc
       countE (XF v) = countV v

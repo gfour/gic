@@ -133,7 +133,7 @@ transExpr dfs (Case e bnd _ alts) =
       keepPat _ = True
       bndName = stringToQName $ showPPr dfs bnd
   in  -- if take 4 bndName == noBinder then 
-        CaseF (Nothing, noEFunc) e' bndName (filter keepPat pats)
+        CaseF noCaseLoc e' bndName (filter keepPat pats)
       -- else
       --  error $ "non-wildcard binder '"++bndName++"' is not yet supported in GHC Core pattern matching"
 transExpr _ (Cast _ _) = error "Cast!"

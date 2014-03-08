@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP #-}
 module SLIC.State (Action(..), CompileMode(..), DoNullDf, GC(..), GHCAPI(..),
-                   Options(..), TypeChecker(..), Verb, defaultOptions,
+                   Options(..), ScrutOpt, TypeChecker(..), Verb, defaultOptions,
                    opt) where
 
 import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
@@ -106,7 +106,12 @@ data Options = Options
   , optFastOp  :: Bool             -- ^ use the fast integer operations
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   , optEStackSz:: Int              -- ^ explicit stack size
+  , optScrut   :: ScrutOpt         -- ^ optimize scrutinee nesting
   }
+
+-- | Optimize scrutinees of formals to skip the nested field and read the
+--   nested context directly from the formal thunk.
+type ScrutOpt = Bool
 
 -- | The default options of the compiler. It is used as a default for
 --   applying user command-line switches, or by the GHC back-end.
@@ -139,6 +144,7 @@ defaultOptions = Options
   , optFastOp  = False
   , optNWorkers= defaultWorkers
   , optEStackSz= defaultEStackSize
+  , optScrut   = False
   }
 
 instance Show Options where

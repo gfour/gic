@@ -301,15 +301,19 @@ prepE (XF v) = XF (prepV v)
 prepE (ConF c el) = ConF c (map prepE el)
 prepE (FF f el) = FF (prepV f) (map prepE el)
 prepE (ConstrF c el) = ConstrF (prepQN c) (map prepE el)
-prepE (CaseF (d, func) e scrut pats) =
-  let prepPat (PatF pat eP) = PatF (renameInvPat pat) (prepE eP)
-  in  CaseF (d, prepQN func) (prepE e) (prepQN scrut) (map prepPat pats)
+prepE (CaseF cn e scrut pats) =
+  let prepPat (PatF pat eP) = PatF (renameInvPat pat) (prepE eP)      
+      cn' = case cn of
+              CLoc (d, func) -> CLoc (d, prepQN func)
+              CFrm frm       -> CFrm (prepQN frm)
+  in  CaseF cn' (prepE e) (prepQN scrut) (map prepPat pats)
 prepE (LetF d ldefs e) = LetF d (map prepDef ldefs) (prepE e)
 prepE (LamF d v e) = LamF d (prepQN v) (prepE e)
 
 prepV :: V -> V
 prepV (V v) = V (prepQN v)
-prepV (BV qn (d, func)) = BV (prepQN qn) (d, prepQN func)
+prepV (BV qn (CLoc (d, func))) = BV (prepQN qn) (CLoc (d, prepQN func))
+prepV (BV qn (CFrm frm)) = BV (prepQN qn) (CFrm (prepQN frm))
 
 class RenameInvPat a where
   renameInvPat :: a -> a

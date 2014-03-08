@@ -431,7 +431,9 @@ mkCExp env config (LARCall n acts) =
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)
   else makeActs n acts env config
-mkCExp env config (CaseL (d@(Just (counter, _)), efunc) e pats) =
+mkCExp _ _ (CaseL (CFrm _) _ _) =
+  error "TODO: mkCExp: CFrm"
+mkCExp env config (CaseL (CLoc (d@(Just (counter, _)), efunc)) e pats) =
   let matchedExpr = mkCExp env config e
       cases       = foldDot mkCPat pats      
       opts        = getOptions config
@@ -485,17 +487,19 @@ mkCExp env config (CaseL (d@(Just (counter, _)), efunc) e pats) =
               -- only add "default:" when debugging
               (if optDebug opts then defaultCase else id).
               tab.("}"++).nl)
-mkCExp _ _ e@(CaseL (Nothing, _) _ _) =
+mkCExp _ _ e@(CaseL (CLoc (Nothing, _)) _ _) =
   ierr $ "mkCExp: found non-enumerated case expression: "++(pprint e "")
 mkCExp _ _ (ConstrL _) =
   ierr "LAR: ConstrL can only occur as the first symbol of a definition"
-mkCExp _ config (BVL v (Just (counter, _), fname)) =
+mkCExp _ config (BVL v (CLoc (Just (counter, _), fname))) =
   let gc = optGC $ getOptions config
       compact = optCompact $ getOptions config
       argsN = getFuncArity fname (getArities config)
   in  pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
-mkCExp _ _ e@(BVL _ (Nothing, _)) =
-    ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
+mkCExp _ _ e@(BVL _ (CLoc (Nothing, _))) =
+  ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
+mkCExp _ _ (BVL _ (CFrm _)) =
+  error "TODO: mkCExp:CFrm"
 
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =

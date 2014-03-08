@@ -10,8 +10,8 @@ import SLIC.DFI (DFI, getMainDepth)
 import SLIC.ITrans.Syntax (QOp(..))
 import SLIC.SyntaxAux
 import SLIC.TTD.SyntaxTTD
-import SLIC.Types (Counter, CstrName, IIndex, PPrint(..), Value(..),
-                   pprintIdx, pprintList)
+import SLIC.Types (Counter, CaseNested(..), CstrName, IIndex, PPrint(..),
+                   Value(..), pprintIdx, pprintList)
 
 -- | Values.
 type ValueT = Value Token
@@ -126,7 +126,7 @@ sendMsg p (Msg src dest color@(token, dchain) Demand) =
             [ Msg dest iID (token', (src, Branch 0, Nothing):dchain) Demand ]
       Just (VarT iID) ->
         [ Msg dest iID (token, (src, Branch 0, Nothing):dchain) Demand ]
-      Just (BVarT iID (Just (c, _), _)) ->
+      Just (BVarT iID (CLoc (Just (c, _), _))) ->
         let (_, nested):_ = token
         in  [ Msg dest iID (getN nested c, (src, Branch 0, Nothing):dchain) Demand]
       Just (ActualsT acts) ->
@@ -177,7 +177,7 @@ sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) =
           in  Msgs [Msg dest cID (token, (src', Branch b, Nothing):dchain') Demand]
         Just (ConT (CN CIf) [_, _, _]) | (brn==1) || (brn==2) ->
           Msgs [ Msg dest src' (token, dchain') (Response val) ]
-        Just (CaseT (Just (cID, _), _) _ pats) | (brn==0) ->
+        Just (CaseT (CLoc (Just (cID, _), _)) _ pats) | (brn==0) ->
           let VT (c, cToken) = val
               (brn', patID) = findPat c 1 pats
               (i, nested'):token' = token

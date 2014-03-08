@@ -12,7 +12,6 @@ import Data.Map (Map, fromList, lookup)
 import SLIC.AuxFun (ierr, showStrings, spaces)
 import SLIC.Constants (nl, space)
 import SLIC.SyntaxAux
-import SLIC.SyntaxFL
 import SLIC.Types
 
 -- * The HIL language
@@ -22,7 +21,7 @@ data ExprH =
     XH V                     -- ^ variable
   | ConH Const [ExprH]       -- ^ built-in constant application
   | FH QOp QName [ExprH]     -- ^ function call (with intensional operators)
-  | CaseH CaseLoc ExprH [PatH] -- ^ pattern matching expression
+  | CaseH CaseNested ExprH [PatH] -- ^ pattern matching expression
   | ConstrH CstrName         -- ^ constructor call
   deriving (Eq,Read)
 
@@ -61,19 +60,20 @@ instance PPrint QOp where
    pprint NOp      = id
 
 instance PPrint ExprH where
-   pprint (XH vn)          = pprintVar vn
+   pprint (XH vn)          = pprint vn
    pprint (ConH cn el)     = prettyConst 0 cn el
    pprint (ConstrH c)      = pprintTH c
    pprint (FH NOp vn ps)   = pprint vn.pprintList space ps
    pprint (FH qOp vn ps)   =
        pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
-   pprint (CaseH (loc, _) e pats) =
-      let pprintPats []        = id
+   pprint (CaseH cn e pats) =
+      let dep = tabIdxOf cn
+          pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatH c0 e0 b0) =
-            ("\n  "++).spacing loc.("| "++).pprint c0.(" -> "++).pprint e0.
+            ("\n  "++).spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
             pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
+      in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
           pprintPats pats
                 
 instance PPrint DefH where
@@ -86,16 +86,16 @@ instance PPrint DefH where
 -- * The ZOIL language
 
 -- | A 0-order intensional expression.
-data ExprZ = XZ V                         -- ^ variable
-	   | ConZ Const [ExprZ]           -- ^ built-in constant application
-	   | FZ QOp QName                 -- ^ intensional call operator
-           | CaseZ CaseLoc ExprZ [PatZ]   -- ^ pattern matching
-           | ConstrZ CstrName             -- ^ intensional constructor
+data ExprZ = XZ V                          -- ^ variable
+           | ConZ Const [ExprZ]            -- ^ built-in constant application
+           | FZ QOp QName                  -- ^ intensional call operator
+           | CaseZ CaseNested ExprZ [PatZ] -- ^ pattern matching
+           | ConstrZ CstrName              -- ^ intensional constructor
            deriving (Eq, Read)
 
 -- | A 0-order variable definition.
-data DefZ = DefZ QName ExprZ              -- ^ v = e
-          | ActualsZ QName MName [ExprZ]  -- ^ v = actuals(e0, ..., eN)
+data DefZ = DefZ QName ExprZ               -- ^ v = e
+          | ActualsZ QName MName [ExprZ]   -- ^ v = actuals(e0, ..., eN)
           deriving (Eq, Read)
 
 -- | A 0-order intensional program.
@@ -108,17 +108,18 @@ data PatZ = PatZ CstrName ExprZ BindsVars deriving (Eq, Read)
 type ModZ = Mod ProgZ
 
 instance PPrint ExprZ where
-   pprint (XZ vn) = pprintVar vn
+   pprint (XZ vn) = pprint vn
    pprint (ConZ cn el) = prettyConst 0 cn el
    pprint (FZ NOp e) = pprint e
    pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
-   pprint (CaseZ (loc, _) e pats) =
-      let pprintPats []        = id
-          pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
-          pprintPat (PatZ c0 e0 b0) =
-            nl.(" "++).spacing loc.(" | "++).pprint c0.(" -> "++).
-            pprint e0.pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
+   pprint (CaseZ cn e pats) =
+     let dep = tabIdxOf cn
+         pprintPats []        = id
+         pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
+         pprintPat (PatZ c0 e0 b0) =
+           nl.(" "++).spaces dep.(" | "++).pprint c0.(" -> "++).
+           pprint e0.pprintBinds b0
+     in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
           pprintPats pats
    pprint (ConstrZ c) = pprintTH c
 

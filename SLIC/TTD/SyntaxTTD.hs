@@ -37,10 +37,10 @@ type Acts = [(IIndex, InstrID)]
 -- | A dataflow instruction.
 data InstrT = CallT QOp InstrID        -- ^ call instruction with intensional index
             | VarT InstrID             -- ^ call instruction using current context
-            | BVarT InstrID CaseLoc    -- ^ call instruction using nested context
+            | BVarT InstrID CaseNested -- ^ call instruction using nested context
             | ActualsT Acts            -- ^ intensional /actuals/ operator
             | ConT Const [InstrID]     -- ^ built-in operator (including values)
-            | CaseT CaseLoc InstrID [PatT] -- ^ pattern matching expression
+            | CaseT CaseNested InstrID [PatT] -- ^ pattern matching expression
             | ConstrT CstrName         -- ^ constructor
 
 -- | A pattern branch contains a constructor and an instruction dependency.
@@ -59,7 +59,7 @@ instance PPrint ProgT where
 instance PPrint InstrT where
   pprint (CallT qOp iID) = pprint qOp.pprintInstrPtr iID
   pprint (VarT iID) = ("var"++).pprintInstrPtr iID
-  pprint (BVarT iID (Just (c, _), _)) =
+  pprint (BVarT iID (CLoc (Just (c, _), _))) =
     ("bvar"++).pprintInstrPtr iID.("{"++).shows c.("}"++)
   pprint (ActualsT acts) =
     let aux (iidx, iID) = ("({"++).pprintIdx iidx.("}: "++).

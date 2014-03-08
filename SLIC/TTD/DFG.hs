@@ -156,7 +156,8 @@ genEntryBox showInstrID vIDs (nID, instrT) =
            ActualsT acts         -> td ("actuals"++).pFields 0 (map snd acts)
            CallT qOp iID         -> td (pprint qOp).pFields 0 [iID]
            VarT iID              -> td ("var"++).pFields 0 [iID]
-           BVarT iID (Just d, _) -> td (("bvar{"++).shows d.("}"++)).pFields 0 [iID]
+           BVarT iID (CLoc (Just d, _)) ->
+             td (("bvar{"++).shows d.("}"++)).pFields 0 [iID]
            CaseT _ iID patsT     -> td ("case"++).pFields 0 [iID].td ("of"++).
                                     pFields 1 (idsOfPats patsT)
            ConstrT c             -> td (pprint c)          

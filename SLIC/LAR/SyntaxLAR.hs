@@ -11,7 +11,6 @@ import SLIC.AuxFun (ierr, showStrings, spaces)
 import SLIC.Constants (nl)
 import SLIC.ITrans.Syntax (pprintBinds)
 import SLIC.SyntaxAux
-import SLIC.SyntaxFL
 import SLIC.Types
 
 -- * The LAR language
@@ -44,8 +43,8 @@ mkCC c cids =
 data ExprL  = LARCall QName [QName]    -- ^ call variable with a LAR of variables
             | LARC Const [ExprL]       -- ^ built-in constant application
             | ConstrL CCstrName        -- ^ constructor call
-            | BVL QName CaseLoc        -- ^ bound variable (constructor projection)
-            | CaseL CaseLoc ExprL [PatL] -- ^ pattern matching expression
+            | BVL QName CaseNested     -- ^ bound variable (constructor projection)
+            | CaseL CaseNested ExprL [PatL] -- ^ pattern matching expression
 
 -- | A LAR pattern.
 data PatL   = PatL CCstrName ExprL Bool
@@ -64,16 +63,17 @@ instance PPrint ExprL where
     pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
     pprint (LARC cn el) = prettyConst 0 cn el
     pprint (ConstrL c) = pprint c
-    pprint (BVL v (loc, f)) = pprintBVC v loc.("{"++).pprint f.("}"++)
-    pprint (CaseL (loc, _) e pats) =
-        let pprintPats []             = id
+    pprint (BVL v cn) = pprintBVC v cn
+    pprint (CaseL cn e pats) =
+        let dep = tabIdxOf cn
+            pprintPats []             = id
             pprintPats (pat : ps)     = showPat pat.pprintPats ps
             showPat (PatL c0 e0 b)= 
                 nl.(" "++).
                 (if b then ("#"++) else spaces 1).
-                spacing loc.("| "++).pprint c0.(" -> "++).pprint e0.
+                spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
                 pprintBinds b
-        in  ("case "++).pprint e.(" of{"++).pprintLoc loc.("}"++).
+        in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
             pprintPats pats
             
 -- | Pretty printer for LAR modules. The typing environment is also given.

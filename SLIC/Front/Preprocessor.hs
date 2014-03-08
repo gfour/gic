@@ -19,7 +19,7 @@
 --   For the unique names generator, see the "Renamer" (or the mini-renamer
 --   for lifted arguments inside the "Lifter").
 
-module SLIC.Front.Preprocessor (checkMod, constrToFuncs, convertFromGHC,
+module SLIC.Front.Preprocessor (checkMod, cNested, constrToFuncs, convertFromGHC,
                                 dummyCName, fixSyntax, genProjSelTEnv,
                                 markStrict, procBV, projCName, 
                                 qual, updCName) where
@@ -35,7 +35,7 @@ import SLIC.SyntaxFL
 import SLIC.Types
 
 -- | A bound variable aliased to a constructor variable of some counter/depth.
-type Alias = (QName, (QName, CaseLoc))
+type Alias = (QName, (QName, CaseNested))
 -- | Aliased variables of the program become bound variables of a specific name,
 --   depth, and enclosing function.
 type BVInfo = [Alias]
@@ -47,7 +47,7 @@ type BVInfo = [Alias]
 constrToFuncs :: Options -> ModF -> ModF
 constrToFuncs opts modF =
   let Prog ds defs = modProg modF
-      newDefs = concatMap newDataDefs ds
+      newDefs = concatMap (newDataDefs (optScrut opts)) ds
       defs'   = map replaceConstrD defs
       prog'   = Prog ds (defs' ++ newDefs)
       tAnnot' = if optTC opts == GICTypeInf False then
@@ -77,13 +77,13 @@ replaceConstrE (LamF dep v e) =
 
 -- | Creates a wrapper function for each constructor of a data type. Also
 --   generates the constructor projection functions.
-newDataDefs :: Data -> [DefF]
-newDataDefs (Data _ _ dts) = concatMap newDataDefsDC dts
+newDataDefs :: ScrutOpt -> Data -> [DefF]
+newDataDefs scrOpt (Data _ _ dts) = concatMap (newDataDefsDC scrOpt) dts
 
 -- | Creates a wrapper function for a given constructor. Also generates
 --   the constructor projection/update/dummy-creation functions.
-newDataDefsDC :: DConstr -> [DefF]
-newDataDefsDC (DConstr c dTypes _) =
+newDataDefsDC :: ScrutOpt -> DConstr -> [DefF]
+newDataDefsDC scrOpt (DConstr c dTypes _) =
     let -- for a Constr(a0, ..., an) creates constr_0, ..., constr_n
         -- formals (keeping their strictness annotations) - the counter
         -- should be initialized to 0
@@ -99,7 +99,7 @@ newDataDefsDC (DConstr c dTypes _) =
           let (pn, [px]) = projCSig c i
               cPat = SPat c bvs
               selBody func arg =
-                CaseF (Just (0, 0), func) (XF (V arg)) underscoreVar
+                CaseF (cNested scrOpt arg func) (XF (V arg)) underscoreVar
                 [ PatF cPat (XF (V (bvs !! i))) ]
               recFields =
                 case sel of
@@ -112,7 +112,7 @@ newDataDefsDC (DConstr c dTypes _) =
                         ux1 = procLName (++"$_1") updName
                         updFields = (take i bvs) ++ [ux1] ++ (drop (i+1) bvs)
                         updater  = DefF updName [Frm ux0 s, Frm ux1 s]
-                                   (CaseF (Just (0, 0), updName)
+                                   (CaseF (cNested scrOpt ux0 updName)
                                     (XF (V ux0)) underscoreVar
                                     [PatF cPat
                                      (FF (V c) (map (\v->XF(V v)) updFields))]
@@ -199,34 +199,42 @@ procBV m (Prog dts defs) =
         DefF v frms (procBVE m v [] (-1) e)
   in  Prog dts (map procBVD defs)
 
--- | Processes all local bound variables to standard variable names of a depth.
---   1st argument is the aliases encountered so far (created by patterns).
---   2nd argument is the curent depth.
+-- | Processes all local bound variables to standard variable names that refer
+--   to an enclosing pattern-matching clause.
+--   The first two arguments are the names of the enclosing module and function
+--   for this clause. The third argument is the aliases encountered so far
+--   (created by patterns). The fourth argument is the curent depth.
 --   If a correctly enumerated case expression or bound variable is found, it
---   is left unchanged (assumed to have been created by defunctionalization).
---   Enumeration happens across every branch line and the same depth may be used
+--   is left unchanged (it is assumed to have been created by defunctionalization).
+--   Enumeration happens across every branch path and the same depth may be used
 --   by different case expressions that are at the same level but under different
 --   branches (and are therefore mutually exclusive).
 procBVE :: MName -> QName -> BVInfo -> Int -> ExprF -> ExprF
-procBVE m func al d (CaseF loc e b pats) =
-  let procBVPat (PatF (SPat c vs) eP) = 
-        let al' = getBVAliasesPat loc' c vs
+procBVE m func al d (CaseF cn e b pats) =
+  let procBVPat dNext cn' (PatF (SPat c vs) eP) = 
+        let al' = getBVAliasesPat cn' c vs
             vs' = cArgsC c (length vs)
-        in  PatF (SPat c vs') (procBVE m func (al++al') (d+1) eP)
-      loc'  = (Just (d+1, d+1), func)
-      case' = CaseF loc' (procBVE m func al d e) b (map procBVPat pats)
-  in  case loc of
-        (Nothing, _) -> case'
-        (Just (_, d'), ef) ->
-          if (d' == d+1) || (ef == noEFunc) || (ef == func) then 
-            case'
-          else
-            if d' /= d+1 then
-              ierr $ "preprocessor: found pattern matching with depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
-            else if ef /= noEFunc && ef /= func then
-                   ierr $ "preprocessor: found pattern matching with different enclosing function already set: "++(qName ef)++" /= "++(qName func)
-                 else
-                   ierr "preprocessor: malformed case expression"
+        in  PatF (SPat c vs') (procBVE m func (al++al') dNext eP)
+      pats' dNext cn' = map (procBVPat dNext cn') pats
+  in  case cn of
+        CFrm _ ->
+          CaseF cn (procBVE m func al d e) b (pats' d cn)
+        CLoc loc ->
+          let dN   = d+1
+              cn'  = CLoc (Just (dN, dN), func)
+              case' = CaseF cn' (procBVE m func al d e) b (pats' dN cn')
+          in  case loc of
+                (Nothing, _) -> case'
+                (Just (_, d'), ef) ->
+                  if (d' == d+1) || (ef == noEFunc) || (ef == func) then 
+                    case'
+                  else
+                    if d' /= d+1 then
+                      ierr $ "preprocessor: found pattern matching with depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
+                    else if ef /= noEFunc && ef /= func then
+                           ierr $ "preprocessor: found pattern matching with different enclosing function already set: "++(qName ef)++" /= "++(qName func)
+                         else
+                           ierr "preprocessor: malformed case expression"
 procBVE m func al d (ConF c el) = ConF c (map (procBVE m func al d) el)
 procBVE m func al d (ConstrF c el) = ConstrF c (map (procBVE m func al d) el)
 procBVE m func al d (FF f el) =
@@ -252,9 +260,9 @@ procBVEV al v =
 --   for the bound variables. Underscore binders are ignored.
 --   For example, pattern 'Cons x y' of depth 1 produces the following mapping:
 --   [(x, (cons_0, 1)), (y, (cons_1, 1))]
-getBVAliasesPat :: CaseLoc -> CstrName -> [QName] -> [Alias]
-getBVAliasesPat loc c vs = 
-  let cVars = map (\v -> (v, loc)) (cArgsC c (length vs))
+getBVAliasesPat :: CaseNested -> CstrName -> [QName] -> [Alias]
+getBVAliasesPat cn c vs = 
+  let cVars = map (\v -> (v, cn)) (cArgsC c (length vs))
       aliases = zip vs cVars
   in  filter (\(v, _)->v/=underscoreVar) aliases
 
@@ -564,3 +572,9 @@ checkNames modF =
       checkPat names (PatF (SPat _ bvs) e) = checkE (names++bvs) e
   in  all (checkD globalNames) defs
 
+-- | If the first argument is true, then it returns the second as a formal
+--   scrutinee, otherwise it returns the third as pattern matching location 0
+--   of an enclosing function.
+cNested :: ScrutOpt -> QName -> QName -> CaseNested
+cNested True  scrut _    = CFrm scrut
+cNested False _     func = CLoc (Just (0, 0), func)

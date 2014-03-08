@@ -8,8 +8,9 @@ import Data.List (intersperse)
 import qualified Data.Map as Map (Map, filterWithKey, fromList, lookup, 
                                   map, null, toList)
 import qualified Data.Sequence as Sequence (elemIndexR, fromList)
-import SLIC.AuxFun (ierr, foldDot, showStrings, spaces, toLowerFirst)
-import SLIC.Constants (bMod, dfMod, mControlParallel, delim, lparen, rparen, nl)
+import SLIC.AuxFun (comment, foldDot, ierr, showStrings, toLowerFirst)
+import SLIC.Constants (bMod, comments, dfMod, mControlParallel, delim, lparen,
+                       rparen, nl)
 
 -- * Names
 
@@ -139,17 +140,28 @@ pprintLoc :: Loc -> ShowS
 pprintLoc Nothing = ("??"++)
 pprintLoc (Just (c, d)) = ("#"++).shows c.("/"++).shows d
 
--- | Spacing function (for depths in locations).
-spacing :: Loc -> ShowS
-spacing (Nothing)     = id 
-spacing (Just (_, d)) = spaces d
-
 -- | A \"case ... of\" location inside an enclosing function.
 type CaseLoc = (Loc, QName)
 
+-- | The field from which a case clause or a bound variable read the nested field.
+--   This eliminates the need for a \'nested\' field when doing pattern matching
+--   on a function formal.
+data CaseNested = CLoc CaseLoc     -- ^ a \'nested\' field in a LAR
+                | CFrm QName       -- ^ the context of a function formal
+                deriving (Eq, Ord, Read, Show)
+
+instance PPrint CaseNested where
+  pprint (CLoc (l, qn)) = pprintLoc l.(" of "++).pprint qn
+  pprint (CFrm frm) = pprint frm
+
+-- | Returns a tab index for pretty printing.
+tabIdxOf :: CaseNested -> Int
+tabIdxOf (CLoc (Just (_, dep), _)) = dep
+tabIdxOf _ = 0
+
 -- | The default value for code where no enumeration has taken place yet.
-noCaseLoc :: CaseLoc 
-noCaseLoc = (Nothing, noEFunc)
+noCaseLoc :: CaseNested
+noCaseLoc = CLoc (Nothing, noEFunc)
 
 -- | The indexes of strict formals for a function signature.
 type StrictInds = [Int]
@@ -260,15 +272,18 @@ paramsOf qn fsigs =
     Nothing -> ierr $ "No parameters found in signatures table for "++(qName qn)
 
 -- | Program variables.
-data V = V QName           -- ^ normal (free or local) variable
-       | BV QName CaseLoc    -- ^ pattern-bound variable
+data V = V QName               -- ^ normal (free or local) variable
+       | BV QName CaseNested   -- ^ pattern-bound variable
        deriving (Eq, Ord, Read, Show)
              
 instance PPrint V where
-  pprint (V v) = pprint v
-  pprint (BV v (loc, f)) =
-    pprint v.("{"++).pprint f.(":"++).pprintLoc loc.("}"++)
-  
+  pprint (V v)     = pprint v
+  pprint (BV v cn) = pprintBVC v cn
+
+-- | Shows a bound variable name at a given pattern matching nesting depth.
+pprintBVC :: QName -> CaseNested -> ShowS
+pprintBVC v cn = ("@"++).pprint v.if comments then comment (pprint cn) else id
+
 -- | Modifies the name of a variable.
 modifyV :: (QName -> QName) -> V -> V
 modifyV f (V v) = V (f v)
