@@ -526,7 +526,8 @@ genDfMod flags (DFI _ env fsigs (DfInfo dfcs extApps) larInfo _) =
 genDfInfo :: Options -> [DefF] -> ProgInfo
 genDfInfo opts defs =
   let defSigs = Map.fromList $ List.map defSig defs
-  in  (defSigs, (genAppCBNs defs, genAppStricts opts defs), genAppPMDepths defs)
+      appCBNs = genAppCBNs (optScrut opts) defs
+  in  (defSigs, (appCBNs, genAppStricts opts defs), genAppPMDepths defs)
 
 -- | Same as 'genDfMod', but the resulting module is now preprocessed (e.g.
 --   constructor calls have been converted to function calls).
@@ -541,12 +542,14 @@ genDfModFinal opts dfi =
   in  (dfModF, genDfInfo opts defs)
 
 -- | Generate call-by-name information for defunctionalization code. Its is 
---   empty for closure constructors, all formals for closure dispatchers.
-genAppCBNs :: [DefF] -> CBNVars
-genAppCBNs defs =
+--   empty for closure constructors, all formals for closure dispatchers
+--   (unless formal scrutinees are used, in which case the closure argument of
+--   the dispatcher is call-by-need).
+genAppCBNs :: ScrutOpt -> [DefF] -> CBNVars
+genAppCBNs scrOpt defs =
   let cbnDef (DefF f _ (ConstrF _ _)) = (f, [])
-      cbnDef (DefF f fs (CaseF _ (XF (V _)) _ _)) =
-        (f, frmsToNames fs)
+      cbnDef (DefF f fs@((Frm cl _):args) (CaseF _ (XF (V cl')) _ _)) | cl == cl' =
+        if scrOpt then (f, frmsToNames args) else (f, frmsToNames fs)
       cbnDef def@(DefF _ _ _) =
         ierr $ "cbnDef: strange defunctionalization code: "++(pprint def "")
   in  Map.fromList $ List.map cbnDef defs
