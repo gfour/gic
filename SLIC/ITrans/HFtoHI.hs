@@ -18,9 +18,9 @@ fromHFtoHIe (ConstrF c _) = ConstrH c
 fromHFtoHIe app@(FF (BV _ _) _) =  
   ierr $ "fromHFtoHIe: the intensional transformation cannot process higher-order bound variables, as in "++(pprint app "")
 fromHFtoHIe (CaseF cloc e _ pats) =
-  let fromHFtoHIpat (PatF (SPat c bvs) eP) =
+  let fromHFtoHIpat (PatB (SPat c bvs, pI) eP) =
         let bvars = zip bvs (repeat cloc)
-        in  PatH c (fromHFtoHIe eP) (areBound bvars eP)
+        in  PatB (c, PatInfo (areBound bvars eP)) (fromHFtoHIe eP)
   in  CaseH cloc (fromHFtoHIe e) (map fromHFtoHIpat pats)
 fromHFtoHIe (LetF _ _ _) =
   ierr "let found when translating from FL to HIL"

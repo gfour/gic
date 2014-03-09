@@ -259,7 +259,7 @@ genAllAppSigs ve defs =
                   in  Map.union (Map.fromList [(appName, appFrms)]) (genAppSigsL lvs el)
             else
               genAppSigsL lvs el
-      genAppSigsP lvs (PatF (SPat _ bvs) e) = genAppSigsE (bvs++lvs) e
+      genAppSigsP lvs (PatB (SPat _ bvs, _) e) = genAppSigsE (bvs++lvs) e
       genAppSigsL lvs el = Map.unions $ List.map (genAppSigsE lvs) el
   in  Map.unions $ List.map (genAppSigsD []) defs
 
@@ -343,10 +343,10 @@ defuncE ndf ve vfs lvs (FF f@(V fName) el) =
 defuncE _ _ _ _ (FF (BV _ _) _) =                        
   ierr "defuncE: bound variable application encountered"
 defuncE ndf ve vfs lvs (CaseF d e v pats) =
-  let defuncPat (PatF sPat@(SPat c bvs) eP) =
+  let defuncPat (PatB sPat@(SPat c bvs, _) eP) =
         let lvs' = Map.union lvs (makeVEnv bvs (getTypesOf c ve))
             (eP', dfInfo) = defuncE ndf ve vfs lvs' eP
-        in  (PatF sPat eP', dfInfo)
+        in  (PatB sPat eP', dfInfo)
       (e'   , (DfInfo dfcsE appsE)) = defuncE ndf ve vfs lvs e
       (pats', (DfInfo dfcsL appsL)) = unzipI $ List.map defuncPat pats
   in  (CaseF d e' v pats', DfInfo (union dfcsE dfcsL) (union appsE appsL))
@@ -632,7 +632,8 @@ mkPatFull :: PatGen
 mkPatFull scrOpt app frms (DFC c ar _ (f, _)) =
   let bns = cArgsC c ar
       bvs = List.map (\v->XF $ BV v (cNested scrOpt 0 app)) bns
-  in  PatF (SPat c bns) (FF (V f) (bvs ++ (List.map (\v->XF $ V v) frms)))
+      pI  = PatInfo (ar/=0)
+  in  PatB (SPat c bns, pI) (FF (V f) (bvs ++ (List.map (\v->XF $ V v) frms)))
 
 -- | Take a list of apply()-formals and a closure constructor and generate
 --   a pattern branch for a closure partial application function.
@@ -640,7 +641,8 @@ mkPatPartial :: PatGen
 mkPatPartial scrOpt app frms (DFC c ar _ (f, _)) =
   let bns  = cArgsC c ar
       bvs  = List.map (\v->XF $ BV v (cNested scrOpt 0 app)) bns
-  in  PatF (SPat c bns) $
+      pI  = PatInfo (ar/=0)
+  in  PatB (SPat c bns, pI) $
       ConstrF (genNC f (ar + length frms)) (bvs ++ (List.map (\v->XF $ V v) frms))
 
 -- | Given an FL module and its DFI, generates the missing code of

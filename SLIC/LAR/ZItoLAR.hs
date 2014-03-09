@@ -10,7 +10,7 @@ module SLIC.LAR.ZItoLAR (fromZOILtoLAR) where
 
 import SLIC.ITrans.Syntax
 import SLIC.LAR.SyntaxLAR
-import SLIC.SyntaxAux(Mod(..), Prog(Prog))
+import SLIC.SyntaxAux(Mod(..), Prog(Prog), PatB(PatB))
 import SLIC.Types
 
 -- | Translates ZOIL to LAR syntax.
@@ -45,7 +45,7 @@ mkExp sigs _ (FZ (Call idx) v) =
 mkExp _ cids (ConstrZ c) =
   ConstrL (mkCC c cids)
 mkExp sigs cids (CaseZ d e ps) =
-  let mkPat (PatZ cP eP bP) = PatL (mkCC cP cids) (mkExp sigs cids eP) bP
+  let mkPat (PatB (cP, pI) eP) = PatB (mkCC cP cids, pI) (mkExp sigs cids eP)
   in  CaseL d (mkExp sigs cids e) (map mkPat ps)
 
 -- | Translates an intensional index of a variable to a name suitable for C.

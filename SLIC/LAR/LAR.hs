@@ -444,7 +444,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
                     sConstrID.("); exit(0);"++).nl
       -- | Generates C code for a pattern. /case/ bodies are contained
       --   in {...} as they may contain declarations.
-      mkCPat (PatL (CC c cId _) eP bindsVars) =
+      mkCPat (PatB (CC c cId _, bindsVars) eP) =
         tab.("case "++).shows cId.(": { /* "++).pprint c.(" */ "++).
         mkPatBody eP bindsVars.
         ("; break; }"++).nl
@@ -486,7 +486,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
          ("/* Empty pattern matching */"++)
        else if (length pats == 1) && (not (optDebug opts)) then
               -- one pattern only; skip the branching
-              let [PatL _ patE bindsVars] = pats
+              let [PatB (_, bindsVars) patE] = pats
               in  -- If using a formal scrutinee, evaluate it now (since the
                   -- 'switch' that evaluates it will be skipped).
                   (case cn of

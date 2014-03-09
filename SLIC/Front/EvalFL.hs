@@ -154,7 +154,7 @@ transFL p =
       transE vs (SFL.CaseF (T.CLoc (Just (cid, _)), _) e _ brs) =
         Case cid (transE vs e) (map (transB vs) brs)
       transE _ _ = error "transE: unhandled construct"
-      transB vs (SFL.PatF (SFL.SPat c _) e) = (T.lName c, transE vs e)
+      transB vs (SA.PatB (SFL.SPat c _, _) e) = (T.lName c, transE vs e)
   in  (map transD fdefs)++builtinDefsFL
 
 -- | Built-in function definitions. This includes constructor wrapper functions

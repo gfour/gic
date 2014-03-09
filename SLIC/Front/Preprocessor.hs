@@ -1,5 +1,5 @@
 -- | A collection of preprocessing utilites.
---
+-- 
 --   Contains:
 -- 
 --   (1) the /constructors-as-functions/ transformation,
@@ -67,7 +67,7 @@ replaceConstrE e@(XF _) = e
 replaceConstrE (ConF c el) = ConF c (map replaceConstrE el)
 replaceConstrE (FF f el) = FF f (map replaceConstrE el)
 replaceConstrE (CaseF d e b pats) =
-  let replaceConstrP (PatF pat0 e0) = PatF pat0 (replaceConstrE e0)
+  let replaceConstrP (PatB pat0 e0) = PatB pat0 (replaceConstrE e0)
   in  CaseF d (replaceConstrE e) b (map replaceConstrP pats)
 -- thunks become applications
 replaceConstrE (ConstrF c el) = FF (V c) (map replaceConstrE el)
@@ -98,10 +98,10 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
         bvs   = cArgsC c (length dTypes)
         mkProj (DT _ s sel, i) =
           let (pn, [px]) = projCSig c i
-              cPat = SPat c bvs
+              cPat = (SPat c bvs, PatInfo True)
               selBody func arg =
                 CaseF (cNested scrOpt 0 func) (XF (V arg)) underscoreVar
-                [ PatF cPat (XF (V (bvs !! i))) ]
+                [ PatB cPat (XF (V (bvs !! i))) ]
               recFields =
                 case sel of
                   Nothing  -> []
@@ -115,7 +115,7 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
                         updater  = DefF updName [Frm ux0 s, Frm ux1 s]
                                    (CaseF (cNested scrOpt 0 updName)
                                     (XF (V ux0)) underscoreVar
-                                    [PatF cPat
+                                    [PatB cPat
                                      (FF (V c) (map (\v->XF(V v)) updFields))]
                                    )
                     in  [selector, updater]
@@ -212,10 +212,10 @@ procBV opts m (Prog dts defs) =
 --   branches (and are therefore mutually exclusive).
 procBVE :: ScrutOpt -> MName -> FSig -> BVInfo -> Int -> ExprF -> ExprF
 procBVE scrOpt m fsig@(func, frms) al d (CaseF cloc@(cn, ef) e b pats) =
-  let procBVPat dNext cloc' (PatF (SPat c vs) eP) = 
+  let procBVPat dNext cloc' (PatB (SPat c vs, pI) eP) = 
         let al' = getBVAliasesPat cloc' c vs
             vs' = cArgsC c (length vs)
-        in  PatF (SPat c vs') (procBVE scrOpt m fsig (al++al') dNext eP)
+        in  PatB (SPat c vs', pI) (procBVE scrOpt m fsig (al++al') dNext eP)
       pats' dNext cloc' = map (procBVPat dNext cloc') pats
       ierrFunc = ierr $ "procBVE: pattern matching has different enclosing function already set: "++(qName ef)++" /= "++(qName func)++" for "++(pprint cn "")
   in  case (cn, e) of
@@ -297,15 +297,15 @@ convertFromGHC (Prog ds defs) =
       elimPrim (ConstrF c el) = ConstrF c (map elimPrim el)
       
       elimPrim (CaseF _ e _ [
-                   PatF (SPat (QN (Just "GHC.Types") "True" ) []) e1,
-                   PatF (SPat (QN (Just "GHC.Types") "False") []) e2]) =
+                   PatB (SPat (QN (Just "GHC.Types") "True" ) [], _) e1,
+                   PatB (SPat (QN (Just "GHC.Types") "False") [], _) e2]) =
         ConF (CN CIf) [elimPrim e, elimPrim e1, elimPrim e2]
       elimPrim (CaseF _ e _ [
-                   PatF (SPat (QN (Just "GHC.Types") "False") []) e1,
-                   PatF (SPat (QN (Just "GHC.Types") "True" ) []) e2]) =
+                   PatB (SPat (QN (Just "GHC.Types") "False") [], _) e1,
+                   PatB (SPat (QN (Just "GHC.Types") "True" ) [], _) e2]) =
         ConF (CN CIf) [elimPrim e, elimPrim e2, elimPrim e1]
       elimPrim (CaseF d e b pats) =
-        let elimPrimP (PatF pat eP) = PatF pat (elimPrim eP)
+        let elimPrimP (PatB pat eP) = PatB pat (elimPrim eP)
         in  CaseF d (elimPrim e) b (map elimPrimP pats)
       elimPrim (LetF d bs e) =
         LetF d (map elimPrimD bs) (elimPrim e)
@@ -351,7 +351,7 @@ liftParamCase m (d, i) (ConstrF c el) =
 liftParamCase m (d, i) (FF f el) =
   liftParamExprL m (d+1, i) el (\el' -> FF f el')
 liftParamCase m ci (CaseF dep e bnd pats) =
-  let aux (PatF pat eP) = PatF pat (liftParamCase m ci eP)
+  let aux (PatB pat eP) = PatB pat (liftParamCase m ci eP)
   in  CaseF dep (liftParamCase m ci e) bnd (map aux pats)
 liftParamCase m ci (LetF dep binds e) =
   LetF dep (map (liftParamCaseD m ci) binds) (liftParamCase m ci e)
@@ -378,8 +378,8 @@ liftCase m ci@(d, i) (CaseF dC eC bC patsC) =
   let -- names the i-th expression that is a pattern matching
       dn    = QN (Just m) ("lifted_case_"++show d++"__"++show i)
       pats' = map (liftParamCaseP ci) patsC
-      liftParamCaseP ci0 (PatF (SPat c bs) eP) =
-        PatF (SPat c bs) (liftParamCase m ci0 eP)
+      liftParamCaseP ci0 (PatB (SPat c bs, pI) eP) =
+        PatB (SPat c bs, pI) (liftParamCase m ci0 eP)
       cf'   = DefF dn [] $ CaseF dC (liftParamCase m ci eC) bC pats'
   in  (XF (V dn), Just cf')
 liftCase m ci e = (liftParamCase m ci e, Nothing)
@@ -477,8 +477,9 @@ qualE info (ConF c el) = ConF c (map (qualE info) el)
 qualE info (FF (V f) el) = FF (V (qualQName info f)) (map (qualE info) el)
 qualE info (ConstrF c el) = ConstrF (qualQName info c) (map (qualE info) el)
 qualE info (CaseF cl e sc pats) =
-  let qualPat (PatF (SPat c bvs) eP) =
-        PatF (SPat (qualQName info c) (map (qualQName info) bvs)) (qualE info eP)
+  let qualPat (PatB (SPat c bvs, pI) eP) =
+        PatB (SPat (qualQName info c) (map (qualQName info) bvs), pI)
+             (qualE info eP)
   in  CaseF cl (qualE info e) (qualU info sc) (map qualPat pats)
 qualE info (LetF d defs e) =            
   LetF d (map (qualDef info) defs) (qualE info e)
@@ -581,7 +582,7 @@ checkNames modF =
       checkE names (LamF _ v e) =
         let names' = v:names               -- add bound variable
         in  checkE names' e
-      checkPat names (PatF (SPat _ bvs) e) = checkE (names++bvs) e
+      checkPat names (PatB (SPat _ bvs, _) e) = checkE (names++bvs) e
   in  all (checkD globalNames) defs
 
 -- | If the first argument is true, then it returns the second as a LAR slot

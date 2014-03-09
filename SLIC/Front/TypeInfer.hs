@@ -465,7 +465,7 @@ inferPats cs an (p : pl) =
 --   imported typed function. Returns the type of the branch and the type
 --   of the pattern constructor.
 inferPat :: [Data] -> STAnnot -> PatF -> STM (SType, SType)
-inferPat cs an (PatF (SPat c@(QN cm cn) bs) e) =
+inferPat cs an (PatB (SPat c@(QN cm cn) bs, _) e) =
   getEnvST >>= \gamma ->
   let (newEnv, tConstr) =
         case findTypesOf c cs of

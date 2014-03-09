@@ -27,7 +27,7 @@ fromHItoZIp (Prog ds defs) =
       fromHItoZIe (CaseH d e pats) =
         let pats' = map fromHItoZIpat pats
         in  CaseZ d (fromHItoZIe e) pats'
-      fromHItoZIpat (PatH c e b) = PatZ c (fromHItoZIe e) b
+      fromHItoZIpat (PatB c e) = PatB c (fromHItoZIe e)
   in  Prog ds (map fromHItoZId defs)
 
 -- | HIL -> ZOIL, module translation.

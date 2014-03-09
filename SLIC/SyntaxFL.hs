@@ -130,9 +130,7 @@ type DefF  = DefFL  SimplePat
 type ProgF = Prog DefF
 
 -- | FL patterns, parameterized by pattern language.
-data PatFL a =
-    PatF a (ExprFL a)    -- ^ a pattern from a constructor to an expression
-    deriving (Eq, Read, Show)
+type PatFL a = PatB a (ExprFL a)
 
 -- * FL modules
 
@@ -177,15 +175,10 @@ instance PPrint a => PPrint (ExprFL a) where
      in  lparen.("\\"++).pprint v.spaces 1.lcurl.dep.rcurl.spaces 1.hyph.rangle.spaces 1.
      pprintPrec p e.rparen
 
-instance PPrint a => PPrint (PatFL a) where
-  pprintPrec p (PatF pat e) =
-    spaces 1 . pprint pat . (" -> "++) . pprintPrec p e
-
 instance PPrint a => PPrint (DefFL a) where
-   pprintPrec _ (DefF vn ps e) =
-       pprint vn.
-       (if length ps == 0 then id else spaces 1).
-       showStrings " " (map (qName.fstFrm) ps).(" = " ++).pprintPrec 0 e.semi
+  pprintPrec _ (DefF vn ps e) =
+    pprint vn.(if length ps == 0 then id else spaces 1).
+    showStrings " " (map (qName.fstFrm) ps).(" = " ++).pprintPrec 0 e.semi
 
 -- * Built-in operators and functions in FL
 
@@ -285,7 +278,7 @@ isValidFL m xl =
           BV _ _ -> ierr "bound variable application, shouldn't appear here"
       chk (CaseF _ e _ pats) flag =
         let patExprs [] = []
-            patExprs ((PatF _ eP) : tl) = eP : (patExprs tl)
+            patExprs ((PatB _ eP) : tl) = eP : (patExprs tl)
             pFlag = chkL (patExprs pats) flag
             eFlag = chk e flag
         in  pFlag && eFlag
@@ -355,7 +348,7 @@ countVarUses si v (FF _ el) =
     sum (map (countVarUses si v) el)
 countVarUses si@(scrOpt, frms) v (CaseF _ e _ pats) =
   let maxVU [] = 0
-      maxVU ps = maximum (map (countVarUses si v) (map (\(PatF _ eP)->eP) ps))
+      maxVU ps = maximum (map (countVarUses si v) (map (\(PatB _ eP)->eP) ps))
       scrutVU =
         case (e, v) of
           (XF (V eV), V vV) | scrOpt && (eV==vV) && (vV `elem` frms) -> 2
@@ -379,8 +372,7 @@ areBound bvars (ConF _ el) = or (map (areBound bvars) el)
 areBound bvars (FF _ el) = or (map (areBound bvars) el)
 areBound bvars (ConstrF _ el) = or (map (areBound bvars) el)
 areBound bvars (CaseF _ e' _ pats') = 
-  let patExprs = map (\(PatF _ e) -> e) pats'
-  in  or ((areBound bvars e') : (map (areBound bvars) patExprs))
+  or ((areBound bvars e') : (map (\(PatB _ e) -> areBound bvars e) pats'))
 areBound _ (LetF _ _ _) =
   ierr "areBound: let-binding encountered"
 areBound bvars (LamF _ _ e) = areBound bvars e
@@ -417,7 +409,7 @@ hasLs p =
       hasLE (ConF _ el) = any hasLE el
       hasLE (ConstrF _ el) = any hasLE el
       hasLE (CaseF _ e _ pats) =
-        or ((hasLE e):(map (\(PatF _ eP)->hasLE eP) pats))
+        or ((hasLE e):(map (\(PatB _ eP)->hasLE eP) pats))
       hasLE (LetF _ _ _) = True
       hasLE (LamF _ _ _) = True
   in  any hasLD defs
@@ -436,7 +428,7 @@ countPMDepths defs =
       countE (ConF _ el) = maximum (0:(map countE el))
       countE (ConstrF _ el) = maximum (0:(map countE el))
       countE (CaseF (loc, _) e _ pats) =
-        let countP (PatF _ eP) = countE eP
+        let countP (PatB _ eP) = countE eP
         in  maximum ((dOfLoc loc):((countE e):(map countP pats)))
       -- These constructs are not supported, we assume lambda lifted code.
       countE (LetF _ _ _) = ierr "countE: found let"

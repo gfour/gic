@@ -25,9 +25,10 @@ patComp (Prog dtsFL defsFH) tcInsts =
       pcE (ConstrF c el) = ConstrF c (map pcE el)
       pcE (CaseF d e s pats) =
         if allSimple pats then
-          CaseF d (pcE e) s (map (\(PatF fP eP)->PatF (pcP fP) (pcE eP)) pats)
+          CaseF d (pcE e) s
+          (map (\(PatB (fP, pI) eP)->PatB (pcP fP, pI) (pcE eP)) pats)
         else
-          let mkMatch (PatF fPat eP) = ([fPat], Nothing, eP)
+          let mkMatch (PatB (fPat, _) eP) = ([fPat], Nothing, eP)
           in  patCompMatches [pcE e] (map mkMatch pats)
       pcE (LetF d defs e) = LetF d (map pcD defs) (pcE e)
       pcE (LamF d v e) = LamF d v (pcE e)
@@ -46,7 +47,7 @@ allSimple pats =
   let isSimple (FPatC _ ps) = all isFPV ps
       isSimple (FPatI _)    = True
       isSimple _            = False
-  in  all (\(PatF fp _)->isSimple fp) pats
+  in  all (\(PatB (fp, _) _)->isSimple fp) pats
 
 -- | A pattern guard is just an expression (well-formedness checked by the parser).
 type GuardFH = ExprFH

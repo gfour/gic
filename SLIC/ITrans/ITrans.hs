@@ -80,7 +80,7 @@ getActs allSigs (FH (Call i) f el) =
 getActs _ fc@(FH NOp _ _) =
   ierr $ "getActs: this function call should have a call() before it: "++(pprint fc "")
 getActs allSigs (CaseH _ e pats) = 
-  (getActs allSigs e) ++ (concatMap (\(PatH _ e0 _) -> getActs allSigs e0) pats)
+  (getActs allSigs e) ++ (concatMap (\(PatB _ e0) -> getActs allSigs e0) pats)
   
 -- | Removes the arguments from all function applications.
 removeFHArgs :: DefH -> DefH
@@ -92,7 +92,7 @@ removeFHArgs def =
         ierr $ "remFHArgsE: this function call should have a call() before it: "++(pprint fc "")
       remFHArgsE (CaseH d e pats) =
         CaseH d (remFHArgsE e)
-        (map (\(PatH c0 e0 b0) -> PatH c0 (remFHArgsE e0) b0) pats)
+        (map (\(PatB c0 e0) -> PatB c0 (remFHArgsE e0)) pats)
       remFHArgsE (ConstrH c) = ConstrH c
   in  case def of
         DefH f vs e   -> DefH f vs (remFHArgsE e)
@@ -134,9 +134,9 @@ insertCallsE inds (CaseH d e pats) =
       
 -- | Helper of 'insertCalls' for patterns.
 insertCallsPat :: Inds -> PatH -> (PatH, Inds)
-insertCallsPat inds (PatH c e b) =
+insertCallsPat inds (PatB c e) =
   let (e', inds') = insertCallsE inds e
-  in  (PatH c e' b, inds')
+  in  (PatB c e', inds')
 
 -- | Helper of 'insertCalls', sequentializes the effect
 --   of a processing function on a list.

@@ -243,9 +243,9 @@ evalE eOpts p (CaseZ (CLoc (Just (_, d)), _) e0 pats) ctxt st =
   let (val0, (ctbl0, wh0)) = evalE eOpts p e0 ctxt st
   in  case val0 of
         VT (c, ctxt') -> 
-          case Prelude.filter (\(PatZ cP _ _)->(cP==c)) pats of
+          case Prelude.filter (\(PatB (cP, _) _)->(cP==c)) pats of
             [] -> ierr $ "case: no branch for constructor "++(qName c)
-            [PatZ _ eP _] ->
+            [PatB _ eP] ->
               let ctbl' = nestCtxtUnder ctxt' ctxt ctbl0 d
               in  evalE eOpts p eP ctxt (ctbl', wh0)
             (_:_) -> ierr $ "case: multiple branches for constructor "++(qName c)

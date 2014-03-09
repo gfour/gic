@@ -111,9 +111,9 @@ enumLetLamE (st, LetF loc defs e) =
         _ -> ierr "the renamer found already enumerated let"
 enumLetLamE (st, CaseF d e b pats) =
   let enumLetLamP :: ((Int, Int), PatF) -> ((Int, Int), PatF)
-      enumLetLamP (st1, PatF sPat e1) =
+      enumLetLamP (st1, PatB sPat e1) =
         let (st2, e2) = enumLetLamE (st1, e1)
-        in  (st2, PatF sPat e2)
+        in  (st2, PatB sPat e2)
       (stE, e') = enumLetLamE (st, e)
       (stPats, pats') = procWithState enumLetLamP stE pats
   in  (stPats, CaseF d e' b pats')
@@ -197,8 +197,8 @@ uniqueNamesE m f ren (FF func el) =
         -- do not process bound variable applications
         BV _ _ -> FF func el'
 uniqueNamesE m f ren (CaseF d e b pats) =
-  let ppat (PatF (SPat c0 bs0) e0) =
-        PatF (SPat (renameConstr m ren c0) bs0) (uniqueNamesE m f ren e0)
+  let ppat (PatB (SPat c0 bs0, pI) e0) =
+        PatB (SPat (renameConstr m ren c0) bs0, pI) (uniqueNamesE m f ren e0)
   in  CaseF d (uniqueNamesE m f ren e) b (map ppat pats)
 uniqueNamesE m f ren (ConstrF c el) =
   let c' = renameConstr m ren c
@@ -302,7 +302,7 @@ prepE (ConF c el) = ConF c (map prepE el)
 prepE (FF f el) = FF (prepV f) (map prepE el)
 prepE (ConstrF c el) = ConstrF (prepQN c) (map prepE el)
 prepE (CaseF (cn, func) e scrut pats) =
-  let prepPat (PatF pat eP) = PatF (renameInvPat pat) (prepE eP)      
+  let prepPat (PatB (pat, pI) eP) = PatB (renameInvPat pat, pI) (prepE eP)
   in  CaseF (cn, prepQN func) (prepE e) (prepQN scrut) (map prepPat pats)
 prepE (LetF d ldefs e) = LetF d (map prepDef ldefs) (prepE e)
 prepE (LamF d v e) = LamF d (prepQN v) (prepE e)

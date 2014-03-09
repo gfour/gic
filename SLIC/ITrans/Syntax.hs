@@ -39,15 +39,8 @@ data DefH =
 -- | A HIL program.
 type ProgH = Prog DefH
 
--- | A flag that shows if a costructor binds variables in an expression.
-type BindsVars = Bool
-
--- | Prints the \"binds\" flag of patterns.
-pprintBinds :: BindsVars -> ShowS
-pprintBinds b = if b then ("   {binds}"++) else id
-
 -- | A HIL pattern pairs a constructor name with a HIL expression.
-data PatH = PatH CstrName ExprH BindsVars deriving (Eq, Read)
+type PatH = PatB CstrName ExprH
 
 -- | The signatures of imported functions.
 type ImportsI = FuncSigs
@@ -67,15 +60,9 @@ instance PPrint ExprH where
    pprint (FH qOp vn ps)   =
        pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
    pprint (CaseH cl@(cn, _) e pats) =
-      let dep = tabIdxOf cn
-          pprintPats []        = id
-          pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
-          pprintPat (PatH c0 e0 b0) =
-            ("\n  "++).spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
-            pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
-          pprintPats pats
-                
+      ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).nl.
+      pprint_tab_l (tabIdxOf cn) pats
+
 instance PPrint DefH where
     pprint (DefH vn ps e) =
         pprint vn.spaces 1.showStrings " " (map qName ps).(" = " ++).pprint e
@@ -101,8 +88,8 @@ data DefZ = DefZ QName ExprZ               -- ^ v = e
 -- | A 0-order intensional program.
 type ProgZ = Prog DefZ
 
--- | A 0-order pattern is a constructor name and an expression.
-data PatZ = PatZ CstrName ExprZ BindsVars deriving (Eq, Read)
+-- | A 0-order pattern.
+type PatZ = PatB CstrName ExprZ
 
 -- | A 0-order module.
 type ModZ = Mod ProgZ
@@ -113,14 +100,8 @@ instance PPrint ExprZ where
    pprint (FZ NOp e) = pprint e
    pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
    pprint (CaseZ cl@(cn, _) e pats) =
-     let dep = tabIdxOf cn
-         pprintPats []        = id
-         pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
-         pprintPat (PatZ c0 e0 b0) =
-           nl.(" "++).spaces dep.(" | "++).pprint c0.(" -> "++).
-           pprint e0.pprintBinds b0
-     in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
-          pprintPats pats
+     ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).nl.
+     pprint_tab_l (tabIdxOf cn) pats
    pprint (ConstrZ c) = pprintTH c
 
 instance PPrint DefZ where
@@ -128,9 +109,6 @@ instance PPrint DefZ where
    pprint (ActualsZ vn m es) =
      pprint vn.("{"++).(m++).("}"++).
      (" = actuals["++).pprintList (", "++) es.("]" ++)
-
-instance PPrint PatZ where
-   pprint (PatZ c e b) = (" | "++).pprint c.(" -> "++).pprint e.pprintBinds b
 
 -- | Searches for a function definition in ZOIL.
 searchDefZ :: QName -> ProgZ -> Maybe DefZ

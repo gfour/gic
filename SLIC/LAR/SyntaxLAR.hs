@@ -2,14 +2,13 @@
 -- 
 
 module SLIC.LAR.SyntaxLAR (ProgL, BlockL(..), CCstrName(..), ExprL(..),
-                           IsActuals, ModL, PatL(..), calcFuncArities,
+                           IsActuals, ModL, calcFuncArities,
                            countPMDepthL, countPMDepthsL, getBlockName,
                            isFun, mkCC, printLAR) where
 
 import Data.Map (empty, insert, insertWithKey)
 import SLIC.AuxFun (ierr, showStrings, spaces)
 import SLIC.Constants (nl)
-import SLIC.ITrans.Syntax (pprintBinds)
 import SLIC.SyntaxAux
 import SLIC.Types
 
@@ -47,35 +46,28 @@ data ExprL  = LARCall QName [QName]    -- ^ call variable with a LAR of variable
             | CaseL CaseLoc ExprL [PatL] -- ^ pattern matching expression
 
 -- | A LAR pattern.
-data PatL   = PatL CCstrName ExprL Bool
+type PatL = PatB CCstrName ExprL
 
 instance PPrint CCstrName where
   pprint (CC c cid ar) = pprintTH c.("{"++).shows cid.("}/"++).shows ar
 
 instance PPrint BlockL where
-    pprint (DefL v e bind) =
-        pprint v.spaces 1.showStrings " " (map qName bind).
-        (" = "++).pprint e
-    pprint (ActualL v act e) =
-        pprint v.(" = "++).(if act then ("ACTUAL."++) else id).pprint e
-        
+  pprint (DefL v e bind) =
+    pprint v.spaces 1.showStrings " " (map qName bind).(" = "++).pprint e
+  pprint (ActualL v act e) =
+    pprint v.(" = "++).(if act then ("ACTUAL."++) else id).pprint e
+
 instance PPrint ExprL where
-    pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
-    pprint (LARC cn el) = prettyConst 0 cn el
-    pprint (ConstrL c) = pprint c
-    pprint (BVL v cn) = pprintBVC v cn
-    pprint (CaseL cl@(cn, _) e pats) =
-        let dep = tabIdxOf cn
-            pprintPats []             = id
-            pprintPats (pat : ps)     = showPat pat.pprintPats ps
-            showPat (PatL c0 e0 b)= 
-                nl.(" "++).
-                (if b then ("#"++) else spaces 1).
-                spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
-                pprintBinds b
-        in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
-            pprintPats pats
-            
+  pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
+  pprint (LARC cn el) = prettyConst 0 cn el
+  pprint (ConstrL c) = pprint c
+  pprint (BVL v cn) = pprintBVC v cn
+  pprint (CaseL cl@(cn, _) e pats) =
+    let dep = tabIdxOf cn
+        pprintPats []             = id
+        pprintPats (pat : ps)     = nl.spaces dep.pprint pat.pprintPats ps
+    in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).pprintPats pats
+
 -- | Pretty printer for LAR modules. The typing environment is also given.
 printLAR :: TEnv -> ModL -> IO ()
 printLAR eLAR modL =
@@ -104,7 +96,7 @@ countPMDepthL (LARC _ []) = 0
 countPMDepthL (LARC _ args) = maximum (map countPMDepthL args)
 -- addition of dict arrays, to reuse/do any better we need some analysis
 countPMDepthL (CaseL (cn, _) e pats) = 
-  let patE (PatL _ eP _) = eP
+  let patE (PatB _ eP) = eP
       maxPatDepth [] = 0
       maxPatDepth ps = maximum (map countPMDepthL (map patE ps))
       cDep = case cn of CLoc _ -> 1 ; CFrm _ -> 0

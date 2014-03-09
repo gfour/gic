@@ -472,7 +472,7 @@ transl_e opts fm (S.Do stmts) st =
             (st3, stsFL) = aux sts st2
         in  -- TODO: we ignore the scrutinee x<-...
             (st3, CaseF noCaseLoc eFL underscoreVar
-                  [PatF (mkPat fm pat) stsFL])
+                  [PatB (mkPat fm pat, PatInfo True) stsFL])
       aux [S.Qualifier e] st1 = transl_e opts fm e st1
       aux _ _ = error "transl_e: cannot process do notation"
   in  aux stmts st
@@ -660,7 +660,7 @@ transl_pat opts fm (S.Alt _ hsPat alts _) st =
   case alts of
     S.UnGuardedAlt e ->
       let (st1, eFH) = transl_e opts fm e st
-      in  (st1, PatF (mkPat fm hsPat) eFH)
+      in  (st1, PatB (mkPat fm hsPat, PatInfo True) eFH)
     _ -> errM fm "transl_pat: can't handle alts"            
 
 -- | Pattern translation.

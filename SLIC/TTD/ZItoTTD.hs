@@ -71,8 +71,8 @@ transE vIDs n (XZ var) =
                BV qn cl -> BVarT (idOf vIDs qn) cl
   in  (((n', varT), []), n')
 transE vIDs n (CaseZ loc e patsZ) =
-  let patE (PatZ _ eP _) = eP
-      patC (PatZ cP _ _) = cP
+  let patE (PatB _ eP) = eP
+      patC (PatB (cP, _) _) = cP
       ((eID:patIDs), entries, n') = transL vIDs n (e:(map patE patsZ))
       n'' = n' + 1
       patsT = map (\(cP, eP)->PatT cP eP) $ zip (map patC patsZ) patIDs

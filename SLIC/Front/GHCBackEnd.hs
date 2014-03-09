@@ -130,7 +130,7 @@ transExpr dfs (Case e bnd _ alts) =
       notDEFAULT (DEFAULT, _, _) = False
       notDEFAULT _ = True
       pats = map (transPat dfs) (filter notDEFAULT alts)
-      -- keepPat (PatF _ _ (FF (V (QN Nothing "patError")) _)) = False
+      -- keepPat (PatB _ _ (FF (V (QN Nothing "patError")) _)) = False
       keepPat _ = True
       bndName = stringToQName $ showPPr dfs bnd
   in  -- if take 4 bndName == noBinder then 
@@ -148,7 +148,7 @@ transPat :: DynFlags -> Alt CoreBndr -> PatF
 transPat dfs (DataAlt altCon, bvs, e) =
   let cstr' = stringToQName $ showPPr dfs (dataConName altCon)
       bvs'  = map (stringToQName.showPPr dfs) bvs      
-  in  PatF (SPat cstr' bvs') (transExpr dfs e)
+  in  PatB (SPat cstr' bvs', PatInfo True) (transExpr dfs e)
 transPat _ (LitAlt _, _, _) = error "GHC Core literal patterns not yet supported"
 transPat _ (DEFAULT, _, _) = error "GHC Core DEFAULT branches not yet supported"
   
@@ -269,13 +269,13 @@ processPatMatch scrOpt datatypes defs =
       procPME si (CaseF d e bnd pats) =
         case e of
           ConF (CN c) _ ->
-            let testForConstr cT (PatF (SPat c' _) _) = cT==c'
+            let testForConstr cT (PatB (SPat c' _, _) _) = cT==c'
                 tPats = filter (testForConstr const_GHC_Types_True ) pats
                 fPats = filter (testForConstr const_GHC_Types_False) pats
             in  if c `elem` cOpsBool then
                   if length tPats == 1 && length fPats == 1 then
-                    let (PatF _ tExpr) = tPats !! 0
-                        (PatF _ fExpr) = fPats !! 0                        
+                    let (PatB _ tExpr) = tPats !! 0
+                        (PatB _ fExpr) = fPats !! 0                        
                     in  if bnd /= underscoreVar &&
                            countVarUses si (V bnd) tExpr == 0 &&
                            countVarUses si (V bnd) fExpr == 0 then
@@ -302,8 +302,8 @@ processPatMatch scrOpt datatypes defs =
                 renVar orig scrut (ConstrF c el) =
                   ConstrF c (map (renVar orig scrut) el)
                 renVar orig scrut (CaseF dC eC bndC patsC) =
-                  let renVarP (PatF sPat eP) =
-                        PatF sPat (renVar orig scrut eP)                  
+                  let renVarP (PatB sPat eP) =
+                        PatB sPat (renVar orig scrut eP)                  
                   in  CaseF dC (renVar orig scrut eC) bndC
                             (map renVarP patsC)
                 renVar orig scrut (LetF dL bindsL eL) =
@@ -312,8 +312,8 @@ processPatMatch scrOpt datatypes defs =
                   in  LetF dL (map renVarD bindsL) (renVar orig scrut eL)
                 renVar orig scrut (LamF dL vL eL) =
                   LamF dL vL (renVar orig scrut eL)
-                renPat orig scrut (PatF sPat ePat) =
-                  PatF sPat (renVar orig scrut ePat)
+                renPat orig scrut (PatB sPat ePat) =
+                  PatB sPat (renVar orig scrut ePat)
             in case e of
                  -- if 'case v of v2 pats' then 'case v of pats[v2/v]'
                  XF (V var) -> 
@@ -335,9 +335,10 @@ processPatMatch scrOpt datatypes defs =
         error "TODO: procPME/si for lambda"
       -- procPME si (LamF d v e) =
         -- LamF d v (procPME e)
-      procPMP si (PatF (SPat (QN Nothing tc) bvs@[_, _]) eP) | isTupleConstr tc =
-          PatF (SPat (dtTuple (length bvs)) bvs) (procPME si eP)
-      procPMP si (PatF sPat eP) = PatF sPat (procPME si eP)
+      procPMP si (PatB (SPat (QN Nothing tc) bvs@[_, _], pI) eP)
+        | isTupleConstr tc =
+          PatB (SPat (dtTuple (length bvs)) bvs, pI) (procPME si eP)
+      procPMP si (PatB sPat eP) = PatB sPat (procPME si eP)
   in  map procPMD defs
       
 -- * GHC built-in constructors

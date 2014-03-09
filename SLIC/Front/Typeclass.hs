@@ -216,7 +216,7 @@ inlineTcMethods tcInfo env modF =
                       ConF (CN CMulI) _   -> Just tInteger
                       ConF (LitInt _) _   -> Just tInt
                       CaseF _ _ _ []      -> Nothing
-                      CaseF _ _ _ ((PatF _ eP):_) -> argT eP -- use 1st pattern
+                      CaseF _ _ _ ((PatB _ eP):_) -> argT eP -- use 1st pattern
                       LetF _ _ eL         -> argT eL
                       LamF _ _ _          -> Nothing         -- can't handle lambda
                       FF (BV _ _) _       -> Nothing         -- can't handle bvars
@@ -234,5 +234,5 @@ inlineTcMethods tcInfo env modF =
       inlineTcE (CaseF d e s pats) = CaseF d (inlineTcE e) s (map inlineTcP pats)
       inlineTcE (LetF d binds e) = LetF d (map inlineTcD binds) (inlineTcE e)
       inlineTcE (LamF d v e) = LamF d v (inlineTcE e)
-      inlineTcP (PatF p e) = PatF p (inlineTcE e)
+      inlineTcP (PatB p e) = PatB p (inlineTcE e)
   in  modF{modProg=(Prog dts defs')}

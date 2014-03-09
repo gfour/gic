@@ -45,7 +45,7 @@ findUsedVarsE (ConZ _ el) = concatMap findUsedVarsE el
 findUsedVarsE (FZ _ v) = [v]
 findUsedVarsE (ConstrZ _) = []
 findUsedVarsE (CaseZ _ e pats) =
-    let procPat (PatZ _ e0 _) = findUsedVarsE e0
+    let procPat (PatB _ e0) = findUsedVarsE e0
     in  (findUsedVarsE e) ++ (concatMap procPat pats)
 
 -- | Returns the ZOIL definition of a variable.
@@ -152,7 +152,7 @@ findCBNbvs :: ScrutInfo -> ExprF -> Map QName Int
 findCBNbvs _ (XF _) = empty
 findCBNbvs _ (ConstrF _ _) = empty
 findCBNbvs si@(scrOpt, frms) (CaseF loc eC _ pats) =
-  let findBVUses (PatF (SPat _ bs) e) = 
+  let findBVUses (PatB (SPat _ bs, _) e) = 
         let bvUses  =
               fromList $ zip bs $ List.map (\v->countVarUses si (BV v loc) e) bs
             bvInner = findCBNbvs si e

@@ -81,6 +81,26 @@ calcCIDs ds =
       aux ((c, ar), cid) = (c, (ar, cid))
   in  Map.fromList $ map aux $ zip constrs [1..(length constrs)]
 
+-- * Pattern annotation
+
+-- | A flag that shows if a costructor binds variables in an expression.
+type BindsVars = Bool
+
+-- | Information stored about a pattern.
+data PatInfo = PatInfo BindsVars
+             deriving (Eq, Read, Show)
+
+instance PPrint PatInfo where
+  pprint (PatInfo b) = if b then ("#"++) else spaces 1
+
+-- | A pattern branch bundles a pattern with accompanying information and an
+--   expression.
+data PatB p e = PatB (p, PatInfo) e
+             deriving (Eq, Read, Show)
+
+instance (PPrint p, PPrint e) => PPrint (PatB p e) where
+  pprint (PatB (p, b) e) = spaces 1.pprint p.spaces 1.pprint b.("-> "++).pprint e
+
 -- * Programs
 
 -- | A program with data definitions and function definitions (parameterized).

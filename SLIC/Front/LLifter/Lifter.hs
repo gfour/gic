@@ -54,7 +54,7 @@ fvExprF vg vn exprF =
 --   an FL pattern and add the free vars of the pattern
 --   to the set associated with the given defined name
 fvPatF :: VarGrh -> QName -> PatF -> VarGrh
-fvPatF vg vn (PatF (SPat _ vnameL) exprF) =
+fvPatF vg vn (PatB (SPat _ vnameL, _) exprF) =
   Map.adjust (\s1 -> Set.difference s1 $ Set.fromList vnameL) 
               vn $ fvExprF vg vn exprF
 
@@ -108,8 +108,9 @@ aRenameExprF ren exprF =
 -- | a-rename an FL pattern using the given map associating
 --   names with names. Constructor and constant names are preserved
 aRenamePatF :: Renamings -> PatF -> PatF
-aRenamePatF ren (PatF (SPat cstrName vnameL) exprF) = 
-  PatF (SPat cstrName (List.map (\vn -> Map.findWithDefault vn vn ren) vnameL)) $
+aRenamePatF ren (PatB (SPat cstrName vnameL, pI) exprF) = 
+  PatB (SPat cstrName 
+        (List.map (\vn -> Map.findWithDefault vn vn ren) vnameL), pI) $
        aRenameExprF ren exprF
 
 -- | a-rename an FL definition using the given map associating
@@ -144,8 +145,8 @@ preApplyExprF vg exprF =
         ConstrF cstrName $ List.map (preApplyExprF vg) exprFL
     CaseF depth exprF' vname patFL -> 
         CaseF depth (preApplyExprF vg exprF') vname $ 
-          List.map (\(PatF sPat exprF'') -> 
-                        PatF sPat $ preApplyExprF vg exprF'')
+          List.map (\(PatB sPat exprF'') -> 
+                        PatB sPat $ preApplyExprF vg exprF'')
                    patFL
     LamF depth vname exprF' ->
         LamF depth vname $ preApplyExprF vg exprF'
@@ -200,8 +201,8 @@ abstractDefsExprF vg exprF =
       ConstrF cstrName $ List.map (abstractDefsExprF vg) exprFL
     FF v exprFL -> FF v $ List.map (abstractDefsExprF vg) exprFL
     CaseF depth exprF' vname patFL ->
-      let abstractDefsPatF (PatF sPat exprF'') =
-              PatF sPat $ abstractDefsExprF vg exprF''
+      let abstractDefsPatF (PatB sPat exprF'') =
+              PatB sPat $ abstractDefsExprF vg exprF''
       in CaseF depth (abstractDefsExprF vg exprF') vname $
             List.map abstractDefsPatF patFL
     LamF depth vname exprF' -> LamF depth vname $ 
@@ -233,9 +234,9 @@ liftDefsExprF exprF =
       let (defFLL, exprFL') = List.unzip $ List.map liftDefsExprF exprFL
       in (List.concat defFLL, FF v exprFL')
     CaseF depth exprF' vname patFL -> 
-      let liftDefsPatF (PatF sPat exprF'') = 
+      let liftDefsPatF (PatB sPat exprF'') = 
             let (defFL', exprF''') = liftDefsExprF exprF''
-            in (defFL', PatF sPat exprF''')
+            in (defFL', PatB sPat exprF''')
           (defFLL, patFL') = List.unzip $ List.map liftDefsPatF patFL
           (defFL, exprF'''') = liftDefsExprF exprF'
       in (defFL ++ (List.concat defFLL), CaseF depth exprF'''' vname patFL')

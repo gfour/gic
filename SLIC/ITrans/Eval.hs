@@ -150,8 +150,8 @@ evalZ trace prog d (FZ (Call i) v) ls dict pc =
 evalZ trace prog d (CaseZ (CLoc (Just (0, 0)), _) e pats) ls dict pc =
     evalZ trace prog (d+1) e ls dict ls >>= \e' ->
         let VT (c, dict') = e'
-            checkPat c0 (PatZ c1 _ _) = c0==c1
-            PatZ _ e'' _ = head (filter (checkPat c) pats)
+            checkPat c0 (PatB (c1, _) _) = c0==c1
+            PatB _ e'' = head (filter (checkPat c) pats)
         in  evalZ trace prog (d+1) e'' ls dict' pc
 evalZ _ _ _ eM@(CaseZ (CLoc loc, _) _ _) _ _ _ =
   ierr $ "Eval: nested pattern matching is not supported, found depth "++(pprintLoc loc "")++"!=0, in: "++(pprint eM "")
