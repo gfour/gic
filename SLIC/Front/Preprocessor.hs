@@ -35,7 +35,7 @@ import SLIC.SyntaxFL
 import SLIC.Types
 
 -- | A bound variable aliased to a constructor variable of some counter/depth.
-type Alias = (QName, (QName, CaseNested))
+type Alias = (QName, (QName, CaseLoc))
 -- | Aliased variables of the program become bound variables of a specific name,
 --   depth, and enclosing function.
 type BVInfo = [Alias]
@@ -210,29 +210,33 @@ procBV m (Prog dts defs) =
 --   by different case expressions that are at the same level but under different
 --   branches (and are therefore mutually exclusive).
 procBVE :: MName -> QName -> BVInfo -> Int -> ExprF -> ExprF
-procBVE m func al d (CaseF cn e b pats) =
-  let procBVPat dNext cn' (PatF (SPat c vs) eP) = 
-        let al' = getBVAliasesPat cn' c vs
+procBVE m func al d (CaseF cloc@(cn, ef) e b pats) =
+  let procBVPat dNext cloc' (PatF (SPat c vs) eP) = 
+        let al' = getBVAliasesPat cloc' c vs
             vs' = cArgsC c (length vs)
         in  PatF (SPat c vs') (procBVE m func (al++al') dNext eP)
-      pats' dNext cn' = map (procBVPat dNext cn') pats
+      pats' dNext cloc' = map (procBVPat dNext cloc') pats
+      ierrFunc = ierr $ "procBVE: pattern matching has different enclosing function already set: "++(qName ef)++" /= "++(qName func)++" for "++(pprint cn "")
   in  case cn of
         CFrm _ ->
-          CaseF cn (procBVE m func al d e) b (pats' d cn)
+          if func==ef then
+            CaseF cloc (procBVE m func al d e) b (pats' d cloc)
+          else
+            ierrFunc
         CLoc loc ->
           let dN   = d+1
-              cn'  = CLoc (Just (dN, dN), func)
-              case' = CaseF cn' (procBVE m func al d e) b (pats' dN cn')
+              cloc' = (CLoc (Just (dN, dN)), func)
+              case' = CaseF cloc' (procBVE m func al d e) b (pats' dN cloc')
           in  case loc of
-                (Nothing, _) -> case'
-                (Just (_, d'), ef) ->
+                Nothing -> case'
+                Just (_, d') ->
                   if (d' == d+1) || (ef == noEFunc) || (ef == func) then 
                     case'
                   else
                     if d' /= d+1 then
                       ierr $ "preprocessor: found pattern matching with depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
                     else if ef /= noEFunc && ef /= func then
-                           ierr $ "preprocessor: found pattern matching with different enclosing function already set: "++(qName ef)++" /= "++(qName func)
+                           ierrFunc
                          else
                            ierr "preprocessor: malformed case expression"
 procBVE m func al d (ConF c el) = ConF c (map (procBVE m func al d) el)
@@ -260,9 +264,9 @@ procBVEV al v =
 --   for the bound variables. Underscore binders are ignored.
 --   For example, pattern 'Cons x y' of depth 1 produces the following mapping:
 --   [(x, (cons_0, 1)), (y, (cons_1, 1))]
-getBVAliasesPat :: CaseNested -> CstrName -> [QName] -> [Alias]
-getBVAliasesPat cn c vs = 
-  let cVars = map (\v -> (v, cn)) (cArgsC c (length vs))
+getBVAliasesPat :: CaseLoc -> CstrName -> [QName] -> [Alias]
+getBVAliasesPat loc c vs = 
+  let cVars = map (\v -> (v, loc)) (cArgsC c (length vs))
       aliases = zip vs cVars
   in  filter (\(v, _)->v/=underscoreVar) aliases
 
@@ -573,8 +577,8 @@ checkNames modF =
   in  all (checkD globalNames) defs
 
 -- | If the first argument is true, then it returns the second as a formal
---   scrutinee, otherwise it returns the third as pattern matching location 0
---   of an enclosing function.
-cNested :: ScrutOpt -> QName -> QName -> CaseNested
-cNested True  scrut _    = CFrm scrut
-cNested False _     func = CLoc (Just (0, 0), func)
+--   scrutinee of the first, otherwise it returns the third as pattern
+--   matching location 0 of an enclosing function.
+cNested :: ScrutOpt -> QName -> QName -> CaseLoc
+cNested True  scrut func = (CFrm scrut, func)
+cNested False _     func = (CLoc (Just (0, 0)), func)

@@ -43,8 +43,8 @@ mkCC c cids =
 data ExprL  = LARCall QName [QName]    -- ^ call variable with a LAR of variables
             | LARC Const [ExprL]       -- ^ built-in constant application
             | ConstrL CCstrName        -- ^ constructor call
-            | BVL QName CaseNested     -- ^ bound variable (constructor projection)
-            | CaseL CaseNested ExprL [PatL] -- ^ pattern matching expression
+            | BVL QName CaseLoc        -- ^ bound variable (constructor projection)
+            | CaseL CaseLoc ExprL [PatL] -- ^ pattern matching expression
 
 -- | A LAR pattern.
 data PatL   = PatL CCstrName ExprL Bool
@@ -64,7 +64,7 @@ instance PPrint ExprL where
     pprint (LARC cn el) = prettyConst 0 cn el
     pprint (ConstrL c) = pprint c
     pprint (BVL v cn) = pprintBVC v cn
-    pprint (CaseL cn e pats) =
+    pprint (CaseL cl@(cn, _) e pats) =
         let dep = tabIdxOf cn
             pprintPats []             = id
             pprintPats (pat : ps)     = showPat pat.pprintPats ps
@@ -73,7 +73,7 @@ instance PPrint ExprL where
                 (if b then ("#"++) else spaces 1).
                 spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
                 pprintBinds b
-        in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
+        in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
             pprintPats pats
             
 -- | Pretty printer for LAR modules. The typing environment is also given.

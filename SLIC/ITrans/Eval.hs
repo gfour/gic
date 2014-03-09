@@ -147,13 +147,13 @@ evalZ trace prog d (FZ NOp v) ls dict pc =
     evalZ trace prog d (XZ (V v)) ls dict pc    
 evalZ trace prog d (FZ (Call i) v) ls dict pc =
   evalZ trace prog d (XZ (V v)) (i:ls) dict pc
-evalZ trace prog d (CaseZ (CLoc (Just (0, 0), _)) e pats) ls dict pc =
+evalZ trace prog d (CaseZ (CLoc (Just (0, 0)), _) e pats) ls dict pc =
     evalZ trace prog (d+1) e ls dict ls >>= \e' ->
         let VT (c, dict') = e'
             checkPat c0 (PatZ c1 _ _) = c0==c1
             PatZ _ e'' _ = head (filter (checkPat c) pats)
         in  evalZ trace prog (d+1) e'' ls dict' pc
-evalZ _ _ _ eM@(CaseZ (CLoc (loc, _)) _ _) _ _ _ =
+evalZ _ _ _ eM@(CaseZ (CLoc loc, _) _ _) _ _ _ =
   ierr $ "Eval: nested pattern matching is not supported, found depth "++(pprintLoc loc "")++"!=0, in: "++(pprint eM "")
 evalZ trace _ d (ConstrZ c) ls dict pc =
     (if trace then
@@ -165,7 +165,7 @@ evalZ trace _ d (ConstrZ c) ls dict pc =
      else
        return ()) >>
     return (VT (c, (pc, ls) : dict))
-evalZ trace prog d (XZ (BV bv (CLoc (Just (0, 0), _)))) ls dict pc =
+evalZ trace prog d (XZ (BV bv (CLoc (Just (0, 0)), _))) ls dict pc =
     let findH ctxt [] =
             ierr $ "Context " ++ (show ctxt) ++ " not found in dictionary " ++ (show dict)
         findH ctxt ((c0, pc0) : tl) =
@@ -212,7 +212,7 @@ forceVal trace prog val ctxt cids =
       let cArity = findArity c cids
           noFunc = ierr "no enclosing function in interpreter mode"
           evalVar v =
-            evalZ trace prog 0 (XZ (BV v (CLoc (Just (0, 0), noFunc)))) ctxt h ctxt >>= \val0 ->
+            evalZ trace prog 0 (XZ (BV v (CLoc (Just (0, 0)), noFunc))) ctxt h ctxt >>= \val0 ->
             forceVal trace prog val0 ctxt cids
           evalVars [] = return ()
           evalVars [v] = evalVar v

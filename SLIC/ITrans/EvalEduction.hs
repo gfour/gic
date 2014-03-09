@@ -236,10 +236,10 @@ evalE eOpts p (FZ (Call ii) v) ctxt st =
   in  evalV eOpts p v ctxt' st'
 evalE eOpts p (XZ (V v)) ctxt st =  
   evalV eOpts p v ctxt st
-evalE eOpts p (XZ (BV v (CLoc (Just (_, d), _)))) ctxt st@(ctbl, _) =
+evalE eOpts p (XZ (BV v (CLoc (Just (_, d)), _))) ctxt st@(ctbl, _) =
   let ctxt' = nestedOf d ctxt ctbl
   in  evalV eOpts p v ctxt' st
-evalE eOpts p (CaseZ (CLoc (Just (_, d), _)) e0 pats) ctxt st =
+evalE eOpts p (CaseZ (CLoc (Just (_, d)), _) e0 pats) ctxt st =
   let (val0, (ctbl0, wh0)) = evalE eOpts p e0 ctxt st
   in  case val0 of
         VT (c, ctxt') -> 

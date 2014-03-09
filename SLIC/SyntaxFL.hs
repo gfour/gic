@@ -40,7 +40,7 @@ data ExprFL a =
   | ConF Const [ExprFL a]            -- ^ constant operator
   | FF V [ExprFL a]                  -- ^ function application
   | ConstrF CstrName [ExprFL a]      -- ^ constructor call
-  | CaseF CaseNested (ExprFL a) QName [PatFL a]
+  | CaseF CaseLoc (ExprFL a) QName [PatFL a]
     -- ^ pattern matching expression, /case e as v of patterns/
   | LetF Loc [DefFL a] (ExprFL a)  -- ^ let ... in ...
   | LamF Depth QName (ExprFL a)      -- ^ lambda abstraction
@@ -154,12 +154,13 @@ instance PPrint a => PPrint (ExprFL a) where
    pprintPrec p (FF vn ps) =
      showParen (p>0) (pprint vn.spaces 1.pprintList space ps)
    pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprintList space el
-   pprintPrec p (CaseF cn e bind pats) =
+   pprintPrec p (CaseF cl@(cn, _) e bind pats) =
      let dep = tabIdxOf cn
      in  ("case "++).pprintPrec p e.
          (if bind==underscoreVar then id else (" as '"++).pprint bind.("'"++)).
          (" of "++).
-         comment (("Nested="++).pprint cn.(", Bind="++).pprint bind.spaces 1).
+         comment (("Nested="++).pprintCaseLoc cl.
+                  (", Bind="++).pprint bind.spaces 1).
          lbracket.nl.
          pprint_tab_l dep pats.rbracket
    pprintPrec p (LetF loc bs e) =
@@ -360,7 +361,7 @@ countVarUses v (LetF _ binds e) =
 countVarUses v (LamF _ _ e) = countVarUses v e
 
 -- | Checks if the bound variables of the list are used by an expression.
-areBound :: [(QName, CaseNested)] -> ExprF -> Bool
+areBound :: [(QName, CaseLoc)] -> ExprF -> Bool
 areBound [] _ = False
 -- assumption: free variables are not bound
 areBound _ (XF (V _)) = False
@@ -418,16 +419,16 @@ hasLs p =
 countPMDepths :: [DefF] -> PMDepths
 countPMDepths defs =
   let countD (DefF f _ e) = (f, countE e)
-      dOfLoc (CLoc (Just (c, _), _)) = c+1
-      dOfLoc (CLoc (Nothing, _)) = ierr "dOfLoc: no location data found"
+      dOfLoc (CLoc (Just (c, _))) = c+1
+      dOfLoc (CLoc Nothing) = ierr "dOfLoc: no location data found"
       dOfLoc (CFrm _) = 0
       countV (V _) = 0
-      countV (BV _ loc) = dOfLoc loc
+      countV (BV _ (loc, _)) = dOfLoc loc
       countE (XF v) = countV v
       countE (FF v el) = maximum ((countV v):(map countE el))
       countE (ConF _ el) = maximum (0:(map countE el))
       countE (ConstrF _ el) = maximum (0:(map countE el))
-      countE (CaseF loc e _ pats) =
+      countE (CaseF (loc, _) e _ pats) =
         let countP (PatF _ eP) = countE eP
         in  maximum ((dOfLoc loc):((countE e):(map countP pats)))
       -- These constructs are not supported, we assume lambda lifted code.

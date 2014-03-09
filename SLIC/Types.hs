@@ -141,27 +141,30 @@ pprintLoc Nothing = ("??"++)
 pprintLoc (Just (c, d)) = ("#"++).shows c.("/"++).shows d
 
 -- | A \"case ... of\" location inside an enclosing function.
-type CaseLoc = (Loc, QName)
+type CaseLoc = (CaseNested, QName)
+
+pprintCaseLoc :: CaseLoc -> ShowS
+pprintCaseLoc (cn, qn) = pprint cn.(" of "++).pprint qn
 
 -- | The field from which a case clause or a bound variable read the nested field.
 --   This eliminates the need for a \'nested\' field when doing pattern matching
 --   on a function formal.
-data CaseNested = CLoc CaseLoc     -- ^ a \'nested\' field in a LAR
-                | CFrm QName       -- ^ the context of a function formal
+data CaseNested = CLoc Loc       -- ^ a \'nested\' field in a LAR
+                | CFrm QName     -- ^ the context found in a formal
                 deriving (Eq, Ord, Read, Show)
 
 instance PPrint CaseNested where
-  pprint (CLoc (l, qn)) = pprintLoc l.(" of "++).pprint qn
+  pprint (CLoc l)   = pprintLoc l
   pprint (CFrm frm) = pprint frm
 
 -- | Returns a tab index for pretty printing.
 tabIdxOf :: CaseNested -> Int
-tabIdxOf (CLoc (Just (_, dep), _)) = dep
+tabIdxOf (CLoc (Just (_, dep))) = dep
 tabIdxOf _ = 0
 
 -- | The default value for code where no enumeration has taken place yet.
-noCaseLoc :: CaseNested
-noCaseLoc = CLoc (Nothing, noEFunc)
+noCaseLoc :: CaseLoc
+noCaseLoc = (CLoc Nothing, noEFunc)
 
 -- | The indexes of strict formals for a function signature.
 type StrictInds = [Int]
@@ -273,7 +276,7 @@ paramsOf qn fsigs =
 
 -- | Program variables.
 data V = V QName               -- ^ normal (free or local) variable
-       | BV QName CaseNested   -- ^ pattern-bound variable
+       | BV QName CaseLoc      -- ^ pattern-bound variable
        deriving (Eq, Ord, Read, Show)
              
 instance PPrint V where
@@ -281,8 +284,9 @@ instance PPrint V where
   pprint (BV v cn) = pprintBVC v cn
 
 -- | Shows a bound variable name at a given pattern matching nesting depth.
-pprintBVC :: QName -> CaseNested -> ShowS
-pprintBVC v cn = ("@"++).pprint v.if comments then comment (pprint cn) else id
+pprintBVC :: QName -> CaseLoc -> ShowS
+pprintBVC v cl =
+  ("@"++).pprint v.if comments then comment (pprintCaseLoc cl) else id
 
 -- | Modifies the name of a variable.
 modifyV :: (QName -> QName) -> V -> V

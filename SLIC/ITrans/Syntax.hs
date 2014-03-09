@@ -21,7 +21,7 @@ data ExprH =
     XH V                     -- ^ variable
   | ConH Const [ExprH]       -- ^ built-in constant application
   | FH QOp QName [ExprH]     -- ^ function call (with intensional operators)
-  | CaseH CaseNested ExprH [PatH] -- ^ pattern matching expression
+  | CaseH CaseLoc ExprH [PatH] -- ^ pattern matching expression
   | ConstrH CstrName         -- ^ constructor call
   deriving (Eq,Read)
 
@@ -66,14 +66,14 @@ instance PPrint ExprH where
    pprint (FH NOp vn ps)   = pprint vn.pprintList space ps
    pprint (FH qOp vn ps)   =
        pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
-   pprint (CaseH cn e pats) =
+   pprint (CaseH cl@(cn, _) e pats) =
       let dep = tabIdxOf cn
           pprintPats []        = id
           pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
           pprintPat (PatH c0 e0 b0) =
             ("\n  "++).spaces dep.("| "++).pprint c0.(" -> "++).pprint e0.
             pprintBinds b0
-      in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
+      in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
           pprintPats pats
                 
 instance PPrint DefH where
@@ -89,7 +89,7 @@ instance PPrint DefH where
 data ExprZ = XZ V                          -- ^ variable
            | ConZ Const [ExprZ]            -- ^ built-in constant application
            | FZ QOp QName                  -- ^ intensional call operator
-           | CaseZ CaseNested ExprZ [PatZ] -- ^ pattern matching
+           | CaseZ CaseLoc ExprZ [PatZ]    -- ^ pattern matching
            | ConstrZ CstrName              -- ^ intensional constructor
            deriving (Eq, Read)
 
@@ -112,14 +112,14 @@ instance PPrint ExprZ where
    pprint (ConZ cn el) = prettyConst 0 cn el
    pprint (FZ NOp e) = pprint e
    pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
-   pprint (CaseZ cn e pats) =
+   pprint (CaseZ cl@(cn, _) e pats) =
      let dep = tabIdxOf cn
          pprintPats []        = id
          pprintPats (p0 : pl) = pprintPat p0 . pprintPats pl
          pprintPat (PatZ c0 e0 b0) =
            nl.(" "++).spaces dep.(" | "++).pprint c0.(" -> "++).
            pprint e0.pprintBinds b0
-     in  ("case "++).pprint e.(" of{"++).pprint cn.("}"++).
+     in  ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).
           pprintPats pats
    pprint (ConstrZ c) = pprintTH c
 
