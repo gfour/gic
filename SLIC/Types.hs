@@ -181,6 +181,11 @@ pprintStrictFrms stricts =
 -- | A map containing the call-by-name formals of each function.
 type CBNVars = Map.Map QName [QName]
 
+pprintCBNVars :: CBNVars -> ShowS
+pprintCBNVars cbns =
+  let aux (f, frms) = pprint f.(" : "++).pprintList (", "++) frms.nl
+  in  foldDot aux $ Map.toList cbns
+
 -- | The variable usage information contains the variables that can be evaluated
 --   using call-by-name and those that can be evaluated using call-by-value.
 type VUsage = (CBNVars, Stricts)
