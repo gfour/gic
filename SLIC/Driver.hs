@@ -136,6 +136,7 @@ processFL opts dfis inputModule =
       
      -- do variable usage analysis
      let cbnVars = findCBNVars opts p0Final
+     -- _ <- putStrLn (pprintCBNVars cbnVars "")
      let stricts = gatherStrictVars p0Final
      -- let mergedVarUsage = (cbnVars, stricts)
           
