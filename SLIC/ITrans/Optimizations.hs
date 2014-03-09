@@ -125,7 +125,7 @@ findCBNVars :: Options -> ModF -> CBNVars
 findCBNVars opts modF =
   let Prog _ defs = modProg modF
       scrOpt = optScrut opts
-      cbnConstrParams = [] -- findCBNComps defs
+      cbnConstrParams = findCBNComps scrOpt defs
       findCBNVarsD :: DefF -> (QName, [QName])
       findCBNVarsD (DefF f frms (ConstrF _ _)) =
         (f, frmsToNames (filter (\(Frm v _)-> v `elem` cbnConstrParams) frms))
@@ -137,45 +137,44 @@ findCBNVars opts modF =
         in  (f, List.map fst cbnFrms)
   in  fromList (List.map findCBNVarsD defs)
 
-{-
 -- | Find the call-by-name components of the constructors. These are the
 --   bound variables that are always used <2 times in the pattern branches 
 --   of the program.
-findCBNComps :: [DefF] -> [QName]
-findCBNComps defs =
-  let aux def@(DefF f _ e) = findCBNbvs (defSig def) e
+findCBNComps :: ScrutOpt -> [DefF] -> [QName]
+findCBNComps scrOpt defs =
+  let aux (DefF _ frms e) = findCBNbvs (scrOpt, frmsToNames frms) e
       bvUses = toList (unionsWith max (List.map aux defs))
   in  List.map fst (filter (\(_,i)->i<2) bvUses)
 
 -- | Analyzes an FL expression to find the maximum number of uses for
 --   bound variables in pattern matching clauses.
-findCBNbvs :: (ScrutOpt, FSig) -> ExprF -> Map QName Int
+findCBNbvs :: ScrutInfo -> ExprF -> Map QName Int
 findCBNbvs _ (XF _) = empty
-findCBNbvs _ (ConstrF _ el) = unionsWith max (List.map (findCBNbvs sf) el)
-findCBNbvs sf@(scrOpt, (f, frms)) (CaseF loc eC _ pats) =
+findCBNbvs si (ConstrF _ el) = empty
+findCBNbvs si@(scrOpt, frms) (CaseF loc eC _ pats) =
   let findBVUses (PatF (SPat _ bs) e) = 
         let bvUses  =
-              fromList $ zip bs $ List.map (\v->countVarUses (BV v loc) e) bs
-            bvInner = findCBNbvs sf e
+              fromList $ zip bs $ List.map (\v->countVarUses si (BV v loc) e) bs
+            bvInner = findCBNbvs si e
         in  unionWith max bvUses bvInner
       scrutUses =
         case eC of
           XF (V v) | scrOpt && (v `elem` frms) -> fromList [(v, 2)]
-          _                                    -> findCBNbvs f eC
+          _                                    -> findCBNbvs si eC
   in  -- "case" is strict in its scrutinee
       unionWith (+) scrutUses $ unionsWith max (List.map findBVUses pats)
-findCBNbvs sf (ConF (CN c) el) = 
+findCBNbvs si (ConF (CN c) el) = 
   case c of
     -- "if" is strict in its first argument only
-    CIf -> unionWith (+) (findCBNbvs sf (el!!0)) $
-           unionWith max (findCBNbvs sf (el!!1)) (findCBNbvs sf (el!!2))
-    _   -> unionsWith max (List.map (findCBNbvs sf) el)
+    CIf -> unionWith (+) (findCBNbvs si (el!!0)) $
+           unionWith max (findCBNbvs si (el!!1)) (findCBNbvs si (el!!2))
+    _   -> unionsWith max (List.map (findCBNbvs si) el)
 findCBNbvs _ (ConF (LitInt _) es) =
   case es of
     [] -> empty
     _  -> ierr "findCBNbvs: found literal application to expressions"
-findCBNbvs sf (FF _ el) = unionsWith max (List.map (findCBNbvs sf) el)
+findCBNbvs si (FF _ el) = unionsWith max (List.map (findCBNbvs si) el)
 findCBNbvs _ (LetF _ _ _) = ierr "findCBNbvs: encountered let-binding"
 findCBNbvs _ (LamF _ _ _) = ierr "findCBNbvs: encountered lambda"
--}
+
 
