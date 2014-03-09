@@ -150,7 +150,7 @@ findCBNComps scrOpt defs =
 --   bound variables in pattern matching clauses.
 findCBNbvs :: ScrutInfo -> ExprF -> Map QName Int
 findCBNbvs _ (XF _) = empty
-findCBNbvs si (ConstrF _ el) = empty
+findCBNbvs _ (ConstrF _ _) = empty
 findCBNbvs si@(scrOpt, frms) (CaseF loc eC _ pats) =
   let findBVUses (PatF (SPat _ bs) e) = 
         let bvUses  =
