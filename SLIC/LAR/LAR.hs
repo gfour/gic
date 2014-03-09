@@ -441,7 +441,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
                       CFrm _             -> ("CONSTR("++).matchedExpr.(")"++)
       defaultCase = tab.("default: printf(\"Pattern matching on "++).pprint e.
                     (" failed: constructor %d encountered.\\n\", "++).
-                    sConstrID.("); exit(0);"++)
+                    sConstrID.("); exit(0);"++).nl
       -- | Generates C code for a pattern. /case/ bodies are contained
       --   in {...} as they may contain declarations.
       mkCPat (PatL (CC c cId _) eP bindsVars) =
@@ -487,7 +487,12 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
        else if (length pats == 1) && (not (optDebug opts)) then
               -- one pattern only; skip the branching
               let [PatL _ patE bindsVars] = pats
-              in  tab.mkPatBody patE bindsVars.semi
+              in  -- If using a formal scrutinee, evaluate it now (since the
+                  -- 'switch' that evaluates it will be skipped).
+                  (case cn of
+                     CFrm _ -> matchedExpr.(";"++).nl
+                     CLoc _ -> id).
+                  tab.mkPatBody patE bindsVars.semi
             else
               tab.("switch ("++).sConstrID.(") {"++).nl.
               cases.
