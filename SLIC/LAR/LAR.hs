@@ -431,16 +431,17 @@ mkCExp env config (LARCall n acts) =
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)
   else makeActs n acts env config
-mkCExp _ _ (CaseL (CFrm _, _) _ _) =
-  error "TODO: mkCExp: CFrm"
-mkCExp env config (CaseL (CLoc d@(Just (counter, _)), efunc) e pats) =
+mkCExp env config (CaseL (cn, efunc) e pats) =
   let matchedExpr = mkCExp env config e
       cases       = foldDot mkCPat pats      
       opts        = getOptions config
-      dS          = shows counter
+      sConstrID   = case cn of
+                      CLoc Nothing       -> ierrCLoc
+                      CLoc (Just (c, _)) -> ("CONSTR(cl["++).shows c.("])"++)
+                      CFrm _             -> ("CONSTR("++).matchedExpr.(")"++)
       defaultCase = tab.("default: printf(\"Pattern matching on "++).pprint e.
-                    (" failed: constructor %d encountered.\\n\", CONSTR(cl["++).
-                    dS.("])); exit(0);"++)
+                    (" failed: constructor %d encountered.\\n\", "++).
+                    sConstrID.("); exit(0);"++)
       -- | Generates C code for a pattern. /case/ bodies are contained
       --   in {...} as they may contain declarations.
       mkCPat (PatL (CC c cId _) eP bindsVars) =
@@ -466,11 +467,17 @@ mkCExp env config (CaseL (CLoc d@(Just (counter, _)), efunc) e pats) =
         mkCExp env config ePB
       compact = optCompact opts
       argsN = getFuncArity efunc (getArities config)
-  in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
-      -- TODO: eliminate this when all patterns are nullary constructors
-      -- (or are used as such, see 'bindsVars')
-      tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
-      logDict opts d.
+      ierrCLoc = ierr $ "mkCExp: non-enumerated case expression: "++(pprint e "")
+  in  (case cn of
+          CLoc Nothing -> ierrCLoc
+          CLoc (Just (counter, _)) ->
+            let dS = shows counter
+            in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
+                -- TODO: eliminate this when all patterns are nullary constructors
+                -- (or are used as such, see 'bindsVars')
+                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
+                logDict opts counter ;
+           CFrm _ -> id).
       -- if debug mode is off, optimize away constructor choice when there is
       -- only one pattern (will segfault/misbehave if the constructor
       -- reached is missing)
@@ -482,25 +489,26 @@ mkCExp env config (CaseL (CLoc d@(Just (counter, _)), efunc) e pats) =
               let [PatL _ patE bindsVars] = pats
               in  tab.mkPatBody patE bindsVars.semi
             else
-              tab.("switch (CONSTR(cl["++).dS.("])) {"++).nl.
+              tab.("switch ("++).sConstrID.(") {"++).nl.
               cases.
               -- only add "default:" when debugging
               (if optDebug opts then defaultCase else id).
               tab.("}"++).nl)
-mkCExp _ _ e@(CaseL (CLoc Nothing, _) _ _) =
-  ierr $ "mkCExp: found non-enumerated case expression: "++(pprint e "")
 mkCExp _ _ (ConstrL _) =
   ierr "LAR: ConstrL can only occur as the first symbol of a definition"
-mkCExp _ config (BVL v (CLoc (Just (counter, _)), fname)) =
+mkCExp _ _ e@(BVL _ (CLoc Nothing, _)) =
+  ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
+mkCExp _ config bv@(BVL v (cloc, fname)) =
   let gc = optGC $ getOptions config
       compact = optCompact $ getOptions config
       argsN = getFuncArity fname (getArities config)
-  in  pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
-mkCExp _ _ e@(BVL _ (CLoc Nothing, _)) =
-  ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
-mkCExp _ _ (BVL _ (CFrm _, _)) =
-  error "TODO: mkCExp:CFrm"
-
+  in  case cloc of
+        CLoc Nothing -> ierr $ "non-enumerated bound variable: "++(pprint bv "")
+        CLoc (Just (counter, _)) ->
+          pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
+        CFrm i ->
+          -- Read the nested context directly from the formal (no thunk flag check).
+          pprint v.("(GETTPTR(("++).mkGETSTRICTARG gc fname i.(").ctxt))"++)
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of

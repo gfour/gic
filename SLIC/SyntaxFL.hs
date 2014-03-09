@@ -10,6 +10,7 @@ import Data.Char (ord, toUpper)
 import Data.Map (elems, empty, filterWithKey, fromList, keys, lookup, unionWithKey)
 import SLIC.AuxFun (comment, ierr, showStrings, spaces, toLowerFirst)
 import SLIC.Constants
+import SLIC.State (ScrutOpt)
 import SLIC.SyntaxAux
 import SLIC.Types
 
@@ -336,29 +337,35 @@ restrictVEnvToProg ve (Prog dts defs) =
 
 -- * Variable usage analyses
 
+-- | The information needed if formal scrutinees are used.
+type ScrutInfo = (ScrutOpt, [QName])
+
 -- | Counts how many times a variable is used in an expression.
-countVarUses :: V -> ExprF -> Int
-countVarUses v (XF v') = if v==v' then 1 else 0
-countVarUses v (ConF (CN c) el) = 
+countVarUses :: ScrutInfo -> V -> ExprF -> Int
+countVarUses _ v (XF v') = if v==v' then 1 else 0
+countVarUses si v (ConF (CN c) el) = 
   case c of
        -- "if" is strict in its first argument
-       CIf -> (countVarUses v (el!!0)) + 
-              maximum [countVarUses v (el!!1), countVarUses v (el!!2)]
-       _   -> sum (map (countVarUses v) el)
-countVarUses _ (ConF (LitInt _) _) = 0
-countVarUses v (FF _ el) =
+       CIf -> (countVarUses si v (el!!0)) + 
+              maximum [countVarUses si v (el!!1), countVarUses si v (el!!2)]
+       _   -> sum (map (countVarUses si v) el)
+countVarUses _ _ (ConF (LitInt _) _) = 0
+countVarUses si v (FF _ el) =
     -- assume it is a strict first-order function (i.e. uses all its arguments) 
-    sum (map (countVarUses v) el)
-countVarUses v (CaseF _ e _ pats) =
+    sum (map (countVarUses si v) el)
+countVarUses si@(scrOpt, frms) v (CaseF _ e _ pats) =
   let maxVU [] = 0
-      maxVU ps = maximum (map (countVarUses v) (map (\(PatF _ eP)->eP) ps))
-  in (countVarUses v e) + (maxVU pats)  
-countVarUses v (ConstrF _ el) = sum (map (countVarUses v) el)
-  -- error "countVarUses: found constructor call without wrapper"
-countVarUses v (LetF _ binds e) =
-  let aux (DefF _ _ eD) = countVarUses v eD
-  in  sum $ (countVarUses v e) : (map aux binds)
-countVarUses v (LamF _ _ e) = countVarUses v e
+      maxVU ps = maximum (map (countVarUses si v) (map (\(PatF _ eP)->eP) ps))
+      scrutVU =
+        case (e, v) of
+          (XF (V eV), V vV) | scrOpt && (eV==vV) && (vV `elem` frms) -> 2
+          _ -> countVarUses si v e
+  in  scrutVU + (maxVU pats)  
+countVarUses si v (ConstrF _ el) = sum (map (countVarUses si v) el)
+countVarUses si v (LetF _ binds e) =
+  let aux (DefF _ _ eD) = countVarUses si v eD
+  in  sum $ (countVarUses si v e) : (map aux binds)
+countVarUses si v (LamF _ _ e) = countVarUses si v e
 
 -- | Checks if the bound variables of the list are used by an expression.
 areBound :: [(QName, CaseLoc)] -> ExprF -> Bool

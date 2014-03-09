@@ -121,7 +121,7 @@ processFL opts dfis inputModule =
      let p0DefStr = procModSource (\_ p->markStrict (optStrict opts) p) p0Def
      -- _ <- (putStrLn ("* Strictness marked") >> printLn p0Def)          
      -- enumerate case expressions and bound variables
-     let p0BVars = procModSource procBV p0DefStr
+     let p0BVars = procModSource (procBV opts) p0DefStr
      -- update the DFI with this new information
      let p0Dfi = updPMDepths p0DefDfi p0BVars
      -- _ <- (putStrLn ("* Bound variables processed") >> printLn p0BVars)
@@ -135,7 +135,7 @@ processFL opts dfis inputModule =
      -- _ <- printLn p0Final
       
      -- do variable usage analysis
-     let cbnVars = findCBNVars p0Final
+     let cbnVars = findCBNVars opts p0Final
      let stricts = gatherStrictVars p0Final
      -- let mergedVarUsage = (cbnVars, stricts)
           

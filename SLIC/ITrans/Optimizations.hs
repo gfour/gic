@@ -116,58 +116,66 @@ ifEnumThenInt ds typ =
 
 -- * Usage analysis
 
--- | Analyzes a FL program to find which formals of each function
---   do not need to be stored in thunks.
-findCBNVars :: ModF -> CBNVars
-findCBNVars modF =
+-- | Analyzes a FL program to find which formals of each function do not need 
+--   to be stored in thunks. Returns all the bound variables used <2 times in
+--   pattern matching throughout the program. Exception: if formal scrutinees
+--   are direcly used as nesting by the code generator (see 'optStruct' in
+--   'SLIC.State'), then these are assumed to require thunks.
+findCBNVars :: Options -> ModF -> CBNVars
+findCBNVars opts modF =
   let Prog _ defs = modProg modF
-      -- returns all the bound variables used <2 times in pattern
-      -- matching throughout the program
-      cbnConstrParams = findCBNComps defs
+      scrOpt = optScrut opts
+      cbnConstrParams = [] -- findCBNComps defs
       findCBNVarsD :: DefF -> (QName, [QName])
       findCBNVarsD (DefF f frms (ConstrF _ _)) =
         (f, frmsToNames (filter (\(Frm v _)-> v `elem` cbnConstrParams) frms))
       -- returns all the formals used <2 times in the function body
       findCBNVarsD (DefF f frms e) =    
-        let frmUses = List.map (\(Frm v _) -> (v, countVarUses (V v) e)) frms
+        let si = (scrOpt, frmsToNames frms)
+            frmUses = List.map (\(Frm v _) -> (v, countVarUses si (V v) e)) frms
             cbnFrms = filter (\(_, i) -> i<2) frmUses
         in  (f, List.map fst cbnFrms)
   in  fromList (List.map findCBNVarsD defs)
 
+{-
 -- | Find the call-by-name components of the constructors. These are the
 --   bound variables that are always used <2 times in the pattern branches 
 --   of the program.
 findCBNComps :: [DefF] -> [QName]
 findCBNComps defs =
-  let aux (DefF f _ e) = findCBNbvs f e
+  let aux def@(DefF f _ e) = findCBNbvs (defSig def) e
       bvUses = toList (unionsWith max (List.map aux defs))
   in  List.map fst (filter (\(_,i)->i<2) bvUses)
 
 -- | Analyzes an FL expression to find the maximum number of uses for
 --   bound variables in pattern matching clauses.
-findCBNbvs :: QName -> ExprF -> Map QName Int
+findCBNbvs :: (ScrutOpt, FSig) -> ExprF -> Map QName Int
 findCBNbvs _ (XF _) = empty
-findCBNbvs _ (ConstrF _ _) = empty
-findCBNbvs f (CaseF loc _ _ pats) =
+findCBNbvs _ (ConstrF _ el) = unionsWith max (List.map (findCBNbvs sf) el)
+findCBNbvs sf@(scrOpt, (f, frms)) (CaseF loc eC _ pats) =
   let findBVUses (PatF (SPat _ bs) e) = 
         let bvUses  =
               fromList $ zip bs $ List.map (\v->countVarUses (BV v loc) e) bs
-            bvInner = findCBNbvs f e
+            bvInner = findCBNbvs sf e
         in  unionWith max bvUses bvInner
-  in  unionsWith max (List.map findBVUses pats)
-findCBNbvs f (ConF (CN c) el) = 
+      scrutUses =
+        case eC of
+          XF (V v) | scrOpt && (v `elem` frms) -> fromList [(v, 2)]
+          _                                    -> findCBNbvs f eC
+  in  -- "case" is strict in its scrutinee
+      unionWith (+) scrutUses $ unionsWith max (List.map findBVUses pats)
+findCBNbvs sf (ConF (CN c) el) = 
   case c of
     -- "if" is strict in its first argument only
-    CIf -> unionWith (+) (findCBNbvs f (el!!0))
-           (unionWith max (findCBNbvs f (el!!1)) (findCBNbvs f (el!!2)))
-    _   -> unionsWith max (List.map (findCBNbvs f) el)
+    CIf -> unionWith (+) (findCBNbvs sf (el!!0)) $
+           unionWith max (findCBNbvs sf (el!!1)) (findCBNbvs sf (el!!2))
+    _   -> unionsWith max (List.map (findCBNbvs sf) el)
 findCBNbvs _ (ConF (LitInt _) es) =
   case es of
     [] -> empty
     _  -> ierr "findCBNbvs: found literal application to expressions"
-findCBNbvs f (FF _ el) = unionsWith max (List.map (findCBNbvs f) el)
+findCBNbvs sf (FF _ el) = unionsWith max (List.map (findCBNbvs sf) el)
 findCBNbvs _ (LetF _ _ _) = ierr "findCBNbvs: encountered let-binding"
 findCBNbvs _ (LamF _ _ _) = ierr "findCBNbvs: encountered lambda"
-
--- * Variable usage analysis
+-}
 

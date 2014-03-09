@@ -584,10 +584,9 @@ mkApplyFuns (ndf, strictness, scrOpt) dfcs extApps =
             frmNames = (genCl ar):params
             frms     = List.map (\v->Frm v strictness) frmNames
             appFunc  = genNApp ar
-            scrut    = genCl ar
-            cn       = cNested scrOpt scrut appFunc
+            cn       = cNested scrOpt 0 appFunc
         in  DefF appFunc frms
-            (CaseF cn (XF (V scrut)) underscoreVar pats)
+            (CaseF cn (XF $ V $ genCl ar) underscoreVar pats)
       -- Create dispatchers for inhabited closure residual types.
       aux 0  = 
         ierr "mkApplyFuns: cannot create a dispatcher for 0 parameters"
@@ -629,8 +628,7 @@ type PatGen = ScrutOpt -> QName -> [QName] -> DFC -> PatF
 mkPatFull :: PatGen
 mkPatFull scrOpt app frms (DFC c ar _ (f, _)) =
   let bns = cArgsC c ar
-      scrut = genCl $ length frms
-      bvs = List.map (\v->XF $ BV v (cNested scrOpt scrut app)) bns
+      bvs = List.map (\v->XF $ BV v (cNested scrOpt 0 app)) bns
   in  PatF (SPat c bns) (FF (V f) (bvs ++ (List.map (\v->XF $ V v) frms)))
 
 -- | Take a list of apply()-formals and a closure constructor and generate
@@ -638,8 +636,7 @@ mkPatFull scrOpt app frms (DFC c ar _ (f, _)) =
 mkPatPartial :: PatGen
 mkPatPartial scrOpt app frms (DFC c ar _ (f, _)) =
   let bns  = cArgsC c ar
-      scrut = genCl $ length frms
-      bvs  = List.map (\v->XF $ BV v (cNested scrOpt scrut app)) bns
+      bvs  = List.map (\v->XF $ BV v (cNested scrOpt 0 app)) bns
   in  PatF (SPat c bns) $
       ConstrF (genNC f (ar + length frms)) (bvs ++ (List.map (\v->XF $ V v) frms))
 

@@ -142,7 +142,7 @@ processArgs cmdArgs =
         aux ("-strict": args) opts = aux args opts{optStrict = True}
         aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
         aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
-        aux ("-compact":args) opts = aux args opts{optCompact = True}{optGC=SemiGC}
+        aux ("-compact":args) opts = aux args opts{optCompact = True}{optGC=SemiGC}{optScrut=True}
         aux ("-fop"   : args) opts = aux args opts{optFastOp = True}
         aux ("-tag"   : args) opts = aux args opts{optTag = True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
@@ -292,7 +292,7 @@ runThroughGHC mNames fPath mg opts =
         GHCCore ->
           do (dflags', cMod) <- wrapper coreGHC
              binds <- cMod
-             transfCore dflags' binds []
+             transfCore opts dflags' binds []
              return True
 
 instance Outputable TypecheckedModule where

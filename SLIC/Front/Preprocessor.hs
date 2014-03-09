@@ -24,6 +24,7 @@ module SLIC.Front.Preprocessor (checkMod, cNested, constrToFuncs, convertFromGHC
                                 markStrict, procBV, projCName, 
                                 qual, updCName) where
 
+import Data.List (elemIndex)
 import qualified Data.Map as Map (Map, fromList, keys, lookup, map, mapKeys, union)
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (errM, ierr, toLowerFirst)
@@ -99,7 +100,7 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
           let (pn, [px]) = projCSig c i
               cPat = SPat c bvs
               selBody func arg =
-                CaseF (cNested scrOpt arg func) (XF (V arg)) underscoreVar
+                CaseF (cNested scrOpt 0 func) (XF (V arg)) underscoreVar
                 [ PatF cPat (XF (V (bvs !! i))) ]
               recFields =
                 case sel of
@@ -112,7 +113,7 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
                         ux1 = procLName (++"$_1") updName
                         updFields = (take i bvs) ++ [ux1] ++ (drop (i+1) bvs)
                         updater  = DefF updName [Frm ux0 s, Frm ux1 s]
-                                   (CaseF (cNested scrOpt ux0 updName)
+                                   (CaseF (cNested scrOpt 0 updName)
                                     (XF (V ux0)) underscoreVar
                                     [PatF cPat
                                      (FF (V c) (map (\v->XF(V v)) updFields))]
@@ -189,44 +190,51 @@ selCSig selName =
 
 -- | Enumerates case expressions and bound variables according to their 
 --   depth in the program text.
-procBV :: MName -> ProgF -> ProgF
-procBV m (Prog dts defs) = 
+procBV :: Options -> MName -> ProgF -> ProgF
+procBV opts m (Prog dts defs) = 
   let -- Enumerates the bound variables of a definition.
       procBVD :: DefF -> DefF
-      procBVD (DefF v frms e) =
+      procBVD def@(DefF v frms e) =
         -- the initial depth is -1: local vars outside of case..of should
         -- compile to illegal code
-        DefF v frms (procBVE m v [] (-1) e)
+        DefF v frms (procBVE (optScrut opts) m (defSig def) [] (-1) e)
   in  Prog dts (map procBVD defs)
 
 -- | Processes all local bound variables to standard variable names that refer
 --   to an enclosing pattern-matching clause.
 --   The first two arguments are the names of the enclosing module and function
---   for this clause. The third argument is the aliases encountered so far
+--   signature for the clause. The third argument is the aliases encountered so far
 --   (created by patterns). The fourth argument is the curent depth.
 --   If a correctly enumerated case expression or bound variable is found, it
 --   is left unchanged (it is assumed to have been created by defunctionalization).
 --   Enumeration happens across every branch path and the same depth may be used
 --   by different case expressions that are at the same level but under different
 --   branches (and are therefore mutually exclusive).
-procBVE :: MName -> QName -> BVInfo -> Int -> ExprF -> ExprF
-procBVE m func al d (CaseF cloc@(cn, ef) e b pats) =
+procBVE :: ScrutOpt -> MName -> FSig -> BVInfo -> Int -> ExprF -> ExprF
+procBVE scrOpt m fsig@(func, frms) al d (CaseF cloc@(cn, ef) e b pats) =
   let procBVPat dNext cloc' (PatF (SPat c vs) eP) = 
         let al' = getBVAliasesPat cloc' c vs
             vs' = cArgsC c (length vs)
-        in  PatF (SPat c vs') (procBVE m func (al++al') dNext eP)
+        in  PatF (SPat c vs') (procBVE scrOpt m fsig (al++al') dNext eP)
       pats' dNext cloc' = map (procBVPat dNext cloc') pats
       ierrFunc = ierr $ "procBVE: pattern matching has different enclosing function already set: "++(qName ef)++" /= "++(qName func)++" for "++(pprint cn "")
-  in  case cn of
-        CFrm _ ->
-          if func==ef then
-            CaseF cloc (procBVE m func al d e) b (pats' d cloc)
-          else
-            ierrFunc
-        CLoc loc ->
+  in  case (cn, e) of
+        (CFrm i, XF (V v)) -> 
+          -- Accept already set CFrm annotations (but do sanity check).
+          if ef /= func then    ierrFunc
+          else if v /= frms !! i then ierr "CFrm annotation mismatch"
+               else CaseF cloc (procBVE scrOpt m fsig al d e) b (pats' d cloc)
+        (CFrm _, _) -> ierr "CFrm set for non-formal scrutinee"
+        (CLoc Nothing, XF (V v)) | scrOpt && (v `elem` frms) ->
+          case elemIndex v frms of
+            Just i ->
+              let cloc' = (CFrm i, func)
+              in  CaseF cloc' (procBVE scrOpt m fsig al d e) b (pats' d cloc')
+            Nothing -> ierr "procBVE: error handling function formal"
+        (CLoc loc, _) ->
           let dN   = d+1
               cloc' = (CLoc (Just (dN, dN)), func)
-              case' = CaseF cloc' (procBVE m func al d e) b (pats' dN cloc')
+              case' = CaseF cloc' (procBVE scrOpt m fsig al d e) b (pats' dN cloc')
           in  case loc of
                 Nothing -> case'
                 Just (_, d') ->
@@ -234,22 +242,22 @@ procBVE m func al d (CaseF cloc@(cn, ef) e b pats) =
                     case'
                   else
                     if d' /= d+1 then
-                      ierr $ "preprocessor: found pattern matching with depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
+                      ierr $ "preprocessor: pattern matching has depth already set, value="++(show d')++", but it was going to be "++(show (d+1))
                     else if ef /= noEFunc && ef /= func then
                            ierrFunc
                          else
                            ierr "preprocessor: malformed case expression"
-procBVE m func al d (ConF c el) = ConF c (map (procBVE m func al d) el)
-procBVE m func al d (ConstrF c el) = ConstrF c (map (procBVE m func al d) el)
-procBVE m func al d (FF f el) =
+procBVE so m func al d (ConF c el) = ConF c (map (procBVE so m func al d) el)
+procBVE so m func al d (ConstrF c el) = ConstrF c (map (procBVE so m func al d) el)
+procBVE so m func al d (FF f el) =
   case f of
-    V fName -> FF (procBVEV al fName) (map (procBVE m func al d) el)
+    V fName -> FF (procBVEV al fName) (map (procBVE so m func al d) el)
     BV _ _  -> ierr "Bound variable found by procBVE, should not appear here"
-procBVE _ _ _ _ bv@(XF (BV _ _)) = bv
-procBVE _ _ al _ (XF (V v)) = XF (procBVEV al v)
-procBVE _ _ _ _ e@(LetF _ _ _) =
+procBVE _ _ _ _ _ bv@(XF (BV _ _)) = bv
+procBVE _ _ _ al _ (XF (V v)) = XF (procBVEV al v)
+procBVE _ _ _ _ _ e@(LetF _ _ _) =
   ierr $ "procBVE(): let binding not lifted: " ++ (pprint e "")
-procBVE _ _ _ _ e@(LamF _ _ _) =
+procBVE _ _ _ _ _ e@(LamF _ _ _) =
   ierr $ "procBVE(): lambda should have already been lifted: " ++ (pprint e "")
 
 -- | The actual function that spots and renames a variable.
@@ -576,9 +584,9 @@ checkNames modF =
       checkPat names (PatF (SPat _ bvs) e) = checkE (names++bvs) e
   in  all (checkD globalNames) defs
 
--- | If the first argument is true, then it returns the second as a formal
---   scrutinee of the first, otherwise it returns the third as pattern
---   matching location 0 of an enclosing function.
-cNested :: ScrutOpt -> QName -> QName -> CaseLoc
-cNested True  scrut func = (CFrm scrut, func)
-cNested False _     func = (CLoc (Just (0, 0)), func)
+-- | If the first argument is true, then it returns the second as a LAR slot
+--   for a formal that is a scrutinee of the third function. Otherwise it
+--   returns the pattern matching location 0 of the third function.
+cNested :: ScrutOpt -> Int -> QName -> CaseLoc
+cNested True  i func = (CFrm i, func)
+cNested False _ func = (CLoc (Just (0, 0)), func)

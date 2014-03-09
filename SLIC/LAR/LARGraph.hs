@@ -11,18 +11,16 @@
 module SLIC.LAR.LARGraph (logConstr, logDict, logGraphStart, logGraphEnd,
                           logPrev) where
 
-import SLIC.AuxFun (ierr)
 import SLIC.Constants (nl, tab)
 import SLIC.State (Options(optVerbose))
-import SLIC.Types (CstrName, Loc, PPrint(pprint))
+import SLIC.Types (Counter, CstrName, PPrint(pprint))
 
 -- | Logs a dictionary connection.
-logDict :: Options -> Loc -> ShowS
-logDict opts (Just (_, depth)) =
+logDict :: Options -> Counter -> ShowS
+logDict opts counter =
   if optVerbose opts then
-    tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, cl["++).shows depth.("].ctxt); "++)
+    tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, cl["++).shows counter.("].ctxt); "++)
   else id
-logDict _ Nothing = ierr "logDict: no depth found"
 
 -- | Logs a constructor evaluation hit.
 logConstr :: Options -> CstrName -> ShowS

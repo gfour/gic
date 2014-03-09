@@ -150,12 +150,12 @@ pprintCaseLoc (cn, qn) = pprint cn.(" of "++).pprint qn
 --   This eliminates the need for a \'nested\' field when doing pattern matching
 --   on a function formal.
 data CaseNested = CLoc Loc       -- ^ a \'nested\' field in a LAR
-                | CFrm QName     -- ^ the context found in a formal
+                | CFrm Int      -- ^ the context found in a formal slot in a LAR
                 deriving (Eq, Ord, Read, Show)
 
 instance PPrint CaseNested where
-  pprint (CLoc l)   = pprintLoc l
-  pprint (CFrm frm) = pprint frm
+  pprint (CLoc l) = pprintLoc l
+  pprint (CFrm i) = ("formal#"++).shows i
 
 -- | Returns a tab index for pretty printing.
 tabIdxOf :: CaseNested -> Int

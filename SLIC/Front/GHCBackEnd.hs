@@ -24,7 +24,7 @@ import SLIC.AuxFun (ierr, trace2)
 import SLIC.Constants
 import SLIC.Driver (processFL)
 import SLIC.Front.GHCFrontEnd (showPPr, showSDoc', transT)
-import SLIC.State (defaultOptions)
+import SLIC.State (Options(..), ScrutOpt, defaultOptions)
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
 import SLIC.Types
@@ -33,9 +33,10 @@ import SLIC.Types
 
 -- | The main entry point of the GHC connector, takes a GHC Core program
 --   (as a set of binders and type constructors) and feeds it to the compiler.
-transfCore :: DynFlags -> CoreProgram -> [TyCon] -> IO ()
-transfCore dfs binds tyCons = 
-  let defs      = processPatMatch datatypes (concatMap (transBind dfs) binds)
+transfCore :: Options -> DynFlags -> CoreProgram -> [TyCon] -> IO ()
+transfCore opts dfs binds tyCons = 
+  let scr       = optScrut opts
+      defs      = processPatMatch scr datatypes (concatMap (transBind dfs) binds)
       datatypes = map (transTyCon dfs) tyCons
       fm        = (defaultMod, modNoPath)
       exports   = empty
@@ -248,24 +249,24 @@ transTyCon dfs tyCon =
 -- | Processes pattern matching expressions to make them more FL-like:
 --   removes scrutinee binders, translates boolean pattern matching 
 --   to if-then-else, processes calls to built-in tuples.
-processPatMatch :: [Data] -> [DefF] -> [DefF]
-processPatMatch datatypes defs =
+processPatMatch :: ScrutOpt -> [Data] -> [DefF] -> [DefF]
+processPatMatch scrOpt datatypes defs =
   let isTupleConstr s =
         (length s > 2) && (head s == '(') && (last s == ')') && 
         (all (==',') $ tail $ init s)
-      procPMD (DefF f fs e) = DefF f fs (procPME e)
-      procPME e@(XF _) = e
-      procPME (ConF c el) = ConF c (map procPME el)
-      procPME (FF f el) = FF f (map procPME el)
-      procPME (ConstrF (QN Nothing c) el@[_, _]) | isTupleConstr c =
+      procPMD (DefF f fs e) = DefF f fs (procPME (scrOpt, frmsToNames fs) e)
+      procPME _ e@(XF _) = e
+      procPME si (ConF c el) = ConF c (map (procPME si) el)
+      procPME si (FF f el) = FF f (map (procPME si) el)
+      procPME si (ConstrF (QN Nothing c) el@[_, _]) | isTupleConstr c =
           let tupleC = bf_Tuple (length el)
           in  if constrExists datatypes tupleC then
-                ConstrF tupleC (map procPME el)
+                ConstrF tupleC (map (procPME si) el)
               else
                 error $ "GHC tuple found, you should define a " ++
                         (show tupleC) ++ " constructor"
-      procPME (ConstrF c el) = ConstrF c (map procPME el)
-      procPME (CaseF d e bnd pats) =
+      procPME si (ConstrF c el) = ConstrF c (map (procPME si) el)
+      procPME si (CaseF d e bnd pats) =
         case e of
           ConF (CN c) _ ->
             let testForConstr cT (PatF (SPat c' _) _) = cT==c'
@@ -274,10 +275,10 @@ processPatMatch datatypes defs =
             in  if c `elem` cOpsBool then
                   if length tPats == 1 && length fPats == 1 then
                     let (PatF _ tExpr) = tPats !! 0
-                        (PatF _ fExpr) = fPats !! 0
+                        (PatF _ fExpr) = fPats !! 0                        
                     in  if bnd /= underscoreVar &&
-                           countVarUses (V bnd) tExpr == 0 &&
-                           countVarUses (V bnd) fExpr == 0 then
+                           countVarUses si (V bnd) tExpr == 0 &&
+                           countVarUses si (V bnd) fExpr == 0 then
                           ConF (CN CIf) [e, tExpr, fExpr]
                         else
                           error "boolean pattern matching uses binder"
@@ -317,19 +318,26 @@ processPatMatch datatypes defs =
                  -- if 'case v of v2 pats' then 'case v of pats[v2/v]'
                  XF (V var) -> 
                    let renPats = map (renPat var bnd) pats
-                   in  CaseF d (procPME e) underscoreVar (map procPMP renPats)
+                   in  CaseF d (procPME si e) underscoreVar
+                       (map (procPMP si) renPats)
                  -- in the general case, transform 'case e of v2 pats'  
                  -- to let v2 = e in case e of pats'
                  -- this may lead to loss of efficiency
                  _ ->
                    LetF Nothing [DefF bnd [] e] (
-                     CaseF d (XF (V bnd)) underscoreVar (map procPMP pats)
+                     CaseF d (XF (V bnd)) underscoreVar (map (procPMP si) pats)
                    )
-      procPME (LetF d binds e) = LetF d (map procPMD binds) (procPME e)
-      procPME (LamF d v e) = LamF d v (procPME e)
-      procPMP (PatF (SPat (QN Nothing tc) bvs@[_, _]) eP) | isTupleConstr tc =
-          PatF (SPat (dtTuple (length bvs)) bvs) (procPME eP)
-      procPMP (PatF sPat eP) = PatF sPat (procPME eP)
+      procPME _ (LetF _ _ _) =
+        error "TODO: procPME/si for let"
+      -- procPME si (LetF d binds e) =
+        -- LetF d (map procPMD binds) (procPME si e)
+      procPME _ (LamF _ _ _) =
+        error "TODO: procPME/si for lambda"
+      -- procPME si (LamF d v e) =
+        -- LamF d v (procPME e)
+      procPMP si (PatF (SPat (QN Nothing tc) bvs@[_, _]) eP) | isTupleConstr tc =
+          PatF (SPat (dtTuple (length bvs)) bvs) (procPME si eP)
+      procPMP si (PatF sPat eP) = PatF sPat (procPME si eP)
   in  map procPMD defs
       
 -- * GHC built-in constructors
