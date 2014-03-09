@@ -103,11 +103,12 @@ countPMDepthL (BVL _ _) = 0
 countPMDepthL (LARC _ []) = 0
 countPMDepthL (LARC _ args) = maximum (map countPMDepthL args)
 -- addition of dict arrays, to reuse/do any better we need some analysis
-countPMDepthL (CaseL _ e pats) = 
+countPMDepthL (CaseL (cn, _) e pats) = 
   let patE (PatL _ eP _) = eP
       maxPatDepth [] = 0
       maxPatDepth ps = maximum (map countPMDepthL (map patE ps))
-  in  1 + (countPMDepthL e) + (maxPatDepth pats)
+      cDep = case cn of CLoc _ -> 1 ; CFrm _ -> 0
+  in  cDep + (countPMDepthL e) + (maxPatDepth pats)
 
 -- | Counts the maximum depths of nested pattern matching expressions
 --   in a LAR program, for every definition.
