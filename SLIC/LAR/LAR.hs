@@ -380,7 +380,7 @@ forceStricts :: GC -> StrictInds -> Arity -> ShowS
 forceStricts gc strictInds fArity =
   let aux x =
         mkVALS gc x fArity "T0".
-        (" = ARGS_FUNC("++).shows x.(", T0)(T0); // strict "++).nl
+        (" = CODE("++).shows x.(", T0)(T0); // strict "++).nl
   in  foldDot aux strictInds
 
 -- | Generates the C code for an expression that is assumed to be the body
@@ -410,14 +410,14 @@ mkCExp :: TEnv -> ConfigLAR -> ExprL -> ShowS
 mkCExp env config (LARC (CN c) exps) =
   let compact = optCompact $ getOptions config
   in  case c of
-        CIf  -> ("(PRIMVAL_R("++).(mkCExp env config (exps !! 0) ).(")?"++).
+        CIf  -> ("(PVAL_R("++).(mkCExp env config (exps !! 0) ).(")?"++).
                  ("("++).(mkCExp env config (exps !! 1)).("):"++).
                  ("("++).(mkCExp env config (exps !! 2)).("))"++)
         c' | c' `elem` [ CMinus, CPlus, CMult, CDivide, CEqu, CLe, CGe  
                        , CGt, CLt, CAnd, COr, CMulI, CNEq, CMod, CDiv] ->
           mkBinOp c' exps env config
         CNeg -> 
-          ("PRIMVAL_C(-(PRIMVAL_R("++).(mkCExp env config (exps !! 0)).
+          ("PVAL_C(-(PVAL_R("++).(mkCExp env config (exps !! 0)).
           ("))"++).mIntTag config.(")"++)
         CTrue  -> intSusp compact "True"
         CFalse -> intSusp compact "False"
@@ -526,10 +526,10 @@ mkBinOp :: COp -> [ExprL] -> TEnv -> ConfigLAR -> ShowS
 mkBinOp c [e1, e2] env config =
   let e1' = mkCExp env config e1
       e2' = mkCExp env config e2
-      val1 = ("PRIMVAL_R("++).e1'.(")"++)
-      val2 = ("PRIMVAL_R("++).e2'.(")"++)
+      val1 = ("PVAL_R("++).e1'.(")"++)
+      val2 = ("PVAL_R("++).e2'.(")"++)
       cBin cOp tagFunc =
-        ("(PRIMVAL_C("++).val1.(cOp++).val2.tagFunc config.("))"++)
+        ("(PVAL_C("++).val1.(cOp++).val2.tagFunc config.("))"++)
       opts = getOptions config
       useFastOps = (optCompact opts) && (optFastOp opts)
       -- This is used by the fast arithmetic ops.
@@ -559,7 +559,7 @@ mkBinOp _ _ _ _ =
 intSusp :: Bool -> String -> ShowS
 intSusp compact c =
   if compact then
-    ("PRIMVAL_C("++).(c++).(")"++)
+    ("PVAL_C("++).(c++).(")"++)
   else
     ("(SUSP("++).(c++).(", "++).intTag.(", (TP_)NULL))"++)
 
@@ -696,7 +696,7 @@ mainFunc env opts mainNesting modules =
             if (dt==dtInt || dt==dtBool) then
               if compact then
                 -- compact mode, special int representation
-                tab.("printf(\"%lu, \", PRIMVAL_R(res));"++).nl
+                tab.("printf(\"%lu, \", PVAL_R(res));"++).nl
               else
                 -- normal mode, ints are isomorphic to nullary constructors
                 tab.("if ((CPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.

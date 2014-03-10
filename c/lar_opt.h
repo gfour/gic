@@ -82,16 +82,16 @@ typedef struct T_ {
 // single-threaded runtime
 #ifndef USE_OMP
 
-#define ZEROIFTAG(x)                        0
-#define THE_VALS(VARSARITY, T)              (THE_ARGS(T))
-#define ARGS(x, T)                          ((((Susp*) THE_VALS(0, T))[x])).ctxt
-#define ARGS_FLAG(x, T)                     ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)0x1))
-#define ARGC(arg)                           (TP_)((uintptr_t)arg | (uintptr_t)0x1)
-#define ARGS_FUNC(x, T)                     ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)(~1)))
+#define ZEROIFTAG(x)           0
+#define THE_VALS(VARSARITY, T) (THE_ARGS(T))
+#define ARGS(x, T)             ((((Susp*) THE_VALS(0, T))[x])).ctxt
+#define ARGS_FLAG(x, T)        ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)0x1))
+#define ARGC(arg)              (TP_)((uintptr_t)arg | (uintptr_t)0x1)
+#define CODE(x, T)             ((LarArg)((uintptr_t)ARGS(x, T) & (~1)))
 #define INIT_ARG_LOCKS(arity_a)                { }
 #define GETARG(x, ARGSARITY, T)  ({            \
-      if (ARGS_FLAG(x, T) != NULL) {		       \
-        Susp val = ARGS_FUNC(x, T)(T);                     \
+      if (ARGS_FLAG(x, T) != NULL) {           \
+        Susp val = CODE(x, T)(T);              \
         VALS(x, ARGSARITY, T) = val;           \
       }                                        \
       VALS(x, ARGSARITY, T);                   \
@@ -104,7 +104,7 @@ typedef struct T_ {
 #define ZEROIFTAG(x)                        x
 #define THE_VALS(VARSARITY, T)              (THE_ARGS(T) + VARSARITY * sizeof(LarArg))
 #define ARGS(x, T)                          ((((LarArg*) THE_ARGS(T))[x]).larArg)
-#define ARGS_FUNC(x, T)                     ARGS(x, T)
+#define CODE(x, T)                          ARGS(x, T)
 #define ARGC(arg)                           arg
 #define LOCKS(x, T)                         (omp_lock_t*)(&((((LarArg*) THE_ARGS(T))[x]).larArgLock))
 
@@ -150,26 +150,26 @@ typedef struct T_ {
 #define GETSTRICTARG(x, VARSARITY, T)      VALS(x, VARSARITY, T)
 
 /* A call-by-name argument calls directly the argument, does no memoization. */
-#define GETCBNARG(x, T)                    (ARGS_FUNC(x, T)(T))
+#define GETCBNARG(x, T)  (CODE(x, T)(T))
 
 /* *********** Macros of the LAR API *********** */
 
-#define CPTR(p)            p
-#define CONSTR(p)          p.constr
+#define CPTR(p)       (p)
+#define CONSTR(p)     (p).constr
 
 /* Primitive value read/create macros. Isomorphic to nullary constructors. */
-#define PRIMVAL_R(p)                   p.constr
+#define PVAL_R(p)     (p).constr
 
 #ifdef USE_TAGS
 #error TODO: USE_TAGS for lar_opt.h
 #else
-#define PRIMVAL_C(i)                   ((Susp) { i, NULL })
+#define PVAL_C(i)     ((Susp) { i, NULL })
 #endif /* USE_TAGS */
 
 #ifdef USE_TAGS
 /* Thunk constructor: (constructor, tag, ctxt). */
-#define SUSP(c, t, p)      ((Susp) {c, t, p})
+#define SUSP(c, t, p) ((Susp) {(c), (t), (p)})
 #else
 /* Thunk constructor, ignores the tag 't'. */
-#define SUSP(c, t, p)      ((Susp) {c, p})
+#define SUSP(c, t, p) ((Susp) {(c), (p)})
 #endif /* USE_TAGS */

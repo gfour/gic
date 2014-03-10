@@ -152,27 +152,27 @@ typedef struct T_ {
 /** Reads the code pointer of a LAR thunk.
     \param x The position of the thunk in the LAR.
     \param T The LAR. */
-#define ARGS_FUNC(x, T)  ARGS(x, T)
+#define CODE(x, T)  ARGS(x, T)
 /** Creates the code pointer of a LAR thunk.
     \param The code pointer to store. */
 #define ARGC(arg)        arg
 /** Reads a pointer. */
-#define CPTR(p)         p
+#define CPTR(p)          p
 /** Returns the constructor part of a thunk. */
-#define CONSTR(p)          p.constr
+#define CONSTR(p)        p.constr
 
 /** Primitive value read/create macros. Isomorphic to nullary constructors. */
-#define PRIMVAL_R(p)                   p.constr
+#define PVAL_R(p)        p.constr
 
 #ifdef USE_TAGS
 /** Creates a primitive value.
     \param i The integer to store.
     \param tag The data type tag to embed. */
-#define PRIMVAL_C(i, tag)              ((Susp) { i, tag, NULL })
+#define PVAL_C(i, tag)   ((Susp) { i, tag, NULL })
 #else
 /** Creates a primitive value.
     \param i The integer to store. */
-#define PRIMVAL_C(i)                   ((Susp) { i, NULL })
+#define PVAL_C(i)        ((Susp) { i, NULL })
 #endif /* USE_TAGS */
 
 #ifdef USE_TAGS

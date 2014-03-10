@@ -99,7 +99,7 @@ typedef struct T_ {
 
 #define GETARG(x, T)  ({                  \
       if (ARGS_FLAG(x, T) != NULL) {	  \
-        Susp val = ARGS_FUNC(x, T)(T);    \
+        Susp val = CODE(x, T)(T);         \
         VALS(x, T) = val;                 \
       }                                   \
       VALS(x, T);                         \
@@ -109,7 +109,7 @@ typedef struct T_ {
 #define GETSTRICTARG(x, T)                 VALS(x, T)
 
 /* A call-by-name argument calls directly the argument, does no memoization. */
-#define GETCBNARG(x, T)                    (ARGS_FUNC(x, T)(T))
+#define GETCBNARG(x, T)                    (CODE(x, T)(T))
 
 #define AR_CAT(A, B) AR_CAT_AUX(A, B)
 #define AR_CAT_AUX(A, B) A ## B
@@ -129,19 +129,18 @@ typedef struct T_ {
 
 /* *********** Macros of the LAR API *********** */
 
-#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
-#define ARGC(arg)                      ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
-#define ARGS_FUNC(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)(~1)))
-
 /* shift right, fill with 0s */
-#define CONSTR(p)                      ((int)(((uintptr_t)p.ctxt) >> 48))
+#define CONSTR(p)     ((int)(((uintptr_t)(p).ctxt) >> 48))
+#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
+#define ARGC(arg)     ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
+#define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
 
 /* Primitive value read/create macros. These values use all high 61 bits. */
-#define PRIMVAL_R(p)                   ((signed long)(((intptr_t)(p).ctxt) >> 3))
-#define PRIMVAL_C(i)                   ((Susp) { (TP_)(((intptr_t)(i)) << 3) } )
+#define PVAL_R(p)     ((signed long)(((intptr_t)(p).ctxt) >> 3))
+#define PVAL_C(i)     ((Susp) { (TP_)(((intptr_t)(i)) << 3) } )
 
 /* Thunk constructor, ignores the tag 't'. */
-#define SUSP(c, t, p)                  ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
+#define SUSP(c, t, p) ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
 
 /* ********** Fast integer handling ***** */
 
@@ -156,19 +155,24 @@ typedef struct T_ {
 
 /* ********** Garbage collection ********** */
 
-#define IS_FORWARDED(ar)   ((((uintptr_t)(ar->prev)) & 0x1) == 0x1)
+#define IS_FORWARDED(ar)   ((uintptr_t)((ar)->prev) & 1)
 #define FORWARDED_ADDR(p)  ((TP_)(((uintptr_t)p) & ~1))
 
 /** Embeds arity/nesting/previous-pointer information in a single word.
-    \param n_arity   the arity of the LAR
-    \param n_nesting the nesting depth of the LAR
-    \param prev      the access-link pointer to the parent LAR
-    \return          the constructed "prev" field
+    \param a    the arity of the LAR
+    \param n    the nesting depth of the LAR
+    \param prev the access-link pointer to the parent LAR
+    \return     the constructed "prev" field
 */
-#define ARINFO(n_arity, n_nesting, prev) (TP_)((((uintptr_t)n_arity) << 56) | (((uintptr_t)n_nesting) << 48) | (((uintptr_t)prev) & PTRMASK))
+#define ARINFO(a, n, prev) (TP_)((((uintptr_t)(a)) << 56) \
+                               | (((uintptr_t)(n)) << 48) \
+                          | (((uintptr_t)prev) & PTRMASK))
+
 /** Returns the access-link pointer of a LAR. */
-#define AR_prev(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
+#define AR_prev(T0)   ((TP_)(((intptr_t)(T0->prev) << 16) >> 16))
+/** Returns the "arity" field of a LAR. */
 #define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
+/** Returns the "nesting" field of a LAR. */
 #define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xff))
 
 #define ARITY(lar)    AR_a(((TP_)lar)->prev)
