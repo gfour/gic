@@ -169,7 +169,7 @@ typedef struct T_ {
 /** Returns the access-link pointer of a LAR. */
 #define AR_prev(T0)   ((TP_)((((intptr_t)(((uintptr_t)(T0->prev)) << 16)) >> 16)))
 #define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
-#define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xffff))
+#define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xff))
 
 #define ARITY(lar)    AR_a(((TP_)lar)->prev)
 #define NESTING(lar)  AR_n(((TP_)lar)->prev)
