@@ -157,7 +157,7 @@ typedef struct T_ {
     \param The code pointer to store. */
 #define ARGC(arg)        arg
 /** Reads a pointer. */
-#define GETTPTR(p)         p
+#define CPTR(p)         p
 /** Returns the constructor part of a thunk. */
 #define CONSTR(p)          p.constr
 

@@ -154,7 +154,7 @@ typedef struct T_ {
 
 /* *********** Macros of the LAR API *********** */
 
-#define GETTPTR(p)         p
+#define CPTR(p)            p
 #define CONSTR(p)          p.constr
 
 /* Primitive value read/create macros. Isomorphic to nullary constructors. */

@@ -475,7 +475,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
             in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
                 -- TODO: eliminate this when all patterns are nullary constructors
                 -- (or are used as such, see 'bindsVars')
-                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = GETTPTR(cl["++).dS.("].ctxt);"++).nl.
+                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = CPTR(cl["++).dS.("].ctxt);"++).nl.
                 logDict opts counter ;
            CFrm _ -> id).
       -- if debug mode is off, optimize away constructor choice when there is
@@ -513,7 +513,7 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
           pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
         CFrm i ->
           -- Read the nested context directly from the formal (no thunk flag check).
-          pprint v.("(GETTPTR(("++).mkGETSTRICTARG gc fname i.(").ctxt))"++)
+          pprint v.("(CPTR(("++).mkGETSTRICTARG gc fname i.(").ctxt))"++)
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -699,8 +699,8 @@ mainFunc env opts mainNesting modules =
                 tab.("printf(\"%lu, \", PRIMVAL_R(res));"++).nl
               else
                 -- normal mode, ints are isomorphic to nullary constructors
-                tab.("if ((GETTPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
-                tab.("else printf(\"Thunk{%d, %p}\", CONSTR(res), GETTPTR(res.ctxt));"++).nl
+                tab.("if ((CPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
+                tab.("else printf(\"Thunk{%d, %p}\", CONSTR(res), CPTR(res.ctxt));"++).nl
             else
               printResDT dt
           typ@(Tg (TDF _ _)) ->

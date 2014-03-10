@@ -129,7 +129,7 @@ typedef struct T_ {
 
 /* *********** Macros of the LAR API *********** */
 
-#define GETTPTR(p)    ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
+#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
 #define ARGC(arg)                      ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
 #define ARGS_FUNC(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)(~1)))
 
