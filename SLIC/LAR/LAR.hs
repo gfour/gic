@@ -538,8 +538,18 @@ mkBinOp c [e1, e2] env config =
         -- If using compact LARs, do faster integer arithmetic for some operators.
         CPlus  | useFastOps -> fastOp "PVAL_ADD"
         CMinus | useFastOps -> fastOp "PVAL_SUB"
+        CMult  | useFastOps -> fastOp "PVAL_MUL"
+        CDiv   | useFastOps -> fastOp "PVAL_DIV"
+        CDivide| useFastOps -> fastOp "PVAL_DIV"
+        CMod   | useFastOps -> fastOp "PVAL_MOD"
+        CAnd   | useFastOps -> fastOp "PVAL_AND"
+        COr    | useFastOps -> fastOp "PVAL_OR"
         CEqu   | useFastOps -> fastOp "PVAL_EQU"
         CNEq   | useFastOps -> fastOp "PVAL_NEQ"
+        CLt    | useFastOps -> fastOp "PVAL_LT"
+        CGt    | useFastOps -> fastOp "PVAL_GT"
+        CLe    | useFastOps -> fastOp "PVAL_LE"
+        CGe    | useFastOps -> fastOp "PVAL_GE"
         -- C operators that are different from Haskell
         CMulI -> lparen.(pprint CMulI).lparen.e1'.comma.e2'.rparen.rparen
         CNEq  -> cBin "!=" mBoolTag

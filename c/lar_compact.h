@@ -136,8 +136,8 @@ typedef struct T_ {
 #define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
 
 /* Primitive value read/create macros. These values use all high 61 bits. */
-#define PVAL_R(p)     ((signed long)(((intptr_t)(p).ctxt) >> 3))
-#define PVAL_C(i)     ((Susp) { (TP_)(((intptr_t)(i)) << 3) } )
+#define PVAL_R(p)     ((signed long)(((intptr_t)(p).ctxt) >> 2))
+#define PVAL_C(i)     ((Susp) { (TP_)(((intptr_t)(i)) << 2) } )
 
 /* Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p) ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
@@ -149,15 +149,17 @@ typedef struct T_ {
 
 #define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) + ((intptr_t)(p2).ctxt)) })
 #define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) - ((intptr_t)(p2).ctxt)) })
-#define PVAL_MUL(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) >> 3) * ((intptr_t)(p2).ctxt)) })
-#define PVAL_DIV(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) / ((intptr_t)(p2).ctxt)) << 3) })
+#define PVAL_MUL(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) >> 2) * ((intptr_t)(p2).ctxt)) })
+#define PVAL_DIV(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) / ((intptr_t)(p2).ctxt)) << 2) })
 #define PVAL_MOD(p1, p2)  ((Susp) { (TP_)(((intptr_t)(p1).ctxt) % ((intptr_t)(p2).ctxt)) })
-#define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 3 ) })
-#define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) != ((intptr_t)(p2).ctxt)) << 3 ) })
-#define PVAL_LT(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) < ((intptr_t)(p2).ctxt)) << 3 ) })
-#define PVAL_LE(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) <= ((intptr_t)(p2).ctxt)) << 3 ) })
-#define PVAL_GT(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) > ((intptr_t)(p2).ctxt)) << 3 ) })
-#define PVAL_GE(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) >= ((intptr_t)(p2).ctxt)) << 3 ) })
+#define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) == ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) != ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_LT(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) < ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_LE(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) <= ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_GT(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) > ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_GE(p1, p2)  ((Susp) { (TP_)((((intptr_t)(p1).ctxt) >= ((intptr_t)(p2).ctxt)) << 2 ) })
+#define PVAL_AND(p1, p2) ((((intptr_t)(p1).ctxt) & ((intptr_t)(p2).ctxt)) == (1<<2))
+#define PVAL_OR(p1, p2)  ((((intptr_t)(p1).ctxt) | ((intptr_t)(p2).ctxt)) == (1<<2))
 
 /* ********** Garbage collection ********** */
 
