@@ -286,7 +286,7 @@ inline byte* MM_alloc (size_t bytes)
   // If no space left
   if (space + bytes > spaceEnd) {
 #ifdef OMP
-    fprintf(stderr, "The OpenMP runtime is not supported by the smei-space "
+    fprintf(stderr, "The OpenMP runtime is not supported by the semi-space "
                     " garbage collector.\n");
     exit(1);
 #endif /* OMP */
