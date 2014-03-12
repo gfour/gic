@@ -136,7 +136,8 @@ typedef struct T_ {
 #define PVAL_C(i)     (((intptr_t)(i)) << 2)
 
 /* Thunk constructor, ignores the data type tag 't'. */
-#define SUSP(c, t, p) (((uintptr_t)(c) << 48) | (((uintptr_t)(p)) & PTRMASK) | 2)
+#define SUSP(c, t, p) THUNK(c, p)
+#define THUNK(c, p)   (((uintptr_t)(c) << 48) | (((uintptr_t)(p)) & PTRMASK) | 2)
 
 /* ********** Fast integer handling ***** */
 
