@@ -49,14 +49,10 @@ typedef unsigned char byte;
 
 typedef struct T_* TP_;
 
-typedef struct Susp {
-  //  int constr;              // constructor id
-  //  union {
-  TP_ ctxt;                    // lazy constructor context
-  //    LarArg arg;            // unevaluated argument
-  //}
-} Susp;
+// A single-word thunk.
+typedef uintptr_t Susp;
 
+// A pointer to code that evaluates a thunk.
 typedef Susp (*LarArg)(TP_);
 
 typedef struct T_ {
@@ -86,7 +82,7 @@ typedef struct T_ {
 
 #define THE_ARGS(T)                    ((byte *) &((T)->data))
 #define VALS(x, T)                     (((Susp*) (THE_ARGS(T)))[x])
-#define ARGS(x, T)                     (VALS(x, T).ctxt)
+#define ARGS(x, T)                     (VALS(x, T))
 #define ARGS_FLAG(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)0x1))
 #define INIT_ARG_LOCKS(arity_a)        { }
 
@@ -130,40 +126,40 @@ typedef struct T_ {
 /* *********** Macros of the LAR API *********** */
 
 /* shift right, fill with 0s */
-#define CONSTR(p)     ((int)(((uintptr_t)(p).ctxt) >> 48))
-#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)((p).ctxt)) << 16)) >> 16) & (~7)))
-#define ARGC(arg)     ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
+#define CONSTR(p)     ((int)((uintptr_t)(p) >> 48))
+#define CPTR(p)       ((TP_)((((intptr_t)((uintptr_t)(p) << 16)) >> 16) & (~7)))
+#define ARGC(arg)     ((uintptr_t)arg | (uintptr_t)0x1)
 #define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
 
 /* Primitive value read/create macros. These values use all high 62 bits. */
-#define PVAL_R(p)     ((signed long)(((intptr_t)((p).ctxt)) >> 2))
-#define PVAL_C(i)     ((Susp) { (TP_)(((intptr_t)(i)) << 2) } )
+#define PVAL_R(p)     ((signed long)((intptr_t)(p) >> 2))
+#define PVAL_C(i)     (((intptr_t)(i)) << 2)
 
 /* Thunk constructor, ignores the data type tag 't'. */
-#define SUSP(c, t, p) ((Susp) { ((TP_)((((uintptr_t)(c)) << 48) | (((uintptr_t)(p)) & PTRMASK) | 2)) } )
+#define SUSP(c, t, p) ((((uintptr_t)(c)) << 48) | (((uintptr_t)(p)) & PTRMASK) |2)
 
 /* ********** Fast integer handling ***** */
 
 /* These operators are enabled when -fop is passed in the command line.
    They should only be used for evaluation purposes. */
 
-#define PVAL_ADD(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) + ((intptr_t)((p2).ctxt))) })
-#define PVAL_SUB(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) - ((intptr_t)((p2).ctxt))) })
-#define PVAL_MUL(p1, p2)  ((Susp) { (TP_)((((intptr_t)((p1).ctxt)) >> 2) * ((intptr_t)((p2).ctxt))) })
-#define PVAL_DIV(p1, p2)  ((Susp) { (TP_)((((intptr_t)((p1).ctxt)) / ((intptr_t)((p2).ctxt))) << 2) })
-#define PVAL_MOD(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) % ((intptr_t)((p2).ctxt))) })
-#define PVAL_EQU(p1, p2)  ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) == ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_NEQ(p1, p2)  ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) != ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_LT(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) <  ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_LE(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) <= ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_GT(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) >  ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_GE(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) >= ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_AND(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) & ((intptr_t)((p2).ctxt))) })
-#define PVAL_OR(p1, p2)   ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) | ((intptr_t)((p2).ctxt))) })
-#define PVAL_NEG(p)       ((Susp) { (TP_)(~((intptr_t)((p).ctxt) - 4) & ~3) })
+#define PVAL_ADD(p1, p2)  ((intptr_t)(p1) + (intptr_t)(p2))
+#define PVAL_SUB(p1, p2)  ((intptr_t)(p1) - (intptr_t)(p2))
+#define PVAL_MUL(p1, p2)  (((intptr_t)(p1) >> 2) * (intptr_t)(p2))
+#define PVAL_DIV(p1, p2)  (((intptr_t)(p1) / ((intptr_t)(p2))) << 2 )
+#define PVAL_MOD(p1, p2)  ((intptr_t)(p1) % ((intptr_t)(p2)))
+#define PVAL_EQU(p1, p2)  ((intptr_t)(((intptr_t)(p1) == (intptr_t)(p2)) << 2 ))
+#define PVAL_NEQ(p1, p2)  ((intptr_t)(((intptr_t)(p1) != (intptr_t)(p2)) << 2 ))
+#define PVAL_LT(p1, p2)   ((intptr_t)(((intptr_t)(p1) <  (intptr_t)(p2)) << 2 ))
+#define PVAL_LE(p1, p2)   ((intptr_t)(((intptr_t)(p1) <= (intptr_t)(p2)) << 2 ))
+#define PVAL_GT(p1, p2)   ((intptr_t)(((intptr_t)(p1) >  (intptr_t)(p2)) << 2 ))
+#define PVAL_GE(p1, p2)   ((intptr_t)(((intptr_t)(p1) >= (intptr_t)(p2)) << 2 ))
+#define PVAL_AND(p1, p2)  ((intptr_t)(p1) & ((intptr_t)(p2)))
+#define PVAL_OR(p1, p2)   ((intptr_t)(p1) | ((intptr_t)(p2)))
+#define PVAL_NEG(p)       (~((intptr_t)(p) - 4) & ~3)
 
-#define IS_PVAL(p)        (((intptr_t)((p).ctxt) & 2) == 0)
-#define IS_CONSTR(p)      (((intptr_t)((p).ctxt) & 2) == 2)
+#define IS_PVAL(p)        (((intptr_t)(p) & 2) == 0)
+#define IS_CONSTR(p)      (((intptr_t)(p) & 2) == 2)
 
 /* ********** Garbage collection ********** */
 
