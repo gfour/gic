@@ -156,9 +156,9 @@ typedef struct T_ {
 /** Creates the code pointer of a LAR thunk.
     \param The code pointer to store. */
 #define ARGC(arg)        arg
-/** Reads a pointer. */
-#define CPTR(p)          p
-/** Returns the constructor part of a thunk. */
+/** Reads a LAR pointer from a thunk. */
+#define CPTR(p)          ((p).ctxt)
+/** Returns the constructor field of a thunk. */
 #define CONSTR(p)        p.constr
 
 /** Primitive value read/create macros. Isomorphic to nullary constructors. */
@@ -192,4 +192,4 @@ typedef struct T_ {
 #define ARGS_FLAG(x, T)    ARGS(x, T)
 
 #define AR_SIZE(ar)   (sizeof(TP_) + 2 + (ar->arity*(sizeof(LarArg)+sizeof(Susp))) + (ar->nesting*sizeof(TP_)))
-#define IS_THUNK(p)       ({ printf("IS_THUNK(ar) missing"); exit(-1); 0; })
+#define IS_CONSTR(p)       ({ printf("IS_CONSTR(p) missing"); exit(-1); 0; })

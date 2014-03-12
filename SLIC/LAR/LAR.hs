@@ -479,7 +479,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
             in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
                 -- TODO: eliminate this when all patterns are nullary constructors
                 -- (or are used as such, see 'bindsVars')
-                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = CPTR(cl["++).dS.("].ctxt);"++).nl.
+                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = CPTR(cl["++).dS.("]);"++).nl.
                 logDict opts counter ;
            CFrm _ -> id).
       -- if debug mode is off, optimize away constructor choice when there is
@@ -517,7 +517,7 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
           pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
         CFrm i ->
           -- Read the nested context directly from the formal (no thunk flag check).
-          pprint v.("(CPTR(("++).mkGETSTRICTARG gc fname i.(").ctxt))"++)
+          pprint v.("(CPTR("++).mkGETSTRICTARG gc fname i.("))"++)
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -704,7 +704,7 @@ mainFunc env opts mainNesting modules =
       (case (findType mainDef env) of
           Tg (T dt) | dt==dtInteger ->
             wrapIfGMP
-            (tab.("printf(\"Integer result=%s\\n\", mpz_get_str(0, 10, *((mpz_t*)res.ctxt)));"++).nl)
+            (tab.("printf(\"Integer result=%s\\n\", mpz_get_str(0, 10, *((mpz_t*)(CPTR(res)))));"++).nl)
             (tab.("printf(\"cannot compute 'result', gic must be built with libgmp support\\n\");"++).nl)
           Tg (T dt) ->
             if (dt==dtInt || dt==dtBool) then
@@ -713,8 +713,8 @@ mainFunc env opts mainNesting modules =
                 tab.("printf(\"%ld, \", PVAL_R(res));"++).nl
               else
                 -- normal mode, ints are isomorphic to nullary constructors
-                tab.("if ((CPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
-                tab.("else printf(\"Thunk{%d, %p}\", CONSTR(res), CPTR(res.ctxt));"++).nl
+                tab.("if ((CPTR(res)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
+                tab.("else printf(\"Thunk{%d, %p}\", CONSTR(res), CPTR(res));"++).nl
             else
               printResDT dt
           typ@(Tg (TDF _ _)) ->

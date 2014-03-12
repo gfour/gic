@@ -150,7 +150,7 @@ static TP_ MM_forward (TP_ lar)
   // if already forwarded, just return it
   if (IS_FORWARDED(lar)) {
     // We have stored the forwarded pointer in .prev
-    TP_ fw_lar = CPTR(lar->prev);
+    TP_ fw_lar = AR_prev(lar->prev);
 #if VERBOSE_GC
     printf("already to %p\n", fw_lar);
 #endif
@@ -189,7 +189,7 @@ static void MM_scan (TP_ lar) {
 #endif
   char lar_a = ARITY(lar);
   char lar_n = NESTING(lar);
-  TP_ lar_prev = CPTR(lar->prev);
+  TP_ lar_prev = AR_prev(lar->prev);
   // TODO: can this happen in a single byte-update?
   if (MM_heap_ptr(lar_prev))
     lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(MM_forward(lar_prev)));
@@ -197,7 +197,7 @@ static void MM_scan (TP_ lar) {
   int n;
   for (n=0; n<lar_a; n++) {
     Susp val = VALS(n, lar);
-    if (ARGS_FLAG(n, lar) == NULL && IS_THUNK(val.ctxt) && MM_heap_ptr(val.ctxt))
+    if (ARGS_FLAG(n, lar) == NULL && IS_CONSTR(val) && MM_heap_ptr(CPTR(val)))
       TODO("val.ctxt = MM_forward(VALS(n, lar).ctxt);");
   }
   for (n=0; n<lar_n; n++) {
@@ -242,7 +242,7 @@ static void MM_compare (TP_ lar)
 {
   ASSERT_GC(IS_FORWARDED(lar),
             "comparing an invalid LAR");
-  TP_ copy = CPTR(lar->prev);
+  TP_ copy = AR_prev(lar->prev);
   ASSERT_GC(IS_FORWARDED(copy),
             "invalid forwarding pointer");
   ASSERT_GC(AR_SIZE(lar) == AR_SIZE(copy),
@@ -259,7 +259,7 @@ static void MM_compare (TP_ lar)
   for (n=0; n<ARITY(lar); n++) {
     ASSERT_GC(VALS(n, lar).constr == VALS(n, copy).constr,
               "mismatch in VALS constr");
-    ASSERT_GC(MM_ptr_eq(VALS(n, lar).ctxt, VALS(n, copy).ctxt),
+    ASSERT_GC(MM_ptr_eq(CPTR(VALS(n, lar)), CPTR(VALS(n, copy))),
               "mismatch in VALS context");
   }
   for (n=0; n<NESTING(lar); n++)

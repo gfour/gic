@@ -131,7 +131,7 @@ typedef struct T_ {
 
 /* shift right, fill with 0s */
 #define CONSTR(p)     ((int)(((uintptr_t)(p).ctxt) >> 48))
-#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)(p)) << 16)) >> 16) & (~7)))
+#define CPTR(p)       ((TP_)((((intptr_t)(((uintptr_t)((p).ctxt)) << 16)) >> 16) & (~7)))
 #define ARGC(arg)     ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
 #define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
 
@@ -163,6 +163,7 @@ typedef struct T_ {
 #define PVAL_NEG(p)       ((Susp) { (TP_)(~((intptr_t)((p).ctxt) - 4) & ~3) })
 
 #define IS_PVAL(p)        (((intptr_t)((p).ctxt) & 2) == 0)
+#define IS_CONSTR(p)      (((intptr_t)((p).ctxt) & 2) == 2)
 
 /* ********** Garbage collection ********** */
 
@@ -190,4 +191,3 @@ typedef struct T_ {
 #define NESTING(lar)  AR_n(((TP_)lar)->prev)
 
 #define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
-#define IS_THUNK(p)   ((((uintptr_t)p) & 0x4) != (uintptr_t)NULL)

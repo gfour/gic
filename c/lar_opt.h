@@ -154,8 +154,10 @@ typedef struct T_ {
 
 /* *********** Macros of the LAR API *********** */
 
-#define CPTR(p)       (p)
-#define CONSTR(p)     (p).constr
+/** Reads a LAR pointer from a thunk. */
+#define CPTR(p)       ((p).ctxt)
+/** Returns the constructor field of a thunk. */
+#define CONSTR(p)     ((p).constr)
 
 /* Primitive value read/create macros. Isomorphic to nullary constructors. */
 #define PVAL_R(p)     (p).constr

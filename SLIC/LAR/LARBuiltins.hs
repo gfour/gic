@@ -143,7 +143,7 @@ prettyPrintDTName :: CstrName -> Int -> DTName -> ShowS
 prettyPrintDTName c n dtName =
   let comp = ("comp"++).(shows n)
       bv   = pprint $ ithFrmOfCstr (n-1) c
-  in  tab.tab.comp.(" = "++).bv.("(CPTR(i.ctxt));"++).nl.
+  in  tab.tab.comp.(" = "++).bv.("(CPTR(i));"++).nl.
       tab.tab.pprinterName dtName.
       ("("++).comp.(");"++).nl
 
@@ -173,7 +173,7 @@ prettyPrintInteger :: ShowS
 prettyPrintInteger = 
     pprinterSig dtInteger.(" {"++).nl.
     wrapIfGMP
-    (tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)(CPTR(i.ctxt)))));"++).nl)
+    (tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)(CPTR(i)))));"++).nl)
     (tab.("printf(\"Cannot print Integer, no libgmp support.\\n\");"++).nl).
     tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
     ("}"++).nl
@@ -229,8 +229,8 @@ b_putStr gc compact =
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
       tab.tab.("printf(\"%c\", "++).
       (if compact then ("(unsigned char)PVAL_R"++) else ("CONSTR"++)).
-      ("("++).mkGETARG gc bf_Cons 0 "CPTR(i.ctxt)".("));"++).nl.
-      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "CPTR(i.ctxt)".(";"++).nl.
+      ("("++).mkGETARG gc bf_Cons 0 "CPTR(i)".("));"++).nl.
+      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "CPTR(i)".(";"++).nl.
       tab.("}"++).nl.
       tab.("return "++).pprint bf_Unit.("(0);"++).nl.
       ("}"++).nl
@@ -356,8 +356,8 @@ b_mulI opts =
   mulISig.(" {"++).nl.
   wrapIfGMP
   (tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
-   tab.("mpz_t *v1 = (mpz_t *)CPTR(a.ctxt);"++).nl.
-   tab.("mpz_t *v2 = (mpz_t *)CPTR(b.ctxt);"++).nl.
+   tab.("mpz_t *v1 = (mpz_t *)CPTR(a);"++).nl.
+   tab.("mpz_t *v2 = (mpz_t *)CPTR(b);"++).nl.
    -- tab.("printf(\"Integer multiplication, addresses %p and %p -> %p\\n\", v1, v2, ret);"++).nl.
    tab.("mpz_init(*ret);"++).nl.
    tab.("mpz_mul(ret[0], v1[0], v2[0]);"++).nl.
@@ -432,14 +432,14 @@ prettyPrintList compact =
       tab.("else if (CONSTR(i)=="++).shows cidCons.(") {"++).nl.
       tab.tab.("printf(\"[\");"++).nl.
       tab.tab.("while (1) {"++).nl.
-      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(CPTR(i.ctxt));"++).nl.
+      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(CPTR(i));"++).nl.
       (if compact then
          tab.tab.tab.("if (IS_PVAL(comp1))"++).nl.
          tab.tab.tab.tab.("printf(\"%ld\", PVAL_R(comp1));"++).nl.
          tab.tab.tab.("else"++).nl.tab
        else id).
       tab.tab.tab.("printf(\"%d\", CONSTR(comp1));"++).nl.
-      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(CPTR(i.ctxt));"++).nl.
+      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(CPTR(i));"++).nl.
       tab.tab.tab.("if (CONSTR(comp2)==1) break;"++).nl.
       tab.tab.tab.("printf(\",\");"++).nl.
       tab.tab.tab.("i = comp2;"++).nl.

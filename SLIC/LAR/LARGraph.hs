@@ -19,7 +19,7 @@ import SLIC.Types (Counter, CstrName, PPrint(pprint))
 logDict :: Options -> Counter -> ShowS
 logDict opts counter =
   if optVerbose opts then
-    tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, cl["++).shows counter.("].ctxt); "++)
+    tab.("fprintf(p, \"\\\"LAR_%p\\\" -> \\\"LAR_%p\\\" [style=dashed] ; \\n\", T0, CPTR(cl["++).shows counter.("])); "++)
   else id
 
 -- | Logs a constructor evaluation hit.
