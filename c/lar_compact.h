@@ -135,12 +135,12 @@ typedef struct T_ {
 #define ARGC(arg)     ((TP_)((uintptr_t)arg | (uintptr_t)0x1))
 #define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
 
-/* Primitive value read/create macros. These values use all high 61 bits. */
+/* Primitive value read/create macros. These values use all high 62 bits. */
 #define PVAL_R(p)     ((signed long)(((intptr_t)((p).ctxt)) >> 2))
 #define PVAL_C(i)     ((Susp) { (TP_)(((intptr_t)(i)) << 2) } )
 
-/* Thunk constructor, ignores the tag 't'. */
-#define SUSP(c, t, p) ((Susp) { ((TP_)((((uintptr_t)c) << 48) | (((uintptr_t)p) & PTRMASK))) } )
+/* Thunk constructor, ignores the data type tag 't'. */
+#define SUSP(c, t, p) ((Susp) { ((TP_)((((uintptr_t)(c)) << 48) | (((uintptr_t)(p)) & PTRMASK) | 2)) } )
 
 /* ********** Fast integer handling ***** */
 
@@ -160,6 +160,9 @@ typedef struct T_ {
 #define PVAL_GE(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) >= ((intptr_t)((p2).ctxt))) << 2 )) })
 #define PVAL_AND(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) & ((intptr_t)((p2).ctxt))) })
 #define PVAL_OR(p1, p2)   ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) | ((intptr_t)((p2).ctxt))) })
+#define PVAL_NEG(p)       ((Susp) { (TP_)(~((intptr_t)((p).ctxt) - 4) & ~3) })
+
+#define IS_PVAL(p)        (((intptr_t)((p).ctxt) & 2) == 0)
 
 /* ********** Garbage collection ********** */
 
