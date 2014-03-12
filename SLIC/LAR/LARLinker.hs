@@ -103,7 +103,7 @@ makeCLinker opts dfis modNames =
       foldDot extInitMod modNames.             -- linked module initializers
       declarationsBuiltins opts.
       mainFunc env opts mainDepth modNames.
-      prettyPrintersC.nl.
+      prettyPrintersC opts.nl.
       epilogue opts.nl
 
 -- | Whole program compilation: generates the defunctionalization module,

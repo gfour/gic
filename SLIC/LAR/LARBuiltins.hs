@@ -57,13 +57,13 @@ gmpFree opts ptr =
 -}
 
 -- | Pretty-printing (and forcing) functions.
-prettyPrintersC :: ShowS
-prettyPrintersC =
-  prettyPrintInt.nl.
+prettyPrintersC :: Options -> ShowS
+prettyPrintersC opts =
+  prettyPrintInt opts.nl.
   prettyPrintBool.nl.
   prettyPrintInteger.nl.
   prettyPrintDefunc.nl.
-  prettyPrintList.nl.
+  prettyPrintList opts.nl.
   prettyPrintUnit.nl.
   prettyPrintMagic.nl
 
@@ -140,36 +140,39 @@ prettyPrinterConstr cids (DConstr c cts _) =
 -- | The part of the pretty printer that handles a constructor component.
 prettyPrintDTName :: CstrName -> Int -> DTName -> ShowS
 prettyPrintDTName c n dtName =
-    let comp = ("comp"++).(shows n)
-        bv   = pprint $ ithFrmOfCstr (n-1) c
-    in  tab.tab.comp.(" = "++).bv.("(i.ctxt);"++).nl.
-        tab.tab.pprinterName dtName.
-            ("("++).comp.(");"++).nl
+  let comp = ("comp"++).(shows n)
+      bv   = pprint $ ithFrmOfCstr (n-1) c
+  in  tab.tab.comp.(" = "++).bv.("(CPTR(i.ctxt));"++).nl.
+      tab.tab.pprinterName dtName.
+      ("("++).comp.(");"++).nl
 
 -- * Hard-coded built-in functions
 
 -- | Built-in pretty printer for Int.
-prettyPrintInt :: ShowS
-prettyPrintInt = 
-    pprinterSig dtInt.(" {"++).nl.
-    tab.("printf(\"%d\", CONSTR(i));"++).nl.
-    tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
-    ("}"++).nl
+prettyPrintInt :: Options -> ShowS
+prettyPrintInt opts = 
+  pprinterSig dtInt.(" {"++).nl.
+  (if optCompact opts then
+     tab.("printf(\"%ld\", PVAL_R(i));"++)
+   else
+     tab.("printf(\"%d\", CONSTR(i));"++)).nl.
+  tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
+  ("}"++).nl
 
 -- | Built-in pretty printer for Bool.
 prettyPrintBool :: ShowS
 prettyPrintBool = 
-    pprinterSig dtBool.(" {"++).nl.
-    tab.("printf(\"%d\", CONSTR(i));"++).nl.
-    tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
-    ("}"++).nl
+  pprinterSig dtBool.(" {"++).nl.
+  tab.("printf(\"%d\", CONSTR(i));"++).nl.
+  tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
+  ("}"++).nl
 
 -- | Built-in pretty printer for Integer.
 prettyPrintInteger :: ShowS
 prettyPrintInteger = 
     pprinterSig dtInteger.(" {"++).nl.
     wrapIfGMP
-    (tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)i.ctxt)));"++).nl)
+    (tab.("printf(\"%s\", mpz_get_str(0, 10, *((mpz_t*)(CPTR(i.ctxt)))));"++).nl)
     (tab.("printf(\"Cannot print Integer, no libgmp support.\\n\");"++).nl).
     tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
     ("}"++).nl
@@ -223,9 +226,9 @@ b_putStr gc =
   in  ("FUNC("++).pprint bf_putStr.(") {"++).nl.
       tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
-      tab.tab.("printf(\"%c\", CONSTR("++).mkGETARG gc bf_Cons 0 "i.ctxt".
+      tab.tab.("printf(\"%c\", CONSTR("++).mkGETARG gc bf_Cons 0 "CPTR(i.ctxt)".
               ("));"++).nl.
-      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "i.ctxt".(";"++).nl.
+      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "CPTR(i.ctxt)".(";"++).nl.
       tab.("}"++).nl.
       tab.("return "++).pprint bf_Unit.("(0);"++).nl.
       ("}"++).nl
@@ -353,8 +356,8 @@ b_mulI opts =
   mulISig.(" {"++).nl.
   wrapIfGMP
   (tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
-   tab.("mpz_t *v1 = (mpz_t *)a.ctxt;"++).nl.
-   tab.("mpz_t *v2 = (mpz_t *)b.ctxt;"++).nl.
+   tab.("mpz_t *v1 = (mpz_t *)CPTR(a.ctxt);"++).nl.
+   tab.("mpz_t *v2 = (mpz_t *)CPTR(b.ctxt);"++).nl.
    -- tab.("printf(\"Integer multiplication, addresses %p and %p -> %p\\n\", v1, v2, ret);"++).nl.
    tab.("mpz_init(*ret);"++).nl.
    tab.("mpz_mul(ret[0], v1[0], v2[0]);"++).nl.
@@ -417,8 +420,8 @@ bfsLARInfo =
       pmd v = findPMDepth v builtinPmDepths
   in  map (\f -> (f, (ar f, ar f, pmd f))) cBuiltinFuncsC
 
-prettyPrintList :: ShowS
-prettyPrintList =
+prettyPrintList :: Options -> ShowS
+prettyPrintList opts =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
       Just (_, cidNil ) = Data.Map.lookup bf_Nil  builtinCIDs
   in  pprinterSig dtList.(" {"++).nl.
@@ -429,9 +432,14 @@ prettyPrintList =
       tab.("else if (CONSTR(i)=="++).shows cidCons.(") {"++).nl.
       tab.tab.("printf(\"[\");"++).nl.
       tab.tab.("while (1) {"++).nl.
-      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(i.ctxt);"++).nl.
+      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(CPTR(i.ctxt));"++).nl.
+      (if optCompact opts then
+         tab.tab.tab.("if (IS_PVAL(comp1))"++).nl.
+         tab.tab.tab.tab.("printf(\"%ld\", PVAL_R(comp1));"++).nl.
+         tab.tab.tab.("else"++).nl.tab
+       else id).
       tab.tab.tab.("printf(\"%d\", CONSTR(comp1));"++).nl.
-      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(i.ctxt);"++).nl.
+      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(CPTR(i.ctxt));"++).nl.
       tab.tab.tab.("if (CONSTR(comp2)==1) break;"++).nl.
       tab.tab.tab.("printf(\",\");"++).nl.
       tab.tab.tab.("i = comp2;"++).nl.
