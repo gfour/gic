@@ -158,8 +158,8 @@ typedef struct T_ {
 #define PVAL_LE(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) <= ((intptr_t)((p2).ctxt))) << 2 )) })
 #define PVAL_GT(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) >  ((intptr_t)((p2).ctxt))) << 2 )) })
 #define PVAL_GE(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) >= ((intptr_t)((p2).ctxt))) << 2 )) })
-#define PVAL_AND(p1, p2)  ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) & ((intptr_t)((p2).ctxt))) == (1<<2)) << 2) })
-#define PVAL_OR(p1, p2)   ((Susp) { (TP_)((intptr_t)((((intptr_t)((p1).ctxt)) | ((intptr_t)((p2).ctxt))) == (1<<2)) << 2) })
+#define PVAL_AND(p1, p2)  ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) & ((intptr_t)((p2).ctxt))) })
+#define PVAL_OR(p1, p2)   ((Susp) { (TP_)(((intptr_t)((p1).ctxt)) | ((intptr_t)((p2).ctxt))) })
 
 /* ********** Garbage collection ********** */
 
