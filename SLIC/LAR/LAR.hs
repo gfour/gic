@@ -86,7 +86,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
             CompileModule -> id).
         mainProg defs' env config.
         (case cMode of
-            Whole -> prettyPrintersC.epilogue opts
+            Whole -> prettyPrintersC opts.epilogue opts
             CompileModule -> id).
         prettyPrintersFor dTypes cids.nl
 
@@ -409,6 +409,7 @@ mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
 mkCExp :: TEnv -> ConfigLAR -> ExprL -> ShowS
 mkCExp env config (LARC (CN c) exps) =
   let compact = optCompact $ getOptions config
+      useFastOps = compact && (optFastOp $ getOptions config)
   in  case c of
         CIf  -> ("(PVAL_R("++).(mkCExp env config (exps !! 0) ).(")?"++).
                  ("("++).(mkCExp env config (exps !! 1)).("):"++).
@@ -416,9 +417,12 @@ mkCExp env config (LARC (CN c) exps) =
         c' | c' `elem` [ CMinus, CPlus, CMult, CDivide, CEqu, CLe, CGe  
                        , CGt, CLt, CAnd, COr, CMulI, CNEq, CMod, CDiv] ->
           mkBinOp c' exps env config
-        CNeg -> 
-          ("PVAL_C(-(PVAL_R("++).(mkCExp env config (exps !! 0)).
-          ("))"++).mIntTag config.(")"++)
+        CNeg ->
+          let nExp = mkCExp env config (exps !! 0)
+          in  if useFastOps then
+                ("PVAL_NEG("++).nExp.(")"++)
+              else
+                ("PVAL_C(-(PVAL_R("++).nExp.("))"++).mIntTag config.(")"++)
         CTrue  -> intSusp compact "True"
         CFalse -> intSusp compact "False"
         _      -> error $ "mkCExp: unknown built-in constant "++(pprint c "")
@@ -542,7 +546,7 @@ mkBinOp c [e1, e2] env config =
         CDiv   | useFastOps -> fastOp "PVAL_DIV"
         CDivide| useFastOps -> fastOp "PVAL_DIV"
         CMod   | useFastOps -> fastOp "PVAL_MOD"
-        CAnd   | useFastOps -> fastOp "PVAL_AND"
+        -- CAnd   | useFastOps -> fastOp "PVAL_AND"
         COr    | useFastOps -> fastOp "PVAL_OR"
         CEqu   | useFastOps -> fastOp "PVAL_EQU"
         CNEq   | useFastOps -> fastOp "PVAL_NEQ"
@@ -706,7 +710,7 @@ mainFunc env opts mainNesting modules =
             if (dt==dtInt || dt==dtBool) then
               if compact then
                 -- compact mode, special int representation
-                tab.("printf(\"%lu, \", PVAL_R(res));"++).nl
+                tab.("printf(\"%ld, \", PVAL_R(res));"++).nl
               else
                 -- normal mode, ints are isomorphic to nullary constructors
                 tab.("if ((CPTR(res.ctxt)) == 0) printf(\"%d, \", CONSTR(res));"++).nl.
