@@ -25,9 +25,14 @@ then
   export CC=gcc
 fi
 
+# FASTOP="-fop"
 export CFLAGS2="-Wno-#warnings"
 # export CFLAGS2="-DSSTACK"
-export GICFLAGS="-gic-tc -mem 220000000 -compact"
+export GICFLAGS="-gic-tc -mem 220000000 -compact $FASTOP"
+echo Using:
+echo gic $GICFLAGS
+echo C compiler: $CC
+
 ulimit -s 262144
 echo -n "Ack: "
 testRun Examples/NewBench/ack.hs
@@ -49,7 +54,7 @@ echo -n "Church: "
 testRun Examples/NewBench/church.hs
 cp main.c gic_church.c
 cp a.out gic_church
-export GICFLAGS="-gic-tc -mem 2442800000 -compact"
+export GICFLAGS="-gic-tc -mem 442800000 -compact $FASTOP"
 echo -n "Digits: "
 testRun Examples/Data/digits_of_e1.hs
 cp main.c gic_digits_of_e1.c
@@ -58,7 +63,7 @@ echo -n "Reverse: "
 testRun Examples/Data/reverse.hs
 cp main.c gic_reverse.c
 cp a.out gic_reverse
-export GICFLAGS="-gic-tc -mem 24428000000 -compact"
+export GICFLAGS="-gic-tc -mem 24428000000 -compact $FASTOP"
 echo -n "Ntak: "
 testRun Examples/NewBench/ntak.hs
 cp main.c gic_ntak.c
@@ -71,7 +76,7 @@ echo -n "Tree-sort: "
 testRun Examples/NewBench/tree-sort.hs
 cp main.c gic_tree_sort.c
 cp a.out gic_tree_sort
-export GICFLAGS="-mem 24428000000 -compact"
+export GICFLAGS="-mem 24428000000 -compact $FASTOP"
 echo -n "Queens: "
 testRun Examples/NewBench/queens.hs
 cp main.c gic_queens.c
