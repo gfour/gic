@@ -96,9 +96,11 @@ function testLAR {
   echo -n $1, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} $1
 
-  echo -n $1, LAR:\ 
+  echo -n $1, LAR, libgc:\ 
   ./run_libgc.sh $1
+  # echo -n $1, LAR, semi:\ 
   # ./run_lar.sh -mem 1280000000 $1
+  # echo -n $1, LAR, compact-semi:\ 
   # CFLAGS2="-w" ./run_lar.sh -mem 2280000000 -compact $1
 }
 
@@ -108,7 +110,7 @@ unset OMP
 echo -- LAR --
 
 echo -- 1. Simple types --
-export GICFLAGS=-gic-tc-nsig
+export GICFLAGS="-gic-tc-nsig"
 for file in Examples/Num/exmh*.hs Examples/Num/myex*.hs Examples/Data/*.hs
 do
     testLAR ${file}
