@@ -126,7 +126,7 @@ static void MM_process_stack ()
     TP_ lar = *((TP_ *) ptr);
 
 #if VERBOSE_GC
-    printf("rootset: ");
+    //printf("rootset: ");
 #endif /* VERBOSE_GC */
     if (MM_heap_ptr(lar)) {
       *((TP_ *)ptr) = MM_forward(lar);
@@ -150,7 +150,7 @@ static TP_ MM_forward (TP_ lar)
   // if already forwarded, just return it
   if (IS_FORWARDED(lar)) {
     // We have stored the forwarded pointer in .prev
-    TP_ fw_lar = AR_prev(lar->prev);
+    TP_ fw_lar = AR_prev(lar);
 #if VERBOSE_GC
     printf("already to %p\n", fw_lar);
 #endif
@@ -175,7 +175,7 @@ static TP_ MM_forward (TP_ lar)
   bytes_copied += sz;
 #endif
 #if VERBOSE_GC
-  printf("copied to %p\n", lar->prev);
+  printf("copied to %p\n", AR_prev(lar));
 #endif
   return fw_lar;
 }
@@ -189,7 +189,7 @@ static void MM_scan (TP_ lar) {
 #endif
   char lar_a = ARITY(lar);
   char lar_n = NESTING(lar);
-  TP_ lar_prev = AR_prev(lar->prev);
+  TP_ lar_prev = AR_prev(lar);
   // TODO: can this happen in a single byte-update?
   if (MM_heap_ptr(lar_prev))
     lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(MM_forward(lar_prev)));
@@ -242,7 +242,7 @@ static void MM_compare (TP_ lar)
 {
   ASSERT_GC(IS_FORWARDED(lar),
             "comparing an invalid LAR");
-  TP_ copy = AR_prev(lar->prev);
+  TP_ copy = AR_prev(lar);
   ASSERT_GC(IS_FORWARDED(copy),
             "invalid forwarding pointer");
   ASSERT_GC(AR_SIZE(lar) == AR_SIZE(copy),
