@@ -86,7 +86,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
             CompileModule -> id).
         mainProg defs' env config.
         (case cMode of
-            Whole -> prettyPrintersC opts.epilogue opts
+            Whole -> prettyPrintersC (optCompact opts).epilogue opts
             CompileModule -> id).
         prettyPrintersFor dTypes cids.nl
 

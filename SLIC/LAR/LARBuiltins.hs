@@ -28,12 +28,13 @@ t0 = "T0"
 builtins :: Options -> ShowS
 builtins opts =
   let gc = optGC opts
+      compact = optCompact opts
   in  b_readIntIO.nl.
-      b_printIntIO gc.nl.      
-      b_putStr gc.nl.
+      b_printIntIO gc.nl.
+      b_putStr gc compact.nl.
       b_putStrLn.nl.
       b_toInteger opts.nl.
-      b_strToList opts.nl.
+      b_strToList gc compact.nl.
       b_show gc.nl.
       b_mulI opts.nl.
       builtinConstrsC.
@@ -57,13 +58,13 @@ gmpFree opts ptr =
 -}
 
 -- | Pretty-printing (and forcing) functions.
-prettyPrintersC :: Options -> ShowS
-prettyPrintersC opts =
-  prettyPrintInt opts.nl.
+prettyPrintersC :: CompactOpt -> ShowS
+prettyPrintersC compact =
+  prettyPrintInt compact.nl.
   prettyPrintBool.nl.
   prettyPrintInteger.nl.
   prettyPrintDefunc.nl.
-  prettyPrintList opts.nl.
+  prettyPrintList compact.nl.
   prettyPrintUnit.nl.
   prettyPrintMagic.nl
 
@@ -149,10 +150,10 @@ prettyPrintDTName c n dtName =
 -- * Hard-coded built-in functions
 
 -- | Built-in pretty printer for Int.
-prettyPrintInt :: Options -> ShowS
-prettyPrintInt opts = 
+prettyPrintInt :: CompactOpt -> ShowS
+prettyPrintInt compact = 
   pprinterSig dtInt.(" {"++).nl.
-  (if optCompact opts then
+  (if compact then
      tab.("printf(\"%ld\", PVAL_R(i));"++)
    else
      tab.("printf(\"%d\", CONSTR(i));"++)).nl.
@@ -220,14 +221,15 @@ b_printIntIO gc =
   ("}"++).nl
 
 -- | Writes a string to the standard input.
-b_putStr :: GC -> ShowS
-b_putStr gc =
+b_putStr :: GC -> CompactOpt -> ShowS
+b_putStr gc compact =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
   in  ("FUNC("++).pprint bf_putStr.(") {"++).nl.
       tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
-      tab.tab.("printf(\"%c\", CONSTR("++).mkGETARG gc bf_Cons 0 "CPTR(i.ctxt)".
-              ("));"++).nl.
+      tab.tab.("printf(\"%c\", "++).
+      (if compact then ("(unsigned char)PVAL_R"++) else ("CONSTR"++)).
+      ("("++).mkGETARG gc bf_Cons 0 "CPTR(i.ctxt)".("));"++).nl.
       tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "CPTR(i.ctxt)".(";"++).nl.
       tab.("}"++).nl.
       tab.("return "++).pprint bf_Unit.("(0);"++).nl.
@@ -277,12 +279,10 @@ b_toInteger opts =
   ("}"++).nl
 
 -- | Converts a C string to a Haskell list. For internal use.
-b_strToList :: Options -> ShowS
-b_strToList opts =
+b_strToList :: GC -> CompactOpt -> ShowS
+b_strToList gc compact =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
       Just (_, cidNil)  = Data.Map.lookup bf_Nil  builtinCIDs
-      gc = optGC opts
-      compact = optCompact opts
   in  ("Susp strToList(char *str, int chars, TP_ T0) {"++).nl.
       tab.("// construct list from back-to-front"++).nl.
       tab.("int d;"++).nl.
@@ -420,8 +420,8 @@ bfsLARInfo =
       pmd v = findPMDepth v builtinPmDepths
   in  map (\f -> (f, (ar f, ar f, pmd f))) cBuiltinFuncsC
 
-prettyPrintList :: Options -> ShowS
-prettyPrintList opts =
+prettyPrintList :: Bool -> ShowS
+prettyPrintList compact =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
       Just (_, cidNil ) = Data.Map.lookup bf_Nil  builtinCIDs
   in  pprinterSig dtList.(" {"++).nl.
@@ -433,7 +433,7 @@ prettyPrintList opts =
       tab.tab.("printf(\"[\");"++).nl.
       tab.tab.("while (1) {"++).nl.
       tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(CPTR(i.ctxt));"++).nl.
-      (if optCompact opts then
+      (if compact then
          tab.tab.tab.("if (IS_PVAL(comp1))"++).nl.
          tab.tab.tab.tab.("printf(\"%ld\", PVAL_R(comp1));"++).nl.
          tab.tab.tab.("else"++).nl.tab

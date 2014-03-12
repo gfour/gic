@@ -2,9 +2,9 @@
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.State (Action(..), CompileMode(..), DoNullDf, GC(..), GHCAPI(..),
-                   Options(..), ScrutOpt, TypeChecker(..), Verb, defaultOptions,
-                   opt) where
+module SLIC.State (Action(..), CompactOpt, CompileMode(..), DoNullDf, GC(..),
+                   GHCAPI(..), Options(..), ScrutOpt, TypeChecker(..), Verb,
+                   defaultOptions, opt) where
 
 import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
                        defaultMemSize, defaultMaxCtxts, defaultWorkers, nl)
@@ -102,7 +102,7 @@ data Options = Options
   , optLink    :: Bool             -- ^ linking mode
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
   , optWhRedis :: Bool             -- ^ use the Redis-based warehouse for the Erlang back-end
-  , optCompact :: Bool             -- ^ use the compact x86-64 representation
+  , optCompact :: CompactOpt       -- ^ use the compact x86-64 representation
   , optFastOp  :: Bool             -- ^ use the fast integer operations
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   , optEStackSz:: Int              -- ^ explicit stack size
@@ -112,6 +112,9 @@ data Options = Options
 -- | Optimize scrutinees of formals to skip the nested field and read the
 --   nested context directly from the formal thunk.
 type ScrutOpt = Bool
+
+-- | Flag to use the compact thunk representation.
+type CompactOpt = Bool
 
 -- | The default options of the compiler. It is used as a default for
 --   applying user command-line switches, or by the GHC back-end.
