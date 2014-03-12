@@ -93,7 +93,7 @@ ulimit -s 262143
 function testLAR {
   #echo Testing file ${file}...
 
-  echo -n $1, GHCi:\ 
+  echo -n $1, GHCi\ \ \ \ \ \ :\ 
   echo "result" | ghci ${GHCI_FLAGS} $1
 
   echo -n $1, LAR, libgc:\ 
