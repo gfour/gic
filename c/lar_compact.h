@@ -1,7 +1,7 @@
 /*
    LAR infrastructure, compact representation for use with the semi-space
-   garbage collector. Only works on the x86-64 architecture due to heavy
-   use of tagged pointers and assumptions about the use of bits in pointers.
+   garbage collector. Only works on the x86-64 architecture due to
+   assumptions about pointer bit layout.
 */
 
 // Header files
@@ -15,7 +15,7 @@
 
 /* Give an error on non-x86-64-bit systems. */
 #ifndef __x86_64__
-#error "The compact LAR representation does not support non-x86-64 platforms yet."
+#error "The compact LAR representation does not support non-x86-64 platforms."
 #endif /* __x86_64__ */
 
 /* Tags are not supported. */
@@ -91,7 +91,7 @@ typedef struct T_ {
 
 #define VAR(x)        FUNC(x)
 #define FUNC(x)       Susp x(TP_ T0)
-#define ACTUAL        T0 = (TP_)(AR_prev(T0))
+#define ACTUAL        T0 = (AR_prev(T0))
 
 #define GETARG(x, T)  ({                  \
       if (ARGS_FLAG(x, T) != NULL) {	  \
@@ -136,12 +136,11 @@ typedef struct T_ {
 #define PVAL_C(i)     (((intptr_t)(i)) << 2)
 
 /* Thunk constructor, ignores the data type tag 't'. */
-#define SUSP(c, t, p) ((((uintptr_t)(c)) << 48) | (((uintptr_t)(p)) & PTRMASK) |2)
+#define SUSP(c, t, p) (((uintptr_t)(c) << 48) | (((uintptr_t)(p)) & PTRMASK) | 2)
 
 /* ********** Fast integer handling ***** */
 
-/* These operators are enabled when -fop is passed in the command line.
-   They should only be used for evaluation purposes. */
+/* Simplified integer operators (enabled with the -fop command-line switch). */
 
 #define PVAL_ADD(p1, p2)  ((intptr_t)(p1) + (intptr_t)(p2))
 #define PVAL_SUB(p1, p2)  ((intptr_t)(p1) - (intptr_t)(p2))
