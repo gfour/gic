@@ -696,7 +696,7 @@ mainFunc env opts mainNesting modules =
       tab.("TP_ T0=NULL;"++).nl.
       (case gc of
           LibGC  -> id
-          SemiGC -> tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl).
+          SemiGC -> tab.("TP_ t0 = PUSHAR(AR(0, "++).shows mainNesting.("));"++).nl).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.
