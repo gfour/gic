@@ -9,11 +9,11 @@
 #include <libunwind.h>
 
 /** Enables internal consistency check (used for debugging). */
-#define DEBUG_GC 1
+#define DEBUG_GC 0
 // Print (lots of) diagnostic messages
 #define VERBOSE_GC 0
 /** Print statistics. */
-#define GC_STATS 1
+#define GC_STATS 0
 
 /** GC assertion. */
 #if DEBUG_GC

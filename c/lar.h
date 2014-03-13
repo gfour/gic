@@ -152,17 +152,17 @@ typedef struct T_ {
 /** Reads the code pointer of a LAR thunk.
     \param x The position of the thunk in the LAR.
     \param T The LAR. */
-#define CODE(x, T)  ARGS(x, T)
+#define CODE(x, T)       ARGS(x, T)
 /** Creates the code pointer of a LAR thunk.
     \param The code pointer to store. */
 #define ARGC(arg)        arg
 /** Reads a LAR pointer from a thunk. */
 #define CPTR(p)          ((p).ctxt)
 /** Returns the constructor field of a thunk. */
-#define CONSTR(p)        p.constr
+#define CONSTR(p)        (p).constr
 
 /** Primitive value read/create macros. Isomorphic to nullary constructors. */
-#define PVAL_R(p)        p.constr
+#define PVAL_R(p)        (p).constr
 
 #ifdef USE_TAGS
 /** Creates a primitive value.
@@ -187,9 +187,11 @@ typedef struct T_ {
 
 /** For compatibility with the "compact" representation. */
 #define ARINFO(a, n, prev) (prev)
-#define FORWARDED_ADDR(p)  (TP_)({ printf("FORWARDED(p) missing"); exit(-1); (TP_)0; })
-#define IS_FORWARDED(ar)   ({ printf("IS_FORWARDED(ar) missing"); exit(-1); (TP_)0; })
-#define ARGS_FLAG(x, T)    ARGS(x, T)
+
+#define FORWARDED_ADDR(p)  ((TP_)((uintptr_t)((p)->prev) & ~1))
+#define IS_FORWARDED(ar)   (((uintptr_t)((ar)->prev) & 1) == 1)
+#define FW_ARINFO(a, n, p) ((TP_)((uintptr_t)(ARINFO(a, n, p)) | 1))
 
 #define AR_SIZE(ar)   (sizeof(TP_) + 2 + (ar->arity*(sizeof(LarArg)+sizeof(Susp))) + (ar->nesting*sizeof(TP_)))
-#define IS_CONSTR(p)       ({ printf("IS_CONSTR(p) missing"); exit(-1); 0; })
+#define IS_VAL(n, lar)     (ARGS(n, lar)==NULL)
+#define IS_CONSTR(v)       (1)

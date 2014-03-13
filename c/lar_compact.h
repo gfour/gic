@@ -129,8 +129,8 @@ typedef struct T_ {
 #define CONSTR(p)     ((int)((uintptr_t)(p) >> 48))
 #define CPTR(p)       ((TP_)((((intptr_t)((uintptr_t)(p) << 16)) >> 16) & (~7)))
 #define ARGC(arg)     ((uintptr_t)arg | 1)
-#define ARGFUNC(x, T) ((LarArg)(CODE(ARGS(x, T))))
-#define CODE(p)       ((uintptr_t)(p) & ~1)
+#define ARGFUNC(x, T) ((LarArg)(CODE(x, T)))
+#define CODE(x, T)    ((uintptr_t)(ARGS(x, T)) & ~1)
 
 /* Primitive value read/create macros. These values use all high 62 bits. */
 #define PVAL_R(p)     ((signed long)((intptr_t)(p) >> 2))
@@ -159,7 +159,7 @@ typedef struct T_ {
 #define PVAL_OR(p1, p2)   ((intptr_t)(p1) | ((intptr_t)(p2)))
 #define PVAL_NEG(p)       (~((intptr_t)(p) - 4) & ~3)
 
-#define IS_VAL(p)         (((intptr_t)(p) & 1) == 0)
+#define IS_VAL(n, lar)    (((intptr_t)(VALS(n, lar)) & 1) == 0)
 #define IS_PVAL(p)        (((intptr_t)(p) & 2) == 0)
 #define IS_CONSTR(p)      (((intptr_t)(p) & 2) == 2)
 

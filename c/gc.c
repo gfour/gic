@@ -109,18 +109,20 @@ static void MM_gc(void) {
 #endif /* GC_STATS */
 }
 
-static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t regname, TP_ reg_tp) {
+static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t reg, TP_ reg_tp) {
+#ifdef LAR_COMPACT
   reg_tp = CPTR(reg_tp);
+#endif /* LAR_COMPACT */
   if (MM_heap_ptr(reg_tp) && (!(IS_FORWARDED(reg_tp)))) {
-    if (regname>=UNW_X86_64_XMM0) {
+    if (reg>=UNW_X86_64_XMM0) {
       printf("Cannot handle XMM registers yet.");
       exit(-1);
     }
-    printf("forwarding reg %2d=%p\n", regname, reg_tp);
+    printf("forwarding reg %2d=%p\n", reg, reg_tp);
     TP_ fw_tp = MM_forward(reg_tp);
-    int r = unw_set_reg(cursor, regname, (unw_word_t)fw_tp);
+    int r = unw_set_reg(cursor, reg, (unw_word_t)fw_tp);
     if (r!=0) {
-      printf("Error modifying register %d (%p => %p)\n", regname, reg_tp, fw_tp);
+      printf("Error modifying register %d (%p => %p)\n", reg, reg_tp, fw_tp);
       exit(-1);
     }
 #if GC_STATS
@@ -287,9 +289,12 @@ static TP_ MM_forward(TP_ lar) {
   }
 
   // Calculate LAR layout to forward it.
-  char lar_a = AR_a(lar->prev);
-  char lar_n = AR_n(lar->prev);
+  char lar_a = ARITY(lar);
+  char lar_n = NESTING(lar);
   size_t sz = AR_SIZE(lar);
+#ifndef LAR_COMPACT
+  TODO("Missing case: padding bytes.");
+#endif /* LAR_COMPACT */
 #if VERBOSE_GC
   printf("found LAR %p with arity %d and nesting %d, size=%ld bytes\n", 
 	 lar, lar_a, lar_n, sz);
@@ -353,13 +358,16 @@ static void MM_scan(TP_ lar) {
   int n;
   for (n=0; n<lar_a; n++) {
     Susp val = VALS(n, lar);
-    if (IS_CONSTR(val)) {
+    if (IS_VAL(n, lar) && IS_CONSTR(val)) {
       TP_ cptr = CPTR(val);
       if (MM_heap_ptr(cptr)) {
 	int constrId = CONSTR(val);
 	TP_ fwCtxt   = MM_forward(cptr);
-	// VALS(n, lar) = THUNK(constrId, fwCtxt);
+#ifdef LAR_COMPACT
 	VALS(n, lar) = THUNK(constrId, fwCtxt);
+#else
+	TODO("VALS(n, lar) = THUNK(constrId, fwCtxt);");
+#endif /* LAR_COMPACT */
       }
       else if (cptr!=0) { printf("stack constructor: %p\n", cptr); exit(-1); }
     }
@@ -368,7 +376,7 @@ static void MM_scan(TP_ lar) {
   for (n=0; n<lar_n; n++) {
 #ifdef LAR_COMPACT
     TP_ nested = NESTED(n, lar_a, lar);
-#else
+#else /* LAR_COMPACT */
     TP_ nested = NESTED(n, lar);
 #endif /* LAR_COMPACT */
     if (MM_heap_ptr(nested)) {
@@ -376,7 +384,7 @@ static void MM_scan(TP_ lar) {
 #ifdef LAR_COMPACT
       NESTED(n, lar_a, lar) = fwCtxt;
 #else
-      TODO("NESTED in lar.h mode");
+      NESTED(n, lar) = fwCtxt;
 #endif /* LAR_COMPACT */
     }
   }
@@ -397,8 +405,10 @@ static void MM_compare_heaps(byte* old_space) {
   ASSERT_GC(scan == old_space, "out of bounds when comparing");
 }
 
-static void MM_print_Susp(Susp s) {
-  if (IS_VAL(s)) {
+#ifdef LAR_COMPACT
+static void MM_print_Susp(int n, TP_ lar) {
+  if (IS_VAL(n, lar)) {
+    Susp s = VALS(n, lar);
     if (IS_PVAL(s)) {
       printf("val(int=%ld)", PVAL_R(s));
     }
@@ -410,10 +420,16 @@ static void MM_print_Susp(Susp s) {
     }
     else printf("Unknown Susp found.");
   } else {
-    printf("code{%p}", (LarArg)CODE(s));
+    printf("code{%p}", (LarArg)CODE(n, lar));
   }
 }
+#else
+static void MM_print_Susp(int n, TP_ lar) {
+  TODO("MM_print_Susp missing");
+}
+#endif /* LAR_COMPACT */
 
+#ifdef LAR_COMPACT
 /** Compares two thunks.
     \param  A thunk in from-space.
     \param  A thunk in to-space.
@@ -421,13 +437,16 @@ static void MM_print_Susp(Susp s) {
     the pointer field of the second be the forwarded pointer field of the first,
     returns 1. Otherwise, returns 0.
 */  
-static int MM_compare_vals(Susp s_from, Susp s_to) {
+static int MM_compare_vals(int n, TP_ lar, TP_ copy) {
+  Susp s_from = VALS(n, lar );
+  Susp s_to   = VALS(n, copy);
   if (s_from==s_to) return 1;
   if (IS_CONSTR(s_from) && IS_CONSTR(s_to))
     return ((CONSTR(s_from)==CONSTR(s_to)) && 
 	    (FORWARDED_ADDR(CPTR(s_from))==CPTR(s_to)));
   return 0;
 }
+#endif /* LAR_COMPACT */
 
 /** Checks if a LAR in the from-space has been forwarded correctly.
     \param lar The from-space LAR.
@@ -444,10 +463,10 @@ static void MM_compare(TP_ lar) {
   
   TP_ copy = FORWARDED_ADDR(lar);
 
-  unsigned char lar_a  = AR_a(lar->prev);
-  unsigned char lar_n  = AR_n(lar->prev);
-  unsigned char copy_a = AR_a(copy->prev);
-  unsigned char copy_n = AR_n(copy->prev);
+  unsigned char lar_a  = ARITY(lar);
+  unsigned char lar_n  = NESTING(lar);
+  unsigned char copy_a = ARITY(copy);
+  unsigned char copy_n = NESTING(copy);
 
   if (lar_a != copy_a) {
     printf("GC: arity mismatch between %p and %p: %d != %d\n",
@@ -466,35 +485,28 @@ static void MM_compare(TP_ lar) {
   }
 
   int n;
-#ifndef LAR_COMPACT
-  // TODO: write this for lar.h thunks
   for (n=0; n<lar_a; n++) {
-    LarArg lar_arg  = (LarArg)(ARGS(n, lar ));
-    LarArg copy_arg = (LarArg)(ARGS(n, copy));
-    if (lar_arg != copy_arg) {
-      printf("GC: arg[%d] mismatch between %p and %p: %p != %p, details:\n",
-	     n, lar, copy, lar_arg, copy_arg);
-      MM_print_Susp((Susp)lar_arg) ; printf(" != ");
-      MM_print_Susp((Susp)copy_arg); printf("\n");
-      exit(-1);
-    }
-  }
-#endif
-  for (n=0; n<lar_a; n++) {
-    Susp lar_s  = VALS(n, lar );
-    Susp copy_s = VALS(n, copy);
-    // TODO: compare the structs for lar.h
-    if (IS_VAL(lar_s) && IS_VAL(copy_s) && (!MM_compare_vals(lar_s, copy_s))) {
+#ifdef LAR_COMPACT
+    if (IS_VAL(n, lar) && IS_VAL(n, copy) && (!MM_compare_vals(n, lar, copy))) {
       printf("GC: val[%d] mismatch between %p and %p: %lx != %lx, details:\n",
-	     n, lar, copy, lar_s, copy_s);
-      MM_print_Susp((Susp)lar_s) ; printf(" != ");
-      MM_print_Susp((Susp)copy_s); printf("\n");
+	     n, lar, copy, VALS(n, lar), VALS(n, copy));
+      MM_print_Susp(n, lar) ; printf(" != ");
+      MM_print_Susp(n, copy); printf("\n");
       exit(-1);
     }
+#else
+  TODO("thunk comparison for lar.h thunks");
+#endif /* LAR_COMPACT */
   }
   for (n=0; n<lar_n; n++) {
+#ifdef LAR_COMPACT
     TP_ lar_nested  = NESTED(n, lar_a , lar);
     TP_ copy_nested = NESTED(n, copy_a, copy);
+#else
+    TP_ lar_nested  = NESTED(n, lar);
+    TP_ copy_nested = NESTED(n, copy);
+#endif /* LAR_COMPACT */
+
     if (lar_nested != copy_nested) {
       printf("GC: nested[%d] mismatch between %p and %p: %p != %p, details:\n",
 	     n, lar, copy, lar_nested, copy_nested);
