@@ -11,16 +11,16 @@
 #ifdef GC
 
 // Function prototypes
-static inline int MM_heap_ptr (TP_ t);
-static void MM_gc ();
-static void MM_process_stack ();
-static TP_ MM_forward (TP_ lar);
-static void MM_scan (TP_ lar);
-static void MM_compare_heaps (byte* old_space);
-static void MM_compare (TP_ lar);
+static inline int MM_heap_ptr(TP_ t);
+static void MM_gc(void);
+static void MM_process_stack(void);
+static TP_ MM_forward(TP_ lar);
+static void MM_scan(TP_ lar);
+static void MM_compare_heaps(byte* old_space);
+static void MM_compare(TP_ lar);
 
 // The minimum amount of space that should be left after garbage collection.
-#define GC_HEADROOM 1000000
+#define GC_HEADROOM 1000
 
 #if GC_STATS
 // Statistics: count the copied LARs & processed LAR pointers in the stack
@@ -36,20 +36,17 @@ void TODO(char *s) {
   exit(-1);
 }
 
-/** Checks if the given ptr points to a LAR allocated on the heap.
+/** Checks if the given pointer points to a LAR allocated on the heap.
     \param t The address of the LAR to check.
     \return 1 if the LAR is on the heap, 0 otherwise.
 */
-static inline int MM_heap_ptr (TP_ t)
-{
+static inline int MM_heap_ptr(TP_ t) {
   // printf("MM_heap_ptr checks %p, spaceStart=%p, spaceEnd=%p\n", t, spaceStart, spaceEnd);
-  return (byte*) t >= spaceStart
-      && (byte*) t <= spaceEnd;
+  return (byte*)t >= spaceStart && (byte*)t <= spaceEnd;
 }
 
 /** Garbage collection entry point. */
-static void MM_gc ()
-{
+static void MM_gc(void) {
 #if GC_STATS
   clock_t t1, t2;
   t1 = clock();
@@ -68,13 +65,13 @@ static void MM_gc ()
   else ASSERT_GC(0, "space does not belong to space1/space2");
 #if DEBUG_GC
   byte* old_space = space;
-#endif
+#endif /* DEBUG_GC */
   space = to_space;
 
-  // Process the root set
+  // Process the root set.
   MM_process_stack();
 
-  // Scan the to-space and forward any remaining pointers
+  // Scan the to-space and forward any remaining pointers.
   byte* scan = to_space;
   while (scan < space) {
     TP_ lar = (TP_)scan;
@@ -87,13 +84,11 @@ static void MM_gc ()
   ASSERT_GC((long) (space-to_space) == (long) bytes_copied,
             "bytes copied by GC do not match the to_space used");
 
-  // TODO Stack: unmark all LARs (when stack allocation is done)*/
-
 #if DEBUG_GC
   MM_compare_heaps(old_space);
   printf("Clearing from-space...\n");
   memset(from_space, 0xbf, MAXMEMSPACE);
-#endif
+#endif /* DEBUG_GC */
 
   // Reverse the two spaces
   spaceStart = to_space;
@@ -101,11 +96,10 @@ static void MM_gc ()
 
 #if GC_STATS
   t2 = clock();
-  printf("bytes copied (including mem headers): %lu/%lu (%f%%),\n"
-         "LAR=%lu, stack roots=%lu, used=%lu, left=%lu,\n"
+  printf("bytes copied: %lu/%lu (%f%%),\n"
+         "forwarded LARs=%lu, stack roots=%lu, used=%lu bytes, left=%lu bytes,\n"
          "spaceStart=%p, space=%p, spaceEnd=%p\n",
-         bytes_copied, MAXMEMSPACE,
-         100*((float)bytes_copied/(float)MAXMEMSPACE),
+         bytes_copied, MAXMEMSPACE, 100*((float)bytes_copied/(float)MAXMEMSPACE),
          lar_count, st_count, (unsigned long) (space-spaceStart),
          (unsigned long) (spaceEnd-space),
          spaceStart, space, spaceEnd);
@@ -115,11 +109,10 @@ static void MM_gc ()
 #endif /* GC_STATS */
 }
 
-/** Traverse the shadow stack and forward everything that looks like a pointer
+/** Traverse the pointer stack and forward everything that looks like a pointer
     to a heap-allocated LAR. If this is not exact, the program will crash. */
-static void MM_process_stack ()
-{
-  printf("Scanning the shadow stack (%p ... %p)\n", sstack_bottom, sstack_ptr);
+static void MM_process_stack(void) {
+  printf("Scanning the pointer stack (%p ... %p)\n", sstack_bottom, sstack_ptr);
   
   TP_* ptr;
   for (ptr = sstack_bottom; ptr <= sstack_ptr; ptr++) {
@@ -132,7 +125,7 @@ static void MM_process_stack ()
       *((TP_ *)ptr) = MM_forward(lar);
 #if GC_STATS
     st_count++;
-#endif
+#endif /* GC_STATS */
     }
   }
 }
@@ -140,9 +133,8 @@ static void MM_process_stack ()
 /** Forwards a LAR pointer, copying the LAR to the to-space.
     \param lar The LAR pointer that must be forwarded.
     \return The new address of the LAR in the to-space.
- */
-static TP_ MM_forward (TP_ lar)
-{
+*/
+static TP_ MM_forward(TP_ lar) {
   ASSERT_GC(lar != NULL, "forwarding null");
 #if VERBOSE_GC
   // printf ("forwarding T0=%p, ", lar);
@@ -150,32 +142,53 @@ static TP_ MM_forward (TP_ lar)
   // if already forwarded, just return it
   if (IS_FORWARDED(lar)) {
     // We have stored the forwarded pointer in .prev
-    TP_ fw_lar = AR_prev(lar);
+    TP_ fw_lar = FORWARDED_ADDR(lar);
 #if VERBOSE_GC
     printf("already to %p\n", fw_lar);
-#endif
+#endif /* VERBOSE_GC */
     return fw_lar;
   }
 
-  // copy this LAR
+  // Calculate LAR layout to forward it.
   char lar_a = AR_a(lar->prev);
   char lar_n = AR_n(lar->prev);
-  // printf("found LAR %p with arity %d and nesting %d\n", lar, lar_a, lar_n);
-
-  // size_t sz = 1 + lar_a + lar_n;
   size_t sz = AR_SIZE(lar);
-  TP_ fw_lar = (TP_)memcpy(space, lar, sz);
-  space += sz;
-  // printf("Copied the LAR (%ld bytes) to %p\n", sz, fw_lar);
+#if VERBOSE_GC
+  printf("found LAR %p with arity %d and nesting %d, size=%ld bytes\n", 
+	 lar, lar_a, lar_n, sz);
+#endif /* VERBOSE_GC */
 
-  lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(fw_lar));
+  int j;
+  // poor man's memcpy
+  if (space+sz<spaceEnd) {
+    unsigned char *lar0 = (unsigned char*)lar;
+    for (j=0; j<sz; j++)
+      space[j] = lar0[j];
+  }
+  else {
+    printf("Out of space.\n");
+    exit(-1);
+  }
+  TP_ fw_lar = (TP_)space;
+  // TODO: use memcpy
+  // TP_ fw_lar = (TP_)memcpy(space, lar, sz);
+
+#if DEBUG_GC
+  if (ARITY(lar)   != ARITY(fw_lar))   printf("fw: arity mismatch");
+  if (NESTING(lar) != NESTING(fw_lar)) printf("fw: nesting mismatch");
+#endif /* DEBUG_GC */
+
+  space += sz;
+  // printf("Copied the LAR (%2ld bytes) to %p\n", sz, fw_lar);
+
+  lar->prev = FW_ARINFO(lar_a, lar_n, fw_lar);
 
 #if GC_STATS
   lar_count++;
   bytes_copied += sz;
 #endif
 #if VERBOSE_GC
-  printf("copied to %p\n", AR_prev(lar));
+  printf("copied to %p\n", FORWARDED_ADDR(lar));
 #endif
   return fw_lar;
 }
@@ -183,30 +196,46 @@ static TP_ MM_forward (TP_ lar)
 /** Scans a LAR and rewrites its contexts using forwarding pointers
     \param lar The LAR to scan.
 */
-static void MM_scan (TP_ lar) {
+static void MM_scan(TP_ lar) {
 #if VERBOSE_GC
   printf("scanning T0=%p\n", lar);
 #endif
-  char lar_a = ARITY(lar);
-  char lar_n = NESTING(lar);
-  TP_ lar_prev = AR_prev(lar);
-  // TODO: can this happen in a single byte-update?
-  if (MM_heap_ptr(lar_prev))
-    lar->prev = ARINFO(lar_a, lar_n, FORWARDED_ADDR(MM_forward(lar_prev)));
+  char lar_a    = ARITY(lar);
+  char lar_n    = NESTING(lar);
+  TP_  lar_prev = AR_prev(lar);
 
+  if (MM_heap_ptr(lar_prev))
+    lar->prev = ARINFO(lar_a, lar_n, MM_forward(lar_prev));
+
+  // Forward LAR pointers inside evaluated lazy constructors.
   int n;
   for (n=0; n<lar_a; n++) {
     Susp val = VALS(n, lar);
-    if (ARGS_FLAG(n, lar) == NULL && IS_CONSTR(val) && MM_heap_ptr(CPTR(val)))
-      TODO("val.ctxt = MM_forward(VALS(n, lar).ctxt);");
+    if (IS_CONSTR(val)) {
+      TP_ cptr = CPTR(val);
+      if (MM_heap_ptr(cptr)) {
+	int constrId = CONSTR(val);
+	TP_ fwCtxt   = MM_forward(cptr);
+	// VALS(n, lar) = THUNK(constrId, fwCtxt);
+	VALS(n, lar) = THUNK(constrId, fwCtxt);
+      }
+      else if (cptr!=0) { printf("stack constructor: %p\n", cptr); exit(-1); }
+    }
   }
+  // Forward LAR pointers inside nested fields.
   for (n=0; n<lar_n; n++) {
 #ifdef LAR_COMPACT
-    if (MM_heap_ptr(NESTED(n, lar_a, lar))) {
+    TP_ nested = NESTED(n, lar_a, lar);
 #else
-    if (MM_heap_ptr(NESTED(n, lar))) {
+    TP_ nested = NESTED(n, lar);
 #endif /* LAR_COMPACT */
-	TODO("NESTED(n, lar) = MM_forward(NESTED(n, lar));");
+    if (MM_heap_ptr(nested)) {
+      TP_ fwCtxt = MM_forward(nested);
+#ifdef LAR_COMPACT
+      NESTED(n, lar_a, lar) = fwCtxt;
+#else
+      TODO("NESTED in lar.h mode");
+#endif /* LAR_COMPACT */
     }
   }
 }
@@ -214,8 +243,8 @@ static void MM_scan (TP_ lar) {
 /** Compare the from-space to the to-space.
     \param old_space The old space.
  */
-static void MM_compare_heaps (byte* old_space) {
-  // Scan the to-space and forward any remaining pointers.
+static void MM_compare_heaps(byte* old_space) {
+  // Scan the from-space and compare forwarded LARs.
   byte* scan = from_space;
   while (scan < old_space) {
     TP_ lar = (TP_)scan;
@@ -226,46 +255,112 @@ static void MM_compare_heaps (byte* old_space) {
   ASSERT_GC(scan == old_space, "out of bounds when comparing");
 }
 
-// Compares a LAR with its copy
+static void MM_print_Susp(Susp s) {
+  if (IS_VAL(s)) {
+    if (IS_PVAL(s)) {
+      printf("val(int=%ld)", PVAL_R(s));
+    }
+    else if (IS_CONSTR(s)) {
+      TP_ c = CPTR(s);
+      printf("val(constructor={%d, %p(fw=%d, from-heap=%d)})", 
+	     CONSTR(s), c, IS_FORWARDED(c), MM_heap_ptr(c));
+      if (IS_FORWARDED(c)) printf("(=>%p)", FORWARDED_ADDR(c));
+    }
+    else printf("Unknown Susp found.");
+  } else {
+    printf("code{%p}", (LarArg)CODE(s));
+  }
+}
 
-inline static int MM_ptr_eq (TP_ x, TP_ y)
-{
-  TODO("MM_ptr_eq");
-  // return x == y || (x->magic == FORWARDED && x->prev == y);
+/** Compares two thunks.
+    \param  A thunk in from-space.
+    \param  A thunk in to-space.
+    \return If the thunks are the same, or if they are lazy constructors with
+    the pointer field of the second be the forwarded pointer field of the first,
+    returns 1. Otherwise, returns 0.
+*/  
+static int MM_compare_vals(Susp s_from, Susp s_to) {
+  if (s_from==s_to) return 1;
+  if (IS_CONSTR(s_from) && IS_CONSTR(s_to))
+    return ((CONSTR(s_from)==CONSTR(s_to)) && 
+	    (FORWARDED_ADDR(CPTR(s_from))==CPTR(s_to)));
   return 0;
 }
 
 /** Checks if a LAR in the from-space has been forwarded correctly.
     \param lar The from-space LAR.
 */
-static void MM_compare (TP_ lar)
-{
-  ASSERT_GC(IS_FORWARDED(lar),
-            "comparing an invalid LAR");
-  TP_ copy = AR_prev(lar);
-  ASSERT_GC(IS_FORWARDED(copy),
-            "invalid forwarding pointer");
-  ASSERT_GC(AR_SIZE(lar) == AR_SIZE(copy),
-            "mismatch in sizes");
-  ASSERT_GC(ARITY(lar) == ARITY(copy),
-            "mismatch in arity");
-  ASSERT_GC(NESTING(lar) == NESTING(copy),
-            "mismatch in nesting");
-/* These checks are disabled.
-  int n;
-  for (n=0; n<ARITY(lar); n++)
-    ASSERT_GC(ARGS(n, lar) == ARGS(n, copy),
-              "mismatch in ARGS");
-  for (n=0; n<ARITY(lar); n++) {
-    ASSERT_GC(VALS(n, lar).constr == VALS(n, copy).constr,
-              "mismatch in VALS constr");
-    ASSERT_GC(MM_ptr_eq(CPTR(VALS(n, lar)), CPTR(VALS(n, copy))),
-              "mismatch in VALS context");
+static void MM_compare(TP_ lar) {
+  // printf("MM_compare(%p): ", lar);
+  if (IS_FORWARDED(lar)) {
+    // printf("LAR is forwarded to %p.\n", FORWARDED_ADDR(lar));
   }
-  for (n=0; n<NESTING(lar); n++)
-    ASSERT_GC(MM_ptr_eq(NESTED(n, lar), NESTED(n, copy)),
-              "mismatch in NESTED");
-  */
+  else {
+    // printf("LAR is not forwarded.\n");
+    return;
+  }
+  
+  TP_ copy = FORWARDED_ADDR(lar);
+
+  unsigned char lar_a  = AR_a(lar->prev);
+  unsigned char lar_n  = AR_n(lar->prev);
+  unsigned char copy_a = AR_a(copy->prev);
+  unsigned char copy_n = AR_n(copy->prev);
+
+  if (lar_a != copy_a) {
+    printf("GC: arity mismatch between %p and %p: %d != %d\n",
+	   lar, copy, lar_a, copy_a);
+    exit(-1);
+  }
+  if (lar_n != copy_n) {
+    printf("GC: nesting mismatch between %p and %p: %d != %d\n",
+	   lar, copy, lar_n, copy_n);
+    exit(-1);
+  }
+  if (AR_SIZE(lar) != AR_SIZE(copy)) {
+    printf("GC: size mismatch between %p and %p: %ld != %ld\n",
+	   lar, copy, AR_SIZE(lar), AR_SIZE(copy));
+    exit(-1);
+  }
+
+  int n;
+#ifndef LAR_COMPACT
+  // TODO: write this for lar.h thunks
+  for (n=0; n<lar_a; n++) {
+    LarArg lar_arg  = (LarArg)(ARGS(n, lar ));
+    LarArg copy_arg = (LarArg)(ARGS(n, copy));
+    if (lar_arg != copy_arg) {
+      printf("GC: arg[%d] mismatch between %p and %p: %p != %p, details:\n",
+	     n, lar, copy, lar_arg, copy_arg);
+      MM_print_Susp((Susp)lar_arg) ; printf(" != ");
+      MM_print_Susp((Susp)copy_arg); printf("\n");
+      exit(-1);
+    }
+  }
+#endif
+  for (n=0; n<lar_a; n++) {
+    Susp lar_s  = VALS(n, lar );
+    Susp copy_s = VALS(n, copy);
+    // TODO: compare the structs for lar.h
+    if (IS_VAL(lar_s) && IS_VAL(copy_s) && (!MM_compare_vals(lar_s, copy_s))) {
+      printf("GC: val[%d] mismatch between %p and %p: %lx != %lx, details:\n",
+	     n, lar, copy, lar_s, copy_s);
+      MM_print_Susp((Susp)lar_s) ; printf(" != ");
+      MM_print_Susp((Susp)copy_s); printf("\n");
+      exit(-1);
+    }
+  }
+  for (n=0; n<lar_n; n++) {
+    TP_ lar_nested  = NESTED(n, lar_a , lar);
+    TP_ copy_nested = NESTED(n, copy_a, copy);
+    if (lar_nested != copy_nested) {
+      printf("GC: nested[%d] mismatch between %p and %p: %p != %p, details:\n",
+	     n, lar, copy, lar_nested, copy_nested);
+      exit(-1);
+    }
+  }
+
+  // printf("OK.\n");
 }
 
 #endif /* GC */
@@ -279,8 +374,7 @@ static void MM_compare (TP_ lar)
     \param bytes The number of bytes to allocate.
     \return The address of the newly allocated memory.
  */
-inline byte* MM_alloc (size_t bytes)
-{
+inline byte* MM_alloc(size_t bytes) {
   bytes = ALIGN(bytes);
 
   // If no space left

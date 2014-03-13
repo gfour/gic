@@ -83,7 +83,7 @@ typedef struct T_ {
 #define THE_ARGS(T)                    ((byte *) &((T)->data))
 #define VALS(x, T)                     (((Susp*) (THE_ARGS(T)))[x])
 #define ARGS(x, T)                     (VALS(x, T))
-#define ARGS_FLAG(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & (uintptr_t)0x1))
+#define ARGS_FLAG(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & 1))
 #define INIT_ARG_LOCKS(arity_a)        { }
 
 #define THE_NESTED(VALSARITY, T)       (THE_ARGS(T) + VALSARITY * sizeof(Susp))
@@ -95,7 +95,7 @@ typedef struct T_ {
 
 #define GETARG(x, T)  ({                  \
       if (ARGS_FLAG(x, T) != NULL) {	  \
-        Susp val = CODE(x, T)(T);         \
+        Susp val = ARGFUNC(x, T)(T);      \
         VALS(x, T) = val;                 \
       }                                   \
       VALS(x, T);                         \
@@ -105,7 +105,7 @@ typedef struct T_ {
 #define GETSTRICTARG(x, T)                 VALS(x, T)
 
 /* A call-by-name argument calls directly the argument, does no memoization. */
-#define GETCBNARG(x, T)                    (CODE(x, T)(T))
+#define GETCBNARG(x, T)                    (ARGFUNC(x, T)(T))
 
 #define AR_CAT(A, B) AR_CAT_AUX(A, B)
 #define AR_CAT_AUX(A, B) A ## B
@@ -128,8 +128,9 @@ typedef struct T_ {
 /* shift right, fill with 0s */
 #define CONSTR(p)     ((int)((uintptr_t)(p) >> 48))
 #define CPTR(p)       ((TP_)((((intptr_t)((uintptr_t)(p) << 16)) >> 16) & (~7)))
-#define ARGC(arg)     ((uintptr_t)arg | (uintptr_t)0x1)
-#define CODE(x, T)    ((LarArg)((uintptr_t)ARGS(x, T) & ~1))
+#define ARGC(arg)     ((uintptr_t)arg | 1)
+#define ARGFUNC(x, T) ((LarArg)(CODE(ARGS(x, T))))
+#define CODE(p)       ((uintptr_t)(p) & ~1)
 
 /* Primitive value read/create macros. These values use all high 62 bits. */
 #define PVAL_R(p)     ((signed long)((intptr_t)(p) >> 2))
@@ -158,13 +159,16 @@ typedef struct T_ {
 #define PVAL_OR(p1, p2)   ((intptr_t)(p1) | ((intptr_t)(p2)))
 #define PVAL_NEG(p)       (~((intptr_t)(p) - 4) & ~3)
 
+#define IS_VAL(p)         (((intptr_t)(p) & 1) == 0)
 #define IS_PVAL(p)        (((intptr_t)(p) & 2) == 0)
 #define IS_CONSTR(p)      (((intptr_t)(p) & 2) == 2)
 
 /* ********** Garbage collection ********** */
 
-#define IS_FORWARDED(ar)   ((uintptr_t)((ar)->prev) & 1)
-#define FORWARDED_ADDR(p)  ((TP_)(((uintptr_t)p) & ~1))
+#define IS_FORWARDED(ar)  (((uintptr_t)((ar)->prev) & 1) == 1)
+// #define FORWARDED_ADDR(p)  ((TP_)((uintptr_t)(p) & ~1))
+#define FORWARDED_ADDR(p) (CPTR((p)->prev))
+#define FW_ARINFO(a, n, p) ((TP_)((uintptr_t)(ARINFO(a, n, p)) | 1))
 
 /** Embeds arity/nesting/previous-pointer information in a single word.
     \param a    the arity of the LAR
