@@ -14,7 +14,7 @@
 static inline int MM_heap_ptr(TP_ t);
 static void MM_gc(void);
 static void MM_process_stack(void);
-static TP_ MM_forward(TP_ lar);
+static TP_  MM_forward(TP_ lar);
 static void MM_scan(TP_ lar);
 static void MM_compare_heaps(byte* old_space);
 static void MM_compare(TP_ lar);
@@ -96,8 +96,8 @@ static void MM_gc(void) {
 
 #if GC_STATS
   t2 = clock();
-  printf("bytes copied: %lu/%lu (%f%%),\n"
-         "forwarded LARs=%lu, stack roots=%lu, used=%lu bytes, left=%lu bytes,\n"
+  printf("bytes copied: %lu/%lu (%f%%), forwarded LARs=%lu,\n"
+         "stack roots=%lu, used to-space=%lu bytes, left to-space=%lu bytes,\n"
          "spaceStart=%p, space=%p, spaceEnd=%p\n",
          bytes_copied, MAXMEMSPACE, 100*((float)bytes_copied/(float)MAXMEMSPACE),
          lar_count, st_count, (unsigned long) (space-spaceStart),
@@ -109,17 +109,37 @@ static void MM_gc(void) {
 #endif /* GC_STATS */
 }
 
+static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t regname, TP_ reg_tp) {
+  reg_tp = CPTR(reg_tp);
+  if (MM_heap_ptr(reg_tp) && (!(IS_FORWARDED(reg_tp)))) {
+    if (regname>=UNW_X86_64_XMM0) {
+      printf("Cannot handle XMM registers yet.");
+      exit(-1);
+    }
+    printf("forwarding reg %2d=%p\n", regname, reg_tp);
+    TP_ fw_tp = MM_forward(reg_tp);
+    int r = unw_set_reg(cursor, regname, (unw_word_t)fw_tp);
+    if (r!=0) {
+      printf("Error modifying register %d (%p => %p)\n", regname, reg_tp, fw_tp);
+      exit(-1);
+    }
+    st_count++;
+  }
+}
+
 /** Traverse the pointer stack and forward everything that looks like a pointer
     to a heap-allocated LAR. If this is not exact, the program will crash. */
 static void MM_process_stack(void) {
-  printf("Scanning the pointer stack (%p ... %p)\n", sstack_bottom, sstack_ptr);
-  
+  printf("Scanning the pointer stack (%p ... %p, %ld pointers)\n",
+	 sstack_bottom, sstack_ptr, sstack_ptr-sstack_bottom+1);
+
   TP_* ptr;
   for (ptr = sstack_bottom; ptr <= sstack_ptr; ptr++) {
-    TP_ lar = *((TP_ *) ptr);
+    // TODO: is CPTR needed here?
+    TP_ lar = CPTR(*((TP_ *) ptr));
 
 #if VERBOSE_GC
-    //printf("rootset: ");
+    printf("candidate root: %p\n", lar);
 #endif /* VERBOSE_GC */
     if (MM_heap_ptr(lar)) {
       *((TP_ *)ptr) = MM_forward(lar);
@@ -128,6 +148,121 @@ static void MM_process_stack(void) {
 #endif /* GC_STATS */
     }
   }
+  // #if VERBOSE_GC
+  printf("Forwarded %ld roots.\n", lar_count);
+  // #endif /* VERBOSE_GC */
+
+  // -------------------------
+  /*
+  unw_cursor_t cursor; unw_context_t uc;
+  unw_word_t rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, 
+             r8,  r9,  r10, r11, r12, r13, r14, r15;
+  unw_word_t xmm0 , xmm1 , xmm2 , xmm3 , xmm4 , xmm5 , xmm6 , xmm7 ,
+             xmm8 , xmm9 , xmm10, xmm11, xmm12, xmm13, xmm14, xmm15;
+  unw_word_t ip, sp, sp_prev=0, offp;
+  int frames = 0;
+
+  unw_getcontext(&uc);
+  unw_init_local(&cursor, &uc);
+  while (unw_step(&cursor) > 0) {
+    const int len = 100;
+    char fname[len];
+    unw_get_reg(&cursor, UNW_X86_64_RAX, &rax);
+    unw_get_reg(&cursor, UNW_X86_64_RBX, &rbx);
+    unw_get_reg(&cursor, UNW_X86_64_RCX, &rcx);
+    unw_get_reg(&cursor, UNW_X86_64_RDX, &rdx);
+    unw_get_reg(&cursor, UNW_X86_64_RSI, &rsi);
+    unw_get_reg(&cursor, UNW_X86_64_RDI, &rdi);
+    unw_get_reg(&cursor, UNW_X86_64_RBP, &rbp);
+    unw_get_reg(&cursor, UNW_X86_64_RSP, &rsp);
+    unw_get_reg(&cursor, UNW_X86_64_R8 , &r8 );
+    unw_get_reg(&cursor, UNW_X86_64_R9 , &r9 );
+    unw_get_reg(&cursor, UNW_X86_64_R10, &r10);
+    unw_get_reg(&cursor, UNW_X86_64_R11, &r11);
+    unw_get_reg(&cursor, UNW_X86_64_R12, &r12);
+    unw_get_reg(&cursor, UNW_X86_64_R13, &r13);
+    unw_get_reg(&cursor, UNW_X86_64_R14, &r14);
+    unw_get_reg(&cursor, UNW_X86_64_R15, &r15);
+    unw_get_reg(&cursor, UNW_REG_IP, &ip);
+    unw_get_reg(&cursor, UNW_REG_SP, &sp);
+    unw_get_reg(&cursor, UNW_X86_64_XMM0 , &xmm0 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM1 , &xmm1 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM2 , &xmm2 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM3 , &xmm3 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM4 , &xmm4 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM5 , &xmm5 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM6 , &xmm6 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM7 , &xmm7 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM8 , &xmm8 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM9 , &xmm9 );
+    unw_get_reg(&cursor, UNW_X86_64_XMM10, &xmm10);
+    unw_get_reg(&cursor, UNW_X86_64_XMM11, &xmm11);
+    unw_get_reg(&cursor, UNW_X86_64_XMM12, &xmm12);
+    unw_get_reg(&cursor, UNW_X86_64_XMM13, &xmm13);
+    unw_get_reg(&cursor, UNW_X86_64_XMM14, &xmm14);
+    unw_get_reg(&cursor, UNW_X86_64_XMM15, &xmm15);
+    int r = unw_get_proc_name(&cursor, fname, len, &offp);
+    if (r==0) {
+      frames++;
+      //printf("%5d. %s(): ", frames, fname);      
+      if (strncmp(fname, "main", 4)==0) {
+	printf("Top-level function frame found, returning from stack walk.\n");
+	return;
+      }
+      MM_check_fw_reg(&cursor, UNW_X86_64_RAX, (TP_)rax);
+      MM_check_fw_reg(&cursor, UNW_X86_64_RBX, (TP_)rbx);
+      MM_check_fw_reg(&cursor, UNW_X86_64_RCX, (TP_)rcx);
+      MM_check_fw_reg(&cursor, UNW_X86_64_RDX, (TP_)rdx);
+      MM_check_fw_reg(&cursor, UNW_X86_64_RSI, (TP_)rsi);
+      MM_check_fw_reg(&cursor, UNW_X86_64_RDI, (TP_)rdi);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R8 , (TP_)r8 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_R9 , (TP_)r9 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_R10, (TP_)r10);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R11, (TP_)r11);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R12, (TP_)r12);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R13, (TP_)r13);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R14, (TP_)r14);
+      MM_check_fw_reg(&cursor, UNW_X86_64_R15, (TP_)r15);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM0 , (TP_)xmm0 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM1 , (TP_)xmm1 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM2 , (TP_)xmm2 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM3 , (TP_)xmm3 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM4 , (TP_)xmm4 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM5 , (TP_)xmm5 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM6 , (TP_)xmm6 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM7 , (TP_)xmm7 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM8 , (TP_)xmm8 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM9 , (TP_)xmm9 );
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM10, (TP_)xmm10);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM11, (TP_)xmm11);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM12, (TP_)xmm12);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM13, (TP_)xmm13);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM14, (TP_)xmm14);
+      MM_check_fw_reg(&cursor, UNW_X86_64_XMM15, (TP_)xmm15);
+      if (MM_heap_ptr((TP_)ip)) { printf("Found heap IP.\n"); exit(-1); }
+      if (MM_heap_ptr((TP_)sp)) { printf("Found heap SP.\n"); exit(-1); }
+      if (sp_prev!=0) {
+	TP_* sptr;
+	for (sptr = (TP_*)sp_prev; sptr < (TP_*)sp; sptr++) {
+	  // printf("Searching sp range (%p ... %p).\n", , );
+	  TP_ candidate = *sptr;
+	  if (MM_heap_ptr(candidate) && (IS_FORWARDED(candidate))) {
+	    TP_ fw_tp = MM_forward(candidate);
+	    printf("Rogue forwarded pointer found: %p => %p\n", candidate, fw_tp);
+	    *sptr = fw_tp;
+	    // exit(-1);
+	  }
+	}
+      }
+      sp_prev = sp;
+    }
+    else { printf("Could not retrieve function name.\n"); exit(-1); }
+    // printf ("rax = %lx, rbx = %lx, rcx = %lx, rdx = %lx, ",
+    // 	    (long) rax, (long) rbx, (long) rcx, (long) rdx);
+    // printf ("ip = %lx, sp = %lx\n", (long) ip, (long) sp);
+  }
+  */
+
 }
 
 /** Forwards a LAR pointer, copying the LAR to the to-space.
@@ -160,13 +295,18 @@ static TP_ MM_forward(TP_ lar) {
 
   int j;
   // poor man's memcpy
-  if (space+sz<spaceEnd) {
+  if ( (ISSPACE1(space) && (space+sz<space1+MAXMEMSPACE)) ||
+       (ISSPACE2(space) && (space+sz<space2+MAXMEMSPACE))) {
     unsigned char *lar0 = (unsigned char*)lar;
     for (j=0; j<sz; j++)
       space[j] = lar0[j];
   }
   else {
-    printf("Out of space.\n");
+    printf("Out of space: %p + %ld = %p >= %p.\n", space, sz, space+sz, spaceEnd);
+    printf("Spaces: space1 = [%p...%p], space2 = [%p...%p]\n",
+	   space1, space1+MAXMEMSPACE, space2, space2+MAXMEMSPACE);
+    printf("Type of this space: %s.\n",
+	   (ISSPACE1(space)? "space1" : (ISSPACE2(space)? "space2" : "??")));
     exit(-1);
   }
   TP_ fw_lar = (TP_)space;
@@ -188,7 +328,7 @@ static TP_ MM_forward(TP_ lar) {
   bytes_copied += sz;
 #endif
 #if VERBOSE_GC
-  printf("copied to %p\n", FORWARDED_ADDR(lar));
+    printf("%p was copied to %p\n", lar, fw_lar);
 #endif
   return fw_lar;
 }
@@ -293,7 +433,7 @@ static int MM_compare_vals(Susp s_from, Susp s_to) {
 static void MM_compare(TP_ lar) {
   // printf("MM_compare(%p): ", lar);
   if (IS_FORWARDED(lar)) {
-    // printf("LAR is forwarded to %p.\n", FORWARDED_ADDR(lar));
+    // printf("LAR %p is forwarded to %p.\n", lar, FORWARDED_ADDR(lar));
   }
   else {
     // printf("LAR is not forwarded.\n");

@@ -4,10 +4,14 @@
 
  */
 
+#define UNW_LOCAL_ONLY
+#define CONFIG_MSABI_SUPPORT
+#include <libunwind.h>
+
 /** Enables internal consistency check (used for debugging). */
 #define DEBUG_GC 1
 // Print (lots of) diagnostic messages
-// #define VERBOSE_GC
+#define VERBOSE_GC 0
 /** Print statistics. */
 #define GC_STATS 1
 
