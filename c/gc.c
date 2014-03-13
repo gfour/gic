@@ -123,34 +123,36 @@ static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t regname, TP_ reg_
       printf("Error modifying register %d (%p => %p)\n", regname, reg_tp, fw_tp);
       exit(-1);
     }
+#if GC_STATS
     st_count++;
+#endif /* GC_STATS */
   }
 }
 
 /** Traverse the pointer stack and forward everything that looks like a pointer
     to a heap-allocated LAR. If this is not exact, the program will crash. */
 static void MM_process_stack(void) {
+#if VERBOSE_GC
   printf("Scanning the pointer stack (%p ... %p, %ld pointers)\n",
 	 sstack_bottom, sstack_ptr, sstack_ptr-sstack_bottom+1);
+#endif /* VERBOSE_GC */
 
-  TP_* ptr;
+  TP_** ptr;
   for (ptr = sstack_bottom; ptr <= sstack_ptr; ptr++) {
-    // TODO: is CPTR needed here?
-    TP_ lar = CPTR(*((TP_ *) ptr));
-
+    TP_ lar = **ptr;
 #if VERBOSE_GC
     printf("candidate root: %p\n", lar);
 #endif /* VERBOSE_GC */
     if (MM_heap_ptr(lar)) {
-      *((TP_ *)ptr) = MM_forward(lar);
+      **((TP_ **)ptr) = MM_forward(lar);
 #if GC_STATS
     st_count++;
 #endif /* GC_STATS */
     }
   }
-  // #if VERBOSE_GC
+#if VERBOSE_GC
   printf("Forwarded %ld roots.\n", lar_count);
-  // #endif /* VERBOSE_GC */
+#endif /* VERBOSE_GC */
 
   // -------------------------
   /*
