@@ -4,9 +4,11 @@
 
  */
 
+/*
 #define UNW_LOCAL_ONLY
 #define CONFIG_MSABI_SUPPORT
 #include <libunwind.h>
+*/
 
 /** Enables internal consistency check (used for debugging). */
 #define DEBUG_GC 0
