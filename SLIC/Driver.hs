@@ -27,8 +27,8 @@ import Data.Map (unions)
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (ierr)
 import SLIC.DFI
-import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfiAppSigs, genModDFI, linkF,
-                          optEnums)
+import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfFlags, dfiAppSigs,
+                          genModDFI, linkF, optEnums)
 import SLIC.Front.EvalFL (evalFL)
 import SLIC.Front.Preprocessor
 import SLIC.Front.Renamer
@@ -76,7 +76,7 @@ processFL opts dfis inputModule =
      -- code that may have come from the GHC front-end
      let p0Preproc = procModSource (\_ p -> convertFromGHC p) p0Alpha
      -- do datatypes-as-functions transformation
-     let p0Constrs = constrToFuncs opts p0Preproc
+     let p0Constrs = constrToFuncs (optTC opts, optScrut opts) p0Preproc
      -- _ <- (putStrLn ("-- * Datatypes-as-functions in modules") >> printLn p0Constrs)
      -- check that the modules are now in good shape for the lambda lifter
      let p0Checked = checkMod p0Constrs
@@ -108,8 +108,8 @@ processFL opts dfis inputModule =
      let dfModF = defuncMod opts e1 p1
      -- _ <- printLn dfMods
      -- do the -enum opimization
-     let dfModFFinal = optEnums opts dfModF
-     
+     let dfModFFinal = (if canOptEnums opts then optEnums else id) dfModF
+
      -- get the defunctionalized FL modules and defunctionalization interfaces
      let ModD p0Def p0DefDfi = dfModFFinal    
      -- _ <- (putStrLn ("* Defunctionalized") >> printLn p0Def)
@@ -162,7 +162,7 @@ processFL opts dfis inputModule =
                  putStrLn "== Separately defunctionalized module ==" >>
                  printLn p0Final
                Whole ->
-                 let wholeProgFinal = linkF opts p0Final p0Dfi
+                 let wholeProgFinal = linkF (dfFlags opts) p0Final p0Dfi
                  in  putStrLn "== Whole defunctionalized program ==" >>
                      printLn wholeProgFinal
          AEvalFL ->
@@ -170,7 +170,7 @@ processFL opts dfis inputModule =
                CompileModule ->
                  error "The non-strict FL interpreter does not support separate compilation."
                Whole ->
-                 let wholeProgFinal = linkF opts p0Final p0Dfi
+                 let wholeProgFinal = linkF (dfFlags opts) p0Final p0Dfi
                  in  do evalFL wholeProgFinal
                         return Nothing
          APrintHIL1 -> printLn p1

@@ -38,19 +38,19 @@ import SLIC.Types
 --   in whole-program mode. Returns the extra usage information needed for
 --   later stages of compilation. Takes the merged DFI of all
 --   the DFIs to link.
-linkWithDf :: Options -> DFI -> ProgL -> (ModL, ProgInfo)
-linkWithDf opts dfi p =
-  let (modDF, pInfo) = genDfModLAR opts dfi
+linkWithDf :: DfFlags -> DFI -> ProgL -> (ModL, ProgInfo)
+linkWithDf flags dfi p =
+  let (modDF, pInfo) = genDfModLAR flags dfi
       pDF = modProg $ modDF
   in  (modDF{modProg=(concatProgs [p, pDF])}, pInfo)
 
 -- | Generates defunctionalization's LAR module. Also returns information
 --   required by later stages of compilation. Takes the merged DFI of all
 --   the DFIs to link.
-genDfModLAR :: Options -> DFI -> (ModL, ProgInfo)
-genDfModLAR opts dfi@(DFI _ _ sigs dfInfo _ _) =
+genDfModLAR :: DfFlags -> DFI -> (ModL, ProgInfo)
+genDfModLAR flags dfi@(DFI _ _ sigs dfInfo _ _) =
   let dfCArities = map (\(DFC c ar _ _)->(c, ar)) $ toList $ diDfcs dfInfo
-      (dfModuleF, progInfo@(defSigs, _, _)) = genDfModFinal opts dfi
+      (dfModuleF, progInfo@(defSigs, _, _)) = genDfModFinal flags dfi
       dfModuleZ  = fromHItoZI $ itransM $ fromHFtoHI dfModuleF
       cids = Map.fromList $ map (\((a, b), c)->(a, (b, c))) $ zip dfCArities [0..]
       sigs' = Map.union sigs defSigs
@@ -62,7 +62,7 @@ genDfModLAR opts dfi@(DFI _ _ sigs dfInfo _ _) =
 makeDfModC :: Options -> DFI -> ShowS
 makeDfModC opts dfi =
   let env = dfiTEnv dfi
-      (mL, (_, (cbns, stricts), pmds)) = genDfModLAR opts dfi
+      (mL, (_, (cbns, stricts), pmds)) = genDfModLAR (dfFlags opts) dfi
       is = modImports mL
       pL@(Prog dts _) = modProg mL
       config   = ConfigLAR { getCBNVars   = cbns
@@ -113,7 +113,7 @@ compileWholeL dfi finalProgLAR config allImports =
   let eLAR = dfiTEnv dfi
       opts = getOptions config
       (modFinal, (fsigs', (cbns', strs'), pmdepths')) =
-        linkWithDf opts dfi finalProgLAR
+        linkWithDf (dfFlags opts) dfi finalProgLAR
       Prog dts blocks = modProg modFinal
       -- update the configuration with defunctionalization's usage information
       cbns    = Map.union (getCBNVars config) cbns'

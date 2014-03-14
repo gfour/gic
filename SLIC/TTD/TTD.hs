@@ -4,6 +4,7 @@ module SLIC.TTD.TTD (callTTDBackend) where
 
 import SLIC.AuxFun (ierr)
 import SLIC.DFI (DFI)
+import SLIC.Front.Defunc (dfFlags)
 import SLIC.ITrans.Syntax
 import SLIC.ITrans.ZLinker (mergeAndLinkZ)
 import SLIC.State
@@ -17,7 +18,7 @@ import SLIC.Types (mainDefQName, pprint)
 callTTDBackend :: Options -> DFI -> ModZ -> IO ()
 callTTDBackend opts dfi m =
   let mn = fst $ modNameF m
-      Prog _ defsZ = mergeAndLinkZ opts dfi [m]
+      Prog _ defsZ = mergeAndLinkZ (dfFlags opts) dfi [m]
       (pTTD, defIDs) = fromZOILtoTTD defsZ
       resultID = idOf defIDs (mainDefQName mn)
   in  case optAction opts of

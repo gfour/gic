@@ -24,6 +24,7 @@ import Data.Maybe (catMaybes)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
 import SLIC.Constants
 import SLIC.DFI (DFI)
+import SLIC.Front.Defunc (dfFlags)
 import SLIC.ITrans.Syntax
 import SLIC.ITrans.ZLinker
 import SLIC.State
@@ -325,7 +326,7 @@ evalZOILLazy opts dfi p3 =
         error"The lazy eduction interpreter does not support separate compilation."
       Whole ->
         let eOpts  = (optVerbose opts, optWhSize opts)
-            p3'    = mergeAndLinkZ opts dfi [p3]
+            p3'    = mergeAndLinkZ (dfFlags opts) dfi [p3]
             val    = evalEduction eOpts (fst $ modNameF p3) (fProg $ progDefs p3')
         in  putStrLn (pprint val "")
 

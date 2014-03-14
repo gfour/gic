@@ -45,13 +45,13 @@ type BVInfo = [Alias]
 
 -- | Replaces constructor calls with function calls that lead to thunks.
 --   (The /constructors-as-functions/ transformation.)
-constrToFuncs :: Options -> ModF -> ModF
-constrToFuncs opts modF =
+constrToFuncs :: (TypeChecker, ScrutOpt) -> ModF -> ModF
+constrToFuncs (tc, scrutOpt) modF =
   let Prog ds defs = modProg modF
-      newDefs = concatMap (newDataDefs (optScrut opts)) ds
+      newDefs = concatMap (newDataDefs scrutOpt) ds
       defs'   = map replaceConstrD defs
       prog'   = Prog ds (defs' ++ newDefs)
-      tAnnot' = if optTC opts == GICTypeInf False then
+      tAnnot' = if tc == GICTypeInf False then
                   modTAnnot modF
                 else
                   Map.union (modTAnnot modF) (genProjSelTEnv ds)

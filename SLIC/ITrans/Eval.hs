@@ -14,6 +14,7 @@ module SLIC.ITrans.Eval (evalZOILCBN) where
 import Data.List (intersperse)
 import SLIC.AuxFun (ierr, spaces)
 import SLIC.DFI (DFI)
+import SLIC.Front.Defunc (dfFlags)
 import SLIC.ITrans.Syntax
 import SLIC.ITrans.ZLinker (mergeAndLinkZ)
 import SLIC.State
@@ -236,7 +237,7 @@ evalZOILCBN :: Options -> DFI -> ModZ -> IO ()
 evalZOILCBN opts dfi p3 =
   let trFlag    = optVerbose opts
       emptyCtxt = []
-      p3' = mergeAndLinkZ opts dfi [p3]
+      p3' = mergeAndLinkZ (dfFlags opts) dfi [p3]
       Prog dts' _ = modProg p3
       m = fst $ modNameF p3
   in  evaluatorZ m trFlag p3' >>= \val -> 
