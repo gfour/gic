@@ -338,16 +338,14 @@ mkCBlock (DefL f e bind) env config =
       opts = getOptions config
       gc = optGC opts
   in  ("FUNC("++).pprint f.("){"++).nl.
-      (if (fArity>0) then
-         case gc of
-           LibGC ->
-             ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl.
-             (if optDebug opts then
-                debugFuncProlog f
-              else id)
-           SemiGC ->
-             ("PUSHAR(T0);"++).nl
-       else id).
+      (case gc of
+          LibGC | fArity > 0 ->
+            ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl.
+            (if optDebug opts then
+               debugFuncProlog f
+             else id)
+          SemiGC -> pushAR
+          _ -> id).
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
           Just strictFrms -> forceStricts gc strictFrms fArity).

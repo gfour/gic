@@ -195,17 +195,20 @@ prettyPrintMagic =
     tab.("return (SUSP(1, "++).uTag.(", 0));"++).nl.
     ("}"++).nl
 
+funcHeader :: QName -> ShowS
+funcHeader f = ("FUNC("++).pprint f.(") {"++).nl.pushAR
+
 -- | Dummy version of the runMainIO function used by GHC.
 b_runMainIO :: ShowS
 b_runMainIO =
-  ("FUNC("++).pprint bf_runMainIO.(") {"++).nl.
+  funcHeader bf_runMainIO.
   tab.("return (SUSP(0, "++).uTag.(", 0));"++).nl.
   ("}"++).nl
 
 -- | Reads an integer from the standard input.
 b_readIntIO :: ShowS
 b_readIntIO =
-  ("FUNC("++).pprint bf_readIntIO.(") {"++).nl.
+  funcHeader bf_readIntIO.
   tab.("int i;"++).nl.
   tab.("if (scanf(\"%d\", &i)==EOF) { printf(\"error: scanf: EOF\\n\"); exit(-1); };"++).nl.
   tab.("return (SUSP(i, "++).uTag.(", 0));"++).nl.
@@ -214,7 +217,7 @@ b_readIntIO =
 -- | Writes an integer to the standard input and returns it.
 b_printIntIO :: GC -> ShowS
 b_printIntIO gc =
-  ("FUNC("++).pprint bf_printIntIO.(") {"++).nl.
+  funcHeader bf_printIntIO.
   tab.("Susp i = "++).mkGETARG gc bf_printIntIO 0 t0.(";"++).nl.
   tab.("printf(\"%d\\n\", CONSTR(i));"++).nl.
   tab.("return i;"++).nl.
@@ -224,7 +227,7 @@ b_printIntIO gc =
 b_putStr :: GC -> CompactOpt -> ShowS
 b_putStr gc compact =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
-  in  ("FUNC("++).pprint bf_putStr.(") {"++).nl.
+  in  funcHeader bf_putStr.
       tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
       tab.tab.("printf(\"%c\", "++).
@@ -238,7 +241,7 @@ b_putStr gc compact =
 -- | Writes a string followed by a newline to the standard input.
 b_putStrLn :: ShowS
 b_putStrLn =
-  ("FUNC("++).pprint bf_putStrLn.(") {"++).nl.
+  funcHeader bf_putStrLn.
   tab.("Susp ret = "++).pprint bf_putStr.("(T0);"++).nl.
   tab.("printf(\"\\n\");"++).nl.
   tab.("return ret;"++).nl.
@@ -246,7 +249,7 @@ b_putStrLn =
 
 b_error :: ShowS
 b_error =
-  ("FUNC("++).pprint bf_error.(") {"++).nl.
+  funcHeader bf_error.
   -- TODO: this should go to stderr, together with the putStrLn output
   tab.("printf(\"error: \");"++).nl.
   tab.("Susp ret = "++).pprint bf_putStrLn.("(T0);"++).nl.
@@ -262,7 +265,7 @@ dummyPre = ("0"++)
 -- | Converts an Int to an Integer.
 b_toInteger :: Options -> ShowS
 b_toInteger opts =
-  ("FUNC("++).pprint bf_toInteger.(") {"++).nl.
+  funcHeader bf_toInteger.
   (if optCompact opts then
      ("printf(\"TODO: toInteger for -compact\");"++).nl
    else
@@ -306,7 +309,7 @@ b_strToList gc compact =
 --   For now, it is the Show Int implementation.
 b_show :: GC -> ShowS
 b_show gc =
-  ("FUNC("++).pprint bf_show.("){"++).nl.
+  funcHeader bf_show.
   tab.("Susp i = "++).mkGETARG gc bf_show 0 t0.(";"++).nl.
   tab.("// find number of digits"++).nl.
   tab.("int a = abs(CONSTR(i)), digits = 0;"++).nl.
@@ -320,7 +323,7 @@ b_show gc =
 
 b_par :: GC -> ShowS
 b_par gc =
-  ("FUNC("++).pprint bf_par.("){"++).nl.
+  funcHeader bf_par.
   wrapIfOMP
   (tab.("Susp a, b;"++).nl.
    ("#pragma omp single nowait"++).nl.
@@ -338,7 +341,7 @@ b_par gc =
 
 b_pseq :: GC -> ShowS
 b_pseq gc =
-  ("FUNC("++).pprint bf_pseq.("){"++).nl.
+  funcHeader bf_pseq.
   wrapIfOMP (tab.("Susp a = "++).mkGETARG gc bf_pseq 0 t0.(";"++).nl) id.
   tab.("Susp b = "++).mkGETARG gc bf_pseq 1 t0.(";"++).nl.
   tab.("return b;"++).nl.
@@ -376,7 +379,7 @@ mkBuiltinCstr dt cstr =
           Just (arC, cidC) -> (cidC, arC==0)
           Nothing -> ierr $ "mkBuiltinCstr: no info for "++(qName cstr)
       tag = shows (findTagOfDT dt builtinTags)
-  in  ("FUNC("++).pprint cstr.("){"++).nl.
+  in  funcHeader cstr.
       ("return (SUSP("++).shows cid.(", "++).tag.
       (if nullary then (",  0));"++)
        else            (", T0));"++)).nl.

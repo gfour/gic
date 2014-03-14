@@ -1,6 +1,6 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, wrapIfMacro,
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, pushAR, wrapIfMacro,
                         wrapIfNotMacro,
                         wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfSSTACK) where
 
@@ -69,3 +69,7 @@ wrapIfNotMacro macroName s =
   ("#ifndef "++).(macroName++).nl.
   s.
   ("#endif /* "++).(macroName++).(" */"++).nl
+
+-- | The call to the macro that pushes the current LAR to the pointer stack.
+pushAR :: ShowS
+pushAR = ("PUSHAR(T0);"++).nl
