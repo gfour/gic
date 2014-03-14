@@ -28,7 +28,7 @@ fi
 # FASTOP="-fop"
 export CFLAGS2="-Wno-#warnings"
 # export CFLAGS2="-DSSTACK"
-export GICFLAGS="-gic-tc -mem 220000000 -compact $FASTOP"
+export GICFLAGS="-gic-tc -mem 28000000 -compact $FASTOP"
 echo Using:
 echo gic $GICFLAGS
 echo C compiler: $CC
@@ -54,7 +54,11 @@ echo -n "Church: "
 testRun Examples/NewBench/church.hs
 cp main.c gic_church.c
 cp a.out gic_church
-export GICFLAGS="-gic-tc -mem 442800000 -compact $FASTOP"
+echo -n "Queens-num: "
+testRun Examples/NewBench/queens-num.hs
+cp main.c gic_queens_num.c
+cp a.out gic_queens_num
+export GICFLAGS="-gic-tc -mem 440000000 -compact $FASTOP"
 echo -n "Digits: "
 testRun Examples/Data/digits_of_e1.hs
 cp main.c gic_digits_of_e1.c
@@ -63,28 +67,25 @@ echo -n "Reverse: "
 testRun Examples/Data/reverse.hs
 cp main.c gic_reverse.c
 cp a.out gic_reverse
-export GICFLAGS="-gic-tc -mem 24428000000 -compact $FASTOP"
-echo -n "Ntak: "
-testRun Examples/NewBench/ntak.hs
-cp main.c gic_ntak.c
-cp a.out gic_ntak
+export GICFLAGS="-gic-tc -mem 1800000000 -compact $FASTOP"
 echo -n "Quick-sort: "
 testRun Examples/NewBench/quick-sort.hs
 cp main.c gic_quick_sort.c
 cp a.out gic_quick_sort
+export GICFLAGS="-mem 1100000000 -compact $FASTOP"
 echo -n "Tree-sort: "
 testRun Examples/NewBench/tree-sort.hs
 cp main.c gic_tree_sort.c
 cp a.out gic_tree_sort
-export GICFLAGS="-mem 24428000000 -compact $FASTOP"
 echo -n "Queens: "
 testRun Examples/NewBench/queens.hs
 cp main.c gic_queens.c
 cp a.out gic_queens
-echo -n "Queens-num: "
-testRun Examples/NewBench/queens-num.hs
-cp main.c gic_queens_num.c
-cp a.out gic_queens_num
+export GICFLAGS="-gic-tc -mem 7628000000 -compact $FASTOP"
+echo -n "Ntak: "
+testRun Examples/NewBench/ntak.hs
+cp main.c gic_ntak.c
+cp a.out gic_ntak
 
 if [ "$GHC" == "" ]
 then
