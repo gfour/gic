@@ -25,7 +25,7 @@ static void MM_compare(TP_ lar);
 #if GC_STATS
 // Statistics: count the copied LARs & processed LAR pointers in the stack
 static unsigned long bytes_copied, lar_count, st_count;
-#endif
+#endif /* GC_STATS */
 
 // Pointers to the memory spaces
 static byte *from_space, *to_space;
@@ -105,7 +105,7 @@ static void MM_gc(void) {
          spaceStart, space, spaceEnd);
 #if VERBOSE_GC
   printf("GC done, time = %.10f sec\n", ((double)(t2 - t1)/CLOCKS_PER_SEC));
-#endif
+#endif /* VERBOSE_GC */
 #endif /* GC_STATS */
 }
 
@@ -277,7 +277,7 @@ static TP_ MM_forward(TP_ lar) {
   ASSERT_GC(lar != NULL, "forwarding null");
 #if VERBOSE_GC
   // printf ("forwarding T0=%p, ", lar);
-#endif
+#endif /* VERBOSE_GC */
   // if already forwarded, just return it
   if (IS_FORWARDED(lar)) {
     // We have stored the forwarded pointer in .prev
@@ -333,10 +333,10 @@ static TP_ MM_forward(TP_ lar) {
 #if GC_STATS
   lar_count++;
   bytes_copied += sz;
-#endif
+#endif /* GC_STATS */
 #if VERBOSE_GC
     printf("%p was copied to %p\n", lar, fw_lar);
-#endif
+#endif /* VERBOSE_GC */
   return fw_lar;
 }
 
@@ -346,7 +346,7 @@ static TP_ MM_forward(TP_ lar) {
 static void MM_scan(TP_ lar) {
 #if VERBOSE_GC
   printf("scanning T0=%p\n", lar);
-#endif
+#endif /* VERBOSE_GC */
   char lar_a    = ARITY(lar);
   char lar_n    = NESTING(lar);
   TP_  lar_prev = AR_prev(lar);
