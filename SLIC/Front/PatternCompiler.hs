@@ -58,11 +58,4 @@ type Match = ([FullPat], Maybe GuardFH, ExprFH)
 --   scrutinees, a list of matches and generates the resulting case expression.
 patCompMatches :: PPrint a => [ExprFL a] -> [Match] -> ExprFL a
 patCompMatches es _ =
-    error $ "Found expressions that need the pattern compiler: "++
-            (pprintList (" "++) es "")
-
--- TODO: have a pass that simplifies all pattern matching with just one branch:
---   /case e of _ -> e'/    ~~~~~>     /e'/
--- 
-
-
+    error $ "Found expressions that need the pattern compiler: "++(pprint es "")

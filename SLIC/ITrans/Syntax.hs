@@ -56,9 +56,9 @@ instance PPrint ExprH where
    pprint (XH vn)          = pprint vn
    pprint (ConH cn el)     = prettyConst 0 cn el
    pprint (ConstrH c)      = pprintTH c
-   pprint (FH NOp vn ps)   = pprint vn.pprintList space ps
+   pprint (FH NOp vn ps)   = pprint vn.pprintList 1 space ps
    pprint (FH qOp vn ps)   =
-       pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList space ps
+       pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList 1 space ps
    pprint (CaseH cl@(cn, _) e pats) =
       ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).nl.
       pprint_tab_l (tabIdxOf cn) pats
@@ -68,7 +68,7 @@ instance PPrint DefH where
         pprint vn.spaces 1.showStrings " " (map qName ps).(" = " ++).pprint e
     pprint (ActualsH vn m es) =
         pprint vn.("{"++).(m++).("}"++).
-        (" = actuals["++).(pprintList (", "++) es).("]" ++)
+        (" = actuals["++).(pprintList 0 (", "++) es).("]" ++)
 
 -- * The ZOIL language
 
@@ -108,7 +108,7 @@ instance PPrint DefZ where
    pprint (DefZ vn e) = pprint vn.(" = " ++).pprint e
    pprint (ActualsZ vn m es) =
      pprint vn.("{"++).(m++).("}"++).
-     (" = actuals["++).pprintList (", "++) es.("]" ++)
+     (" = actuals["++).pprintList 0 (", "++) es.("]" ++)
 
 -- | Searches for a function definition in ZOIL.
 searchDefZ :: QName -> ProgZ -> Maybe DefZ

@@ -560,13 +560,13 @@ checkNames modF =
         in  if vName `elem` names then
               True
             else
-              errM fm $ "Unknown variable "++(qName vName)++", known names: "++(pprintList (", "++) names "")
+              errM fm $ "Unknown variable "++(qName vName)++", known names: "++(pprintList 0 (", "++) names "")
       checkE names (FF f el) =
         let fName = nameOfV f
         in  if (fName `elem` names) || ((lName fName) `elem` tcMethods) then
               all (checkE names) el
             else
-              errM fm $ "Found call to unknown function "++(qName fName)++", known names: "++(pprintList (", "++) names "")
+              errM fm $ "Found call to unknown function "++(qName fName)++", known names: "++(pprintList 0 (", "++) names "")
       checkE names (ConF _ el) = all (checkE names) el
       checkE names (ConstrF c el) =
         if c `elem` names then

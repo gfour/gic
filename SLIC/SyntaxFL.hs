@@ -151,8 +151,8 @@ instance PPrint a => PPrint (ExprFL a) where
    pprintPrec _ (FF vn []) =
      pprint vn
    pprintPrec p (FF vn ps) =
-     showParen (p>0) (pprint vn.spaces 1.pprintList space ps)
-   pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprintList space el
+     showParen (p>0) (pprint vn.spaces 1.pprintList 1 space ps)
+   pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprint el
    pprintPrec p (CaseF cl@(cn, _) e bind pats) =
      let dep = tabIdxOf cn
      in  ("case "++).pprintPrec p e.

@@ -110,7 +110,7 @@ runLoop nWorkers counter entriesTable joins msgQ =
                 [] -> ierr "Program ended with no result."
                 _  -> runLoop nWorkers (counter+1) entriesTable joinsR pendingMsgs
         [Msg _ _ _ (Response valT)] -> (valT, counter)
-        _ -> ierr $ "Cannot handle root msg:"++(pprintList comma msgsToRoot "")
+        _ -> ierr $ "Cannot handle root msg:"++(pprintList 0 comma msgsToRoot "")
 
 -- | Runs a cycle, i.e. sends a message to a dataflow instruction in the program. 
 --   The result is one or more messages to be processed in the next cycle.

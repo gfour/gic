@@ -183,7 +183,7 @@ type CBNVars = Map.Map QName [QName]
 
 pprintCBNVars :: CBNVars -> ShowS
 pprintCBNVars cbns =
-  let aux (f, frms) = pprint f.(" : "++).pprintList (", "++) frms.nl
+  let aux (f, frms) = pprint f.(" : "++).pprintList 0 (", "++) frms.nl
   in  foldDot aux $ Map.toList cbns
 
 -- | The variable usage information contains the variables that can be evaluated
@@ -549,11 +549,12 @@ instance (PPrint a, PPrint b) => PPrint (a, b) where
   pprint (a, b) = ("("++).pprint a.(", "++).pprint b.(")"++)
 
 -- | Helper function to print a list of PPrint-ables.
-pprintList :: (PPrint a) => ShowS -> [a] -> ShowS
-pprintList pDelim as = foldDot id $ intersperse pDelim $ map pprint as
+--   Takes an auxiliary number to pass to the pretty printer of each argument.
+pprintList :: (PPrint a) => Int -> ShowS -> [a] -> ShowS
+pprintList p pDelim as = foldDot id $ intersperse pDelim $ map (pprintPrec p) as
 
 instance (PPrint a) => PPrint [a] where
-  pprint as = pprintList (" "++) as
+  pprint as = pprintList 0 (" "++) as
 
 -- | Prints a printable thing in the IO monad.
 printLn :: (PPrint a) => a -> IO (Maybe b)

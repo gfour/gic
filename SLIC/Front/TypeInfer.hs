@@ -12,7 +12,7 @@ import Data.List (lookup, nub, sort)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import SLIC.AuxFun (ierr, errM, trace2)
-import SLIC.Constants (bMod, space)
+import SLIC.Constants (bMod)
 import SLIC.Front.Preprocessor (genProjSelTEnv)
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -777,7 +777,7 @@ readTypeSigs modF =
                 if ar==frmsLen then frmsTEnv t
                 else errM fm $ "Wrong arity found for "++(lName f)++
                      ", "++(show ar)++" but it has "++(show frmsLen)++
-                     " formals: "++(pprintList space fs "")
+                     " formals: "++(pprint fs "")
                      
   in  return $ Map.unions (tEnv:(map defTEnv defs))
   
