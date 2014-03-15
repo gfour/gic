@@ -639,13 +639,13 @@ prologue opts modName arityCAF =
                     ("static inline byte* MM_alloc(size_t bytes);"++)).nl.
                  ("byte *space, *space1, *space2, *spaceStart, *spaceEnd;"++).nl
                CompileModule -> 
-                 ("extern inline byte* MM_alloc(size_t bytes);"++).nl)
+                 ("extern inline byte* MM_alloc(size_t bytes);"++).nl).
+           wrapIfGC
+           (("// Memory management: shadow stack pointers (base/current)"++).nl.
+            ("static TP_ **sstack_bottom;"++).nl.
+            ("static TP_ **sstack_ptr;"++).nl)
+           id
          LibGC -> id).
-      wrapIfGC
-      (("// Memory management: shadow stack pointers (base/current)"++).nl.
-       ("static TP_ **sstack_bottom;"++).nl.
-       ("static TP_ **sstack_ptr;"++).nl)
-      id.
       (if (optVerbose opts) then
          ("// Graphviz output functionality"++).nl.
          ("int counter; FILE *p; /* file for graph output */"++).nl
@@ -681,19 +681,19 @@ mainFunc env opts mainNesting modules =
            tab.tab.("exit(EXIT_FAILURE);"++).nl.
            tab.("}"++).nl.
            tab.("space = spaceStart = space1;"++).nl.
-           tab.("spaceEnd = space + MAXMEMSPACE;"++).nl
+           tab.("spaceEnd = space + MAXMEMSPACE;"++).nl.
+           -- Initialize the explicit pointer stack.
+           wrapIfGC
+           (("sstack_bottom = (TP_**)malloc(sizeof(TP_*)*SSTACK_MAX_SIZE);"++).nl.
+            ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
+            ("sstack_ptr = sstack_bottom;"++).nl
+           ) id
          LibGC ->
            tab.("GC_init();"++).nl.
            wrapIfOMP (tab.("GC_thr_init();"++).nl) id.
            wrapIfGMP (tab.("mp_set_memory_functions(GMP_GC_malloc, GMP_GC_realloc, GMP_GC_free);"++).nl) id
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
-      -- Initialize the explicit pointer stack.
-      wrapIfGC
-      (("sstack_bottom = (TP_**)malloc(sizeof(TP_*)*SSTACK_MAX_SIZE);"++).nl.
-       ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
-       ("sstack_ptr = sstack_bottom;"++).nl
-      ) id.      
       tab.("// initial activation record"++).nl.
       tab.("TP_ T0=NULL;"++).nl.
       (case gc of
