@@ -17,10 +17,18 @@ if [ "$CC" = "" ]; then
     CC=gcc
 fi
 
-# add -DGC and -DSSTACK to the gcc flags if compiling with -semigc
-# USE_GC="-DGC -DSSTACK"
-# USE_GC="-DGC -DSSTACK -DVERBOSE_GC"
-USE_GC=""
+GC=0
+
+if [ "$GC" = "1"]; then
+    # Add -DGC and -DSSTACK to the gcc flags to use the semi-space collector.
+    USE_GC="-DGC -DSSTACK"
+    # USE_GC="-DGC -DSSTACK -DVERBOSE_GC"
+    # Add the libunwind linking flag.
+    LIBUNWIND="-lunwind"
+else
+    USE_GC=""
+    LIBUNWIND=""
+fi
 
 CFLAGS="-O3 -I . -ggdb3"
 # CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
@@ -30,7 +38,7 @@ CFLAGS="-O3 -I . -ggdb3"
 
 cat c/gc.c >> main.c
 
-CMD="${CC} ${CFLAGS} ${CFLAGS2} main.c ${USE_GC} ${USE_GMP}"
+CMD="${CC} main.c ${CFLAGS} ${CFLAGS2}${USE_GC} ${USE_GMP} ${LIBUNWIND}"
 # echo $CMD
 $CMD
 
