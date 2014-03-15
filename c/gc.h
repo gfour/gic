@@ -4,6 +4,8 @@
 
  */
 
+#ifdef GC
+
 #define UNW_LOCAL_ONLY
 #define CONFIG_MSABI_SUPPORT
 #include <libunwind.h>
@@ -29,3 +31,5 @@
 #define ISSPACE1(x) ((x >= space1) && (x <= space1 + MAXMEMSPACE))
 /** Check if a pointer belongs to space 2. */
 #define ISSPACE2(x) ((x >= space2) && (x <= space2 + MAXMEMSPACE))
+
+#endif /* GC */

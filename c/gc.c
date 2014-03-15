@@ -120,7 +120,12 @@ static int ll_lar(TP_ lar) {
   return (((unsigned char)ARITY(lar) + (unsigned char)NESTING(lar)) != 0);
 }
 
-
+/** Checks if a x86-64 XMM register saved in a stack frame contains a LAR
+    pointer; if yes, the pointers is forwarded.
+    \param The libunwind cursor pointing to the stack frame.
+    \param The XMM register name (see header "libunwind-x86_64.h").
+    \param The 128-bit register contents.
+ */
 static void MM_check_fw_fpreg(unw_cursor_t *cursor, unw_regnum_t reg, unw_fpreg_t reg_tp) {
   TP_ *reg_tp_pair = (TP_*)(&reg_tp);
   int i;
@@ -136,32 +141,43 @@ static void MM_check_fw_fpreg(unw_cursor_t *cursor, unw_regnum_t reg, unw_fpreg_
 	exit(EXIT_FAILURE);
       }
       if (reg_tp_i != reg_tp_iC) {
-	/* printf("X:pointer body, a=%d, n=%d, constr=%d, is_val=%d, is_pval=%d\n", */
-	/*        AR_a(reg_tp_i), AR_n(reg_tp_i), CONSTR(reg_tp_i),  */
-	/*        (((intptr_t)(reg_tp_i) & 1) == 0), IS_PVAL(reg_tp_i)); */
+#if VERBOSE_GC
+	printf("X:pointer body, a=%d, n=%d, constr=%d, is_val=%d, is_pval=%d\n",
+	       AR_a(reg_tp_i), AR_n(reg_tp_i), CONSTR(reg_tp_i),
+	       (((intptr_t)(reg_tp_i) & 1) == 0), IS_PVAL(reg_tp_i));
+#endif /* VERBOSE_GC */
 	pbody = 1;
       }
 #ifdef LAR_COMPACT
-      /* printf("Forwarding XMM register %2d[%d] = %p (pointer body = %p) => ", */
-      /* 	     reg, i, reg_tp_pair[i], reg_tp_iC); */
+#if VERBOSE_GC
+      printf("Forwarding XMM register %2d[%d] = %p (pointer body = %p) => ",
+      	     reg, i, reg_tp_pair[i], reg_tp_iC);
+#endif /* VERBOSE_GC */
       if (pbody == 0)
 	reg_tp_pair[i] = MM_forward(reg_tp_i);
       else
 	reg_tp_pair[i] = (TP_)(((intptr_t)MM_forward(reg_tp_iC) & PTRMASK) |
 			       ((intptr_t)reg_tp_i & ~PTRMASK));
-      /* printf("%p\n", reg_tp_pair[i]); */
+#if VERBOSE_GC
+      printf("%p\n", reg_tp_pair[i]);
+#endif /* VERBOSE_GC */
 #else
       TODO("Register update for lar.h.");
 #endif /* LAR_COMPACT */
-      // printf("Word #%d in XMM register %d looks like a LAR pointer, set=%p.\n",
-      //     i, reg, reg_tp_pair[i]);
       modified = 1;
     }
   }
+  // If a word was modified, write back the register.
   if (modified)
     unw_set_fpreg(cursor, reg, *((unw_fpreg_t*)reg_tp_pair));
 }
 
+/** Checks if a x86 register saved in a stack frame contains a LAR pointer;
+    if yes, the pointer is forwarded.
+    \param The libunwind cursor pointing to the stack frame.
+    \param The x86 register name.
+    \param The register contents cast to a LAR pointer.
+ */
 static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t reg, TP_ reg_tp) {
 #ifdef LAR_COMPACT
   int pbody = 0;
@@ -178,13 +194,13 @@ static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t reg, TP_ reg_tp) 
 	     (((intptr_t)(reg_tp) & 1) == 0), IS_PVAL(reg_tp));
       pbody = 1;
     }
-    printf("Forwarding register %2d=%p.\n", reg, reg_tp);
     TP_ fw_tp;
     if (pbody == 1)
-      fw_tp = (TP_)(((intptr_t)MM_forward(reg_tp) & PTRMASK) |
-		    ((intptr_t)reg_tp & ~PTRMASK));
+      fw_tp = (TP_)(((intptr_t)MM_forward(reg_tp_C) &  PTRMASK) |
+		    ((intptr_t)reg_tp               & ~PTRMASK));
     else
       fw_tp = MM_forward(reg_tp);
+    printf("Forwarding register %2d = %p => %p.\n", reg, reg_tp, fw_tp);
     int r = unw_set_reg(cursor, reg, (unw_word_t)fw_tp);
     if (r!=0) {
       printf("Error modifying register %d (%p => %p): ", reg, reg_tp, fw_tp);
@@ -326,20 +342,35 @@ static void MM_process_stack(void) {
 	for (sptr = (TP_*)sp_prev; sptr < (TP_*)sp; sptr++) {
 	  // printf("Searching sp range (%p ... %p).\n", , );
 	  TP_ candidate = *sptr;
-	  if (MM_heap_ptr(candidate) && (IS_FORWARDED(candidate))) {
-	    TP_ fw_tp = MM_forward(candidate);
+	  TP_ candidateC = CPTR(candidate);
+	  if (MM_heap_ptr(candidateC) &&
+	      (ISSPACE1((byte*)CPTR(candidateC->prev)) || 
+	       ISSPACE2((byte*)CPTR(candidateC->prev)))) {
+	    int pbody = 0;
+	    if (candidate != candidateC) {
+#if VERBOSE_GC
+	      printf("sptr:pointer body, a=%d, n=%d, constr=%d, is_val=%d, is_pval=%d\n",
+	      	     AR_a(candidate), AR_n(candidate), CONSTR(candidate),
+	      	     (((intptr_t)(candidate) & 1) == 0), IS_PVAL(candidate));
+#endif /* VERBOSE_GC */
+	      pbody = 1;
+	    }
+	    TP_ fw_tp;
+	    if (pbody==0)
+	      fw_tp = MM_forward(candidate);
+	    else
+	      fw_tp = (TP_)(((intptr_t)MM_forward(candidateC) &  PTRMASK) |
+			    ((intptr_t)candidate              & ~PTRMASK));
+#if VERBOSE_GC
 	    printf("Rogue forwarded pointer found: %p => %p\n", candidate, fw_tp);
+#endif /* VERBOSE_GC */
 	    *sptr = fw_tp;
-	    // exit(EXIT_FAILURE);
 	  }
 	}
       }
       sp_prev = sp;
     }
     else { printf("Could not retrieve function name.\n"); exit(EXIT_FAILURE); }
-    // printf ("rax = %lx, rbx = %lx, rcx = %lx, rdx = %lx, ",
-    // 	    (long) rax, (long) rbx, (long) rcx, (long) rdx);
-    // printf ("ip = %lx, sp = %lx\n", (long) ip, (long) sp);
   }
 
 }
