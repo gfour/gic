@@ -19,7 +19,7 @@ fi
 
 GC=0
 
-if [ "$GC" = "1"]; then
+if [ "$GC" = "1" ]; then
     # Add -DGC and -DSSTACK to the gcc flags to use the semi-space collector.
     USE_GC="-DGC -DSSTACK"
     # USE_GC="-DGC -DSSTACK -DVERBOSE_GC"
