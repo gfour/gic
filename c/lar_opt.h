@@ -133,9 +133,9 @@ typedef struct T_ {
       VALS(x, ARGSARITY, T);                   \
     })
 
-#ifdef SSTACK
-#error "The shadow stack can only be used in the single-threaded runtime."
-#endif /* SSTACK */
+#ifdef GC
+#error "The semi-space collector can only be used in the single-threaded runtime."
+#endif /* GC */
 
 #endif /* USE_OMP */
 

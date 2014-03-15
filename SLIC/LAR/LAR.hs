@@ -134,7 +134,7 @@ macrosC opts modName arities pmDepths arityCAF =
             -- The memory allocator used by the semi-space collector.
             ("#define GC_MALLOC MM_alloc"++).nl.
             -- Use an explicit stack for function calls.
-            wrapIfSSTACK
+            wrapIfGC
             (("// shadow stack maximum size"++).nl.
              ("#define SSTACK_MAX_SIZE "++).shows (optEStackSz opts).nl.
              ("// record C stack LAR pointer in the explicit pointer stack"++).nl.
@@ -327,7 +327,7 @@ epilogue opts = builtins opts.nl
 debugFuncProlog :: QName -> ShowS
 debugFuncProlog f =
   -- verify that the LAR on the stack is the same as the current LAR visible
-  wrapIfSSTACK
+  wrapIfGC
   (("printf(\"Entered func "++).pprint f.
    ("@%p(sstack-verified: %s)\\n\", *(sstack_ptr-1), (*(sstack_ptr-1)==T0? \"true\": \"false\"));"++).nl) id
   
@@ -641,7 +641,7 @@ prologue opts modName arityCAF =
                CompileModule -> 
                  ("extern inline byte* MM_alloc(size_t bytes);"++).nl)
          LibGC -> id).
-      wrapIfSSTACK
+      wrapIfGC
       (("// Memory management: shadow stack pointers (base/current)"++).nl.
        ("static TP_ **sstack_bottom;"++).nl.
        ("static TP_ **sstack_ptr;"++).nl)
@@ -689,7 +689,7 @@ mainFunc env opts mainNesting modules =
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
       -- Initialize the explicit pointer stack.
-      wrapIfSSTACK
+      wrapIfGC
       (("sstack_bottom = (TP_**)malloc(sizeof(TP_*)*SSTACK_MAX_SIZE);"++).nl.
        ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
        ("sstack_ptr = sstack_bottom;"++).nl

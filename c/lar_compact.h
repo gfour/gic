@@ -28,13 +28,6 @@
 #error "The compact LAR representation does not support the OpenMP runtime."
 #endif /* OMP */
 
-/* The shadow stack should only be used when GC is on. */
-#ifdef GC
-#ifndef SSTACK
-#error Garbage collection in compact mode requires the shadow stack, #define SSTACK.
-#endif /* SSTACK */
-#endif /* GC */
-
 /* Give a warning when compiling without garbage collection. */
 #ifndef GC
 #warning Garbage collection is disabled for this build.
