@@ -32,4 +32,9 @@
 /** Check if a pointer belongs to space 2. */
 #define ISSPACE2(x) ((x >= space2) && (x <= space2 + MAXMEMSPACE))
 
+#else
+
+/** Dummy GC assertion (used as an expression). */
+#define ASSERT_GC_EXPR(c, m) ( { } )
+
 #endif /* GC */
