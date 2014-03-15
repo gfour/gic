@@ -28,6 +28,8 @@ To build the compiler, you need:
       Note: configure with --enable-parallel-mark/-DTHREAD_LOCAL_ALLOC for the parallel runtime.
     * Optional: libgmp (is the `HAS_GMP` macro is enabled) for big integers
       (the Integer data type, see `run_lar.sh`).
+    * Optional: libunwind if using the semi-space collector (needed for the compact
+      representation back-end).
 * For the Erlang back-end: Erlang/OTP R16 or greater.
 * For the Maude back-end: Maude 2.6 and Full Maude.
 * Optional: the GHC profiling libs (if HPROFILE is set in the Makefile),
