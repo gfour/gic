@@ -120,6 +120,24 @@ static int ll_lar(TP_ lar) {
   return (((unsigned char)ARITY(lar) + (unsigned char)NESTING(lar)) != 0);
 }
 
+/** Takes the result of a saved register update and shows an error message.
+    \param r   The result value from the register update operation.
+    \param reg The register (according to libunwind).
+*/
+static void MM_reg_upd_err(int r, unw_regnum_t reg) {
+  if (r != 0) {
+    switch (r) {
+    case UNW_EUNSPEC:
+      printf("An unspecified error occurred.\n"); break;
+    case UNW_EBADREG:
+      printf("An attempt was made to write a register that is either invalid or not accessible in the current frame.\n"); break;
+    default:
+      printf("Unknown error (%d).\n", r);
+    }
+    exit(EXIT_FAILURE);
+  }
+}
+
 /** Checks if a x86-64 XMM register saved in a stack frame contains a LAR
     pointer; if yes, the pointers is forwarded.
     \param The libunwind cursor pointing to the stack frame.
@@ -136,7 +154,7 @@ static void MM_check_fw_fpreg(unw_cursor_t *cursor, unw_regnum_t reg, unw_fpreg_
     TP_ reg_tp_iC = CPTR(reg_tp_i);
 #endif /* LAR_COMPACT */
     if (MM_heap_ptr(CPTR(reg_tp_i)) && ll_lar(CPTR(reg_tp_i))) {
-      if (reg<UNW_X86_64_XMM0) {
+      if (!unw_is_fpreg(reg)) {
 	printf("MM_check_fw_fpreg cannot handle non-XMM register %d.\n", reg);
 	exit(EXIT_FAILURE);
       }
@@ -168,8 +186,14 @@ static void MM_check_fw_fpreg(unw_cursor_t *cursor, unw_regnum_t reg, unw_fpreg_
     }
   }
   // If a word was modified, write back the register.
-  if (modified)
-    unw_set_fpreg(cursor, reg, *((unw_fpreg_t*)reg_tp_pair));
+  if (modified) {
+    unw_fpreg_t new_val = *((unw_fpreg_t*)reg_tp_pair);
+    int r = unw_set_fpreg(cursor, reg, new_val);
+    if (r != 0) {
+      printf("Error modifying register %d: ", reg);
+      MM_reg_upd_err(r, reg);
+    }
+  }
 }
 
 /** Checks if a x86 register saved in a stack frame contains a LAR pointer;
@@ -184,7 +208,7 @@ static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t reg, TP_ reg_tp) 
   TP_ reg_tp_C = CPTR(reg_tp);
 #endif /* LAR_COMPACT */
   if (MM_heap_ptr(reg_tp) && ll_lar(reg_tp)) {
-    if (reg>=UNW_X86_64_XMM0) {
+    if (unw_is_fpreg(reg)) {
       printf("MM_check_fw_reg cannot handle XMM register %d.\n", reg);
       exit(EXIT_FAILURE);
     }    
@@ -202,19 +226,9 @@ static void MM_check_fw_reg(unw_cursor_t *cursor, unw_regnum_t reg, TP_ reg_tp) 
       fw_tp = MM_forward(reg_tp);
     printf("Forwarding register %2d = %p => %p.\n", reg, reg_tp, fw_tp);
     int r = unw_set_reg(cursor, reg, (unw_word_t)fw_tp);
-    if (r!=0) {
+    if (r != 0) {
       printf("Error modifying register %d (%p => %p): ", reg, reg_tp, fw_tp);
-      switch (r) {
-      case UNW_EUNSPEC:
-	printf("An unspecified error occurred.\n"); break;
-      case UNW_EBADREG:
-	printf("An attempt was made to write a register that is either invalid or not accessible in the current frame.\n"); break;
-      /* case UNW_EREADONLY: */
-      /* 	printf("An attempt was made to write to a read-only register.\n"); break; */
-      default:
-	printf("Unknown error (%d).\n", r);
-      }
-      exit(EXIT_FAILURE);
+      MM_reg_upd_err(r, reg);
     }
 
 #if GC_STATS
@@ -281,6 +295,7 @@ static void MM_process_stack(void) {
     unw_get_reg(&cursor, UNW_X86_64_R15, &r15);
     unw_get_reg(&cursor, UNW_REG_IP, &ip);
     unw_get_reg(&cursor, UNW_REG_SP, &sp);
+    /*
     unw_get_fpreg(&cursor, UNW_X86_64_XMM0 , &xmm0 );
     unw_get_fpreg(&cursor, UNW_X86_64_XMM1 , &xmm1 );
     unw_get_fpreg(&cursor, UNW_X86_64_XMM2 , &xmm2 );
@@ -297,6 +312,7 @@ static void MM_process_stack(void) {
     unw_get_fpreg(&cursor, UNW_X86_64_XMM13, &xmm13);
     unw_get_fpreg(&cursor, UNW_X86_64_XMM14, &xmm14);
     unw_get_fpreg(&cursor, UNW_X86_64_XMM15, &xmm15);
+    */
     int r = unw_get_proc_name(&cursor, fname, len, &offp);
     if (r==0) {
       frames++;
@@ -319,6 +335,7 @@ static void MM_process_stack(void) {
       MM_check_fw_reg(&cursor, UNW_X86_64_R13, (TP_)r13);
       MM_check_fw_reg(&cursor, UNW_X86_64_R14, (TP_)r14);
       MM_check_fw_reg(&cursor, UNW_X86_64_R15, (TP_)r15);
+      /*
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM0 , xmm0 );
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM1 , xmm1 );
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM2 , xmm2 );
@@ -335,6 +352,7 @@ static void MM_process_stack(void) {
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM13, xmm13);
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM14, xmm14);
       MM_check_fw_fpreg(&cursor, UNW_X86_64_XMM15, xmm15);
+      */
       if (MM_heap_ptr((TP_)ip)) { printf("Found heap IP.\n"); exit(-1); }
       if (MM_heap_ptr((TP_)sp)) { printf("Found heap SP.\n"); exit(-1); }
       if (sp_prev!=0) {
@@ -475,7 +493,7 @@ static void MM_scan(TP_ lar) {
 	TODO("VALS(n, lar) = THUNK(constrId, fwCtxt);");
 #endif /* LAR_COMPACT */
       }
-      else if (cptr!=0) { printf("stack constructor: %p\n", cptr); exit(EXIT_FAILURE); }
+      else if (cptr != 0) { printf("stack constructor: %p\n", cptr); exit(EXIT_FAILURE); }
     }
   }
   // Forward LAR pointers inside nested fields.
