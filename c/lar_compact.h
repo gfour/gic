@@ -12,6 +12,7 @@
 #include <string.h>
 #include <time.h>
 #include "gc.h"
+#include "lar_semi.h"
 
 /* Give an error on non-x86-64-bit systems. */
 #ifndef __x86_64__
@@ -46,7 +47,11 @@ typedef struct T_* TP_;
 typedef uintptr_t Susp;
 
 // A pointer to code that evaluates a thunk.
+#ifdef GC
+typedef Susp (*LarArg)(TP_*);
+#else
 typedef Susp (*LarArg)(TP_);
+#endif /* GC */
 
 typedef struct T_ {
   TP_ prev;              // link to parent LAR (also GC forwarded pointer)
@@ -73,7 +78,6 @@ typedef struct T_ {
 /* The mask that singles out with AND the important bits in a pointer (3:47). */
 #define PTRMASK                        0xfffffffffff8
 
-#define THE_ARGS(T)                    ((byte *) &((T)->data))
 #define VALS(x, T)                     (((Susp*) (THE_ARGS(T)))[x])
 #define ARGS(x, T)                     (VALS(x, T))
 #define ARGS_FLAG(x, T)                ((LarArg)((uintptr_t)ARGS(x, T) & 1))
@@ -83,8 +87,9 @@ typedef struct T_ {
 #define NESTED(x, VALSARITY, T)        (((TP_*) THE_NESTED(VALSARITY, T))[x])
 
 #define VAR(x)        FUNC(x)
-#define FUNC(x)       Susp x(TP_ T0)
-#define ACTUAL        T0 = (AR_prev(T0))
+
+#define FUNC(x)       Susp x(TP_ AR_TP(T0))
+#define ACTUAL        AR_TP(T0) = (AR_prev(AR_TP(T0)))
 
 #define GETARG(x, T)  ({                  \
       if (ARGS_FLAG(x, T) != NULL) {	  \
@@ -107,14 +112,14 @@ typedef struct T_ {
       TP_ lar = (TP_) MM_alloc(sizeof(T_) +      		\
                                n_arity * sizeof(Susp) +         \
                                n_nesting * sizeof(TP_));        \
-      lar->prev = ARINFO(n_arity, n_nesting, T0);		\
-      AR_CAT(AR_COPY_, n_arity)(lar, 0, ## __VA_ARGS__);        \
-      AR_CAT(AR_CLEAR_, n_nesting)(lar, n_arity, 0);		\
+      lar->prev = ARINFO(n_arity, n_nesting, AR_TP(T0));        \
+      AR_CAT(AR_COPY_, n_arity)(AR_REF(lar), 0, ## __VA_ARGS__);\
+      AR_CAT(AR_CLEAR_, n_nesting)(AR_REF(lar), n_arity, 0);    \
       lar;                                                      \
     })
 #define AR_S(n_arity, n_nesting, ...)                   \
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
-    { ARINFO(n_arity, n_nesting, T0), { __VA_ARGS__ } }))
+    { ARINFO(n_arity, n_nesting, AR_TP(T0)), { __VA_ARGS__ } }))
 
 /* *********** Macros of the LAR API *********** */
 
@@ -171,10 +176,10 @@ typedef struct T_ {
 */
 #define ARINFO(a, n, prev) (TP_)((((uintptr_t)(a)) << 56) \
                                | (((uintptr_t)(n)) << 48) \
-                          | (((uintptr_t)prev) & PTRMASK))
+                        | (((uintptr_t)(prev)) & PTRMASK))
 
 /** Returns the access-link pointer of a LAR. */
-#define AR_prev(T0)   ((TP_)(((intptr_t)(T0->prev) << 16) >> 16))
+#define AR_prev(T0)   ((TP_)(((intptr_t)((T0)->prev) << 16) >> 16))
 /** Returns the "arity" field of a LAR. */
 #define AR_a(p)       ((unsigned char)(((uintptr_t)p) >> 56))
 /** Returns the "nesting" field of a LAR. */
@@ -184,3 +189,5 @@ typedef struct T_ {
 #define NESTING(lar)  AR_n(((TP_)lar)->prev)
 
 #define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
+
+#define FRM_NESTED(n) (CPTR(GETSTRICTARG(n, AR_TP(T0))))

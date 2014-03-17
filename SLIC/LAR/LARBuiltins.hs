@@ -103,6 +103,7 @@ prettyPrinterDT cids (Data dtName _ constrs) =
          else
              id
         ).
+        tab.("TP_ constr_tp = CPTR(i);"++).nl.
         tab.("switch (CONSTR(i)) {"++).nl.
         foldDot (prettyPrinterConstr cids) constrs.
         tab.("}"++).nl.
@@ -143,7 +144,7 @@ prettyPrintDTName :: CstrName -> Int -> DTName -> ShowS
 prettyPrintDTName c n dtName =
   let comp = ("comp"++).(shows n)
       bv   = pprint $ ithFrmOfCstr (n-1) c
-  in  tab.tab.comp.(" = "++).bv.("(CPTR(i));"++).nl.
+  in  tab.tab.comp.(" = "++).bv.("(AR_REF(constr_tp));"++).nl.
       tab.tab.pprinterName dtName.
       ("("++).comp.(");"++).nl
 
@@ -196,7 +197,7 @@ prettyPrintMagic =
     ("}"++).nl
 
 funcHeader :: QName -> ShowS
-funcHeader f = ("FUNC("++).pprint f.(") {"++).nl.pushAR
+funcHeader f = ("FUNC("++).pprint f.(") {"++).nl
 
 -- | Dummy version of the runMainIO function used by GHC.
 b_runMainIO :: ShowS
@@ -230,10 +231,11 @@ b_putStr gc compact =
   in  funcHeader bf_putStr.
       tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
+      tab.tab.("TP_ str_tp = CPTR(i);"++).nl.
       tab.tab.("printf(\"%c\", "++).
       (if compact then ("(unsigned char)PVAL_R"++) else ("CONSTR"++)).
-      ("("++).mkGETARG gc bf_Cons 0 "CPTR(i)".("));"++).nl.
-      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "CPTR(i)".(";"++).nl.
+      ("("++).mkGETARG gc bf_Cons 0 "AR_REF(str_tp)".("));"++).nl.
+      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "AR_REF(str_tp)".(";"++).nl.
       tab.("}"++).nl.
       tab.("return "++).pprint bf_Unit.("(0);"++).nl.
       ("}"++).nl
@@ -286,7 +288,7 @@ b_strToList :: GC -> CompactOpt -> ShowS
 b_strToList gc compact =
   let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
       Just (_, cidNil)  = Data.Map.lookup bf_Nil  builtinCIDs
-  in  ("Susp strToList(char *str, int chars, TP_ T0) {"++).nl.
+  in  ("Susp strToList(char *str, int chars, TP_ AR_TP(T0)) {"++).nl.
       tab.("// construct list from back-to-front"++).nl.
       tab.("int d;"++).nl.
       tab.("Susp lastCell = SUSP("++).shows cidNil.(", "++).listTag.
@@ -297,9 +299,10 @@ b_strToList gc compact =
               mkAllocAR gc True compact bf_Cons 2 0 [("0"++), ("0"++)].("; "++).
               ("// generate evaluated LAR for Cons"++).nl.
       tab.tab.("// read character as integer"++).nl.
-      tab.tab.(mkVALS gc 0 2 "consTP").(" = SUSP((int)str[d], "++).listTag.(", 0);"++).nl.
+      tab.tab.(mkVALS gc 0 2 "AR_REF(consTP)").
+              (" = SUSP((int)str[d], "++).listTag.(", 0);"++).nl.
       tab.tab.("// add last cons cell to the back"++).nl.
-      tab.tab.(mkVALS gc 1 2 "consTP").(" = lastCell;"++).nl.
+      tab.tab.(mkVALS gc 1 2 "AR_REF(consTP)").(" = lastCell;"++).nl.
       tab.tab.("lastCell = SUSP("++).shows cidCons.(", "++).listTag.(", consTP);"++).nl.
       tab.("}"++).nl.
       tab.("return lastCell;"++).nl.
@@ -435,14 +438,15 @@ prettyPrintList compact =
       tab.("else if (CONSTR(i)=="++).shows cidCons.(") {"++).nl.
       tab.tab.("printf(\"[\");"++).nl.
       tab.tab.("while (1) {"++).nl.
-      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(CPTR(i));"++).nl.
+      tab.tab.tab.("TP_ cell_tp = CPTR(i);"++).nl.
+      tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(AR_REF(cell_tp));"++).nl.
       (if compact then
          tab.tab.tab.("if (IS_PVAL(comp1))"++).nl.
          tab.tab.tab.tab.("printf(\"%ld\", PVAL_R(comp1));"++).nl.
          tab.tab.tab.("else"++).nl.tab
        else id).
       tab.tab.tab.("printf(\"%d\", CONSTR(comp1));"++).nl.
-      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(CPTR(i));"++).nl.
+      tab.tab.tab.("comp2 = "++).pprint bf_cons_1.("(AR_REF(cell_tp));"++).nl.
       tab.tab.tab.("if (CONSTR(comp2)==1) break;"++).nl.
       tab.tab.tab.("printf(\",\");"++).nl.
       tab.tab.tab.("i = comp2;"++).nl.

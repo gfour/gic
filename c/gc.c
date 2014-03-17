@@ -245,14 +245,14 @@ static void MM_process_stack(void) {
 	 sstack_bottom, sstack_ptr, sstack_ptr-sstack_bottom+1);
 #endif /* VERBOSE_GC */
 
-  TP_** ptr;
+  TP_* ptr;
   for (ptr = sstack_bottom; ptr <= sstack_ptr; ptr++) {
-    TP_ lar = **ptr;
+    TP_ lar = *ptr;
 #if VERBOSE_GC
     printf("candidate root: %p\n", lar);
 #endif /* VERBOSE_GC */
     if (MM_heap_ptr(lar)) {
-      **((TP_ **)ptr) = MM_forward(lar);
+      *((TP_ *)ptr) = MM_forward(lar);
 #if GC_STATS
     st_count++;
 #endif /* GC_STATS */
@@ -481,14 +481,14 @@ static void MM_scan(TP_ lar) {
   // Forward LAR pointers inside evaluated lazy constructors.
   int n;
   for (n=0; n<lar_a; n++) {
-    Susp val = VALS(n, lar);
-    if (IS_VAL(n, lar) && IS_CONSTR(val)) {
+    Susp val = VALS(n, AR_REF(lar));
+    if (IS_VAL(n, AR_REF(lar)) && IS_CONSTR(val)) {
       TP_ cptr = CPTR(val);
       if (MM_heap_ptr(cptr)) {
 	int constrId = CONSTR(val);
 	TP_ fwCtxt   = MM_forward(cptr);
 #ifdef LAR_COMPACT
-	VALS(n, lar) = THUNK(constrId, fwCtxt);
+	VALS(n, AR_REF(lar)) = THUNK(constrId, fwCtxt);
 #else
 	TODO("VALS(n, lar) = THUNK(constrId, fwCtxt);");
 #endif /* LAR_COMPACT */
@@ -499,16 +499,16 @@ static void MM_scan(TP_ lar) {
   // Forward LAR pointers inside nested fields.
   for (n=0; n<lar_n; n++) {
 #ifdef LAR_COMPACT
-    TP_ nested = NESTED(n, lar_a, lar);
+    TP_ nested = NESTED(n, lar_a, AR_REF(lar));
 #else /* LAR_COMPACT */
-    TP_ nested = NESTED(n, lar);
+    TP_ nested = NESTED(n, AR_REF(lar));
 #endif /* LAR_COMPACT */
     if (MM_heap_ptr(nested)) {
       TP_ fwCtxt = MM_forward(nested);
 #ifdef LAR_COMPACT
-      NESTED(n, lar_a, lar) = fwCtxt;
+      NESTED(n, lar_a, AR_REF(lar)) = fwCtxt;
 #else
-      NESTED(n, lar) = fwCtxt;
+      NESTED(n, AR_REF(lar)) = fwCtxt;
 #endif /* LAR_COMPACT */
     }
   }
@@ -542,8 +542,8 @@ static void MM_compare_heaps(byte* old_space) {
 
 #ifdef LAR_COMPACT
 static void MM_print_Susp(int n, TP_ lar) {
-  if (IS_VAL(n, lar)) {
-    Susp s = VALS(n, lar);
+  if (IS_VAL(n, AR_REF(lar))) {
+    Susp s = VALS(n, AR_REF(lar));
     if (IS_PVAL(s)) {
       printf("val(int=%ld)", PVAL_R(s));
     }
@@ -555,7 +555,7 @@ static void MM_print_Susp(int n, TP_ lar) {
     }
     else printf("Unknown Susp found.");
   } else {
-    printf("code{%p}", (LarArg)CODE(n, lar));
+    printf("code{%p}", (LarArg)CODE(n, AR_REF(lar)));
   }
 }
 #else
@@ -573,8 +573,8 @@ static void MM_print_Susp(int n, TP_ lar) {
     returns 1. Otherwise, returns 0.
 */  
 static int MM_compare_vals(int n, TP_ lar, TP_ copy) {
-  Susp s_from = VALS(n, lar );
-  Susp s_to   = VALS(n, copy);
+  Susp s_from = VALS(n, AR_REF(lar ));
+  Susp s_to   = VALS(n, AR_REF(copy));
   if (s_from==s_to) return 1;
   if (IS_CONSTR(s_from) && IS_CONSTR(s_to))
     return ((CONSTR(s_from)==CONSTR(s_to)) && 
@@ -622,9 +622,10 @@ static void MM_compare(TP_ lar) {
   int n;
   for (n=0; n<lar_a; n++) {
 #ifdef LAR_COMPACT
-    if (IS_VAL(n, lar) && IS_VAL(n, copy) && (!MM_compare_vals(n, lar, copy))) {
+    if (IS_VAL(n, AR_REF(lar)) && IS_VAL(n, AR_REF(copy)) && 
+	(!MM_compare_vals(n, lar, copy))) {
       printf("GC: val[%d] mismatch between %p and %p: %lx != %lx, details:\n",
-	     n, lar, copy, VALS(n, lar), VALS(n, copy));
+	     n, lar, copy, VALS(n, AR_REF(lar)), VALS(n, AR_REF(copy)));
       MM_print_Susp(n, lar) ; printf(" != ");
       MM_print_Susp(n, copy); printf("\n");
       exit(EXIT_FAILURE);
@@ -635,11 +636,11 @@ static void MM_compare(TP_ lar) {
   }
   for (n=0; n<lar_n; n++) {
 #ifdef LAR_COMPACT
-    TP_ lar_nested  = NESTED(n, lar_a , lar);
-    TP_ copy_nested = NESTED(n, copy_a, copy);
+    TP_ lar_nested  = NESTED(n, lar_a , AR_REF(lar ));
+    TP_ copy_nested = NESTED(n, copy_a, AR_REF(copy));
 #else
-    TP_ lar_nested  = NESTED(n, lar);
-    TP_ copy_nested = NESTED(n, copy);
+    TP_ lar_nested  = NESTED(n, AR_REF(lar ));
+    TP_ copy_nested = NESTED(n, AR_REF(copy));
 #endif /* LAR_COMPACT */
 
     if (lar_nested != copy_nested) {

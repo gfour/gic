@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include "gc.h"
+#include "lar_semi.h"
 
 /** Set macro used by LAR-specific C code (such as the garbage collector). */
 #define LAR
@@ -29,10 +30,15 @@ typedef struct Susp {
   int tag;
 #endif /* USE_TAGS */
   /** Lazy constructor context. */
-  TP_ ctxt;
+  TP_ AR_TP(ctxt);
 } Susp;
 
+// A pointer to code that evaluates a thunk.
+#ifdef GC
+typedef Susp (*LarArg)(TP_*);
+#else
 typedef Susp (*LarArg)(TP_);
+#endif /* GC */
 
 typedef struct T_ {
   TP_ prev;              // link to parent LAR (also GC forwarded pointer)
@@ -60,9 +66,6 @@ typedef struct T_ {
 #define True 1
 /** Boolean False. */
 #define False 0
-/** The start of the ARGS fields, holding the code pointers of the thunks.
-    \param T The LAR. */
-#define THE_ARGS(T)   ((byte *) &((T)->data))
 /** The start of the VALS fields, holding the results of thunk evaluation.
     \param T The LAR. */
 #define THE_VALS(T)   (THE_ARGS(T) + (ARITY(T)) * sizeof(LarArg))
@@ -89,7 +92,7 @@ typedef struct T_ {
 /** The C prototype of a LAR formal variable definition. */
 #define VAR(x)        FUNC(x)
 /** The C prototype of a LAR function definition. */
-#define FUNC(x)       Susp x(TP_ T0)
+#define FUNC(x)       Susp x(TP_ AR_TP(T0))
 /** The intensional "actuals" operator. */
 #define ACTUAL        T0 = (TP_)(AR_prev(T0))
 
@@ -124,11 +127,11 @@ typedef struct T_ {
                                n_arity * sizeof(LarArg) +       \
                                n_arity * sizeof(Susp) +         \
                                n_nesting * sizeof(TP_));        \
-      lar->prev = T0;				                \
+      lar->prev = AR_TP(T0);					\
       lar->arity = n_arity;                                     \
       lar->nesting = n_nesting;                                 \
-      AR_CAT(AR_COPY_, n_arity)(lar, 0, ## __VA_ARGS__);        \
-      AR_CAT(AR_CLEAR_, n_nesting)(lar, 0);                     \
+      AR_CAT(AR_COPY_, n_arity)(AR_REF(lar), 0, ## __VA_ARGS__);        \
+      AR_CAT(AR_CLEAR_, n_nesting)(AR_REF(lar), 0);                     \
       lar;                                                      \
     })
 /** LAR constructor for stack allocation.
@@ -137,7 +140,7 @@ typedef struct T_ {
     \param ... The thunks passed to the called function. */
 #define AR_S(n_arity, n_nesting, ...)                   \
   ((TP_) &((LAR_STRUCT(n_arity, n_nesting))             \
-    { T0, n_arity, n_nesting, { __VA_ARGS__ } }))
+    { AR_TP(T0), n_arity, n_nesting, { __VA_ARGS__ } }))
 
 /* *********** Macros of the LAR API *********** */
 
@@ -146,9 +149,9 @@ typedef struct T_ {
 /** Reads a pointer from a field. */
 #define GETPTR(p)        p
 /** The arity of a LAR. */
-#define ARITY(lar)       lar->arity
+#define ARITY(lar)       (AR_TP(lar))->arity
 /** The nesting depth of a LAR. */
-#define NESTING(lar)     lar->nesting
+#define NESTING(lar)     (AR_TP(lar))->nesting
 /** Reads the code pointer of a LAR thunk.
     \param x The position of the thunk in the LAR.
     \param T The LAR. */
@@ -177,10 +180,10 @@ typedef struct T_ {
 
 #ifdef USE_TAGS
 /** Thunk constructor: (constructor, tag, ctxt). */
-#define SUSP(c, t, p)      ((Susp) {c, t, p})
+#define SUSP(c, t, p)      ((Susp) {c, t, AR_TP(p)})
 #else
 /** Thunk constructor, ignores the tag 't'. */
-#define SUSP(c, t, p)      ((Susp) {c, p})
+#define SUSP(c, t, p)      ((Susp) {c, AR_TP(p)})
 #endif /* USE_TAGS */
 
 /* ********** Garbage collection ********** */

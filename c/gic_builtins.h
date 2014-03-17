@@ -15,4 +15,4 @@ Susp mulI(Susp a, Susp b);
     \param chars The length of the C string.
     \return A GIC string (i.e. a lazy list of characters).
 */
-Susp strToList(char *str, int chars, TP_ T0);
+Susp strToList(char *str, int chars, TP_ AR_TP(T0));

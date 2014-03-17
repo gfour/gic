@@ -135,18 +135,19 @@ macrosC opts modName arities pmDepths arityCAF =
             ("#define GC_MALLOC MM_alloc"++).nl.
             -- Use an explicit stack for function calls.
             wrapIfGC
-            (("// shadow stack maximum size"++).nl.
+            (("// pointer stack maximum size"++).nl.
              ("#define SSTACK_MAX_SIZE "++).shows (optEStackSz opts).nl.
-             ("// record C stack LAR pointer in the explicit pointer stack"++).nl.
+             ("// Record LAR pointer in the explicit pointer stack."++).nl.
              (if optDebug opts then
-                ("#define PUSHAR(a) { if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Shadow stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr = &(a); sstack_ptr++; }"++).nl
+                error "debug pushar"
+                ("#define PUSHAR(a) { if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr = a; sstack_ptr++; }"++).nl
               else
-                ("#define PUSHAR(a) { *sstack_ptr++ = &a; }"++).nl).
+                ("#define PUSHAR(a) ((TP_*)({ *sstack_ptr = a; sstack_ptr++; }))"++).nl).
              ("// get call result and pop activation record"++).nl.
              ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
-            -- No shadow stack, dummy macros (use for testing the allocator).
-            (("#define PUSHAR(a) { }"++).nl.
-             ("#define RETVAL(x) x"++).nl)
+            -- No pointer stack, dummy macros (use for testing the allocator).
+            (("#define PUSHAR(a) (a)"++).nl.
+             ("#define RETVAL(x) (x)"++).nl)
           LibGC    -> id).nl.
       defineGCAF modName gc arityCAF.nl.
       (case gc of
@@ -344,7 +345,6 @@ mkCBlock (DefL f e bind) env config =
             (if optDebug opts then
                debugFuncProlog f
              else id)
-          SemiGC -> pushAR
           _ -> id).
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
@@ -402,7 +402,7 @@ mkCStmBody (ConstrL (CC c cId cArity)) _ config =
       (if (cArity>0) || optDebug opts then
          ("return (SUSP("++).shows cId.(", "++).uTag.(", T0));"++).nl
        else
-         ("return (SUSP("++).shows cId.(", "++).uTag.(", (TP_)NULL));"++)).nl
+         ("return (SUSP("++).shows cId.(", "++).uTag.(", NULL));"++)).nl
 mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
 
 -- | Generates C code for a LAR expression. Takes the name of the containing
@@ -516,10 +516,10 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
   in  case cloc of
         CLoc Nothing -> ierr $ "non-enumerated bound variable: "++(pprint bv "")
         CLoc (Just (counter, _)) ->
-          pprint v.("("++).mkNESTED gc compact fname counter argsN.(")"++)
+          pprint v.("(AR_REF("++).mkNESTED gc compact fname counter argsN.("))"++)
         CFrm i ->
           -- Read the nested context directly from the formal (no thunk flag check).
-          pprint v.("(CPTR("++).mkGETSTRICTARG gc fname i.("))"++)
+          pprint v.("(FRM_NESTED("++).shows i.("))"++)
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -616,7 +616,11 @@ defineGCAF modName gc arityCAF =
 -- | Creates the global LAR for CAFs.
 genv :: MName -> Int -> ShowS
 genv m arityCAF = 
-  if arityCAF > 0 then ("static TP_ "++).namegenv m.(";"++) else id
+  if arityCAF > 0 then 
+    wrapIfGC
+    (("static TP_ *"++).namegenv m.(";"++).nl)
+    (("static TP_ "++).namegenv m.(";"++).nl)
+  else id
 
 -- | Generates: (a) the CAF of a module, (b) the C declarations of the memory 
 --   management subsystem, (c) the Graphviz declarations.
@@ -641,9 +645,9 @@ prologue opts modName arityCAF =
                CompileModule -> 
                  ("extern inline byte* MM_alloc(size_t bytes);"++).nl).
            wrapIfGC
-           (("// Memory management: shadow stack pointers (base/current)"++).nl.
-            ("static TP_ **sstack_bottom;"++).nl.
-            ("static TP_ **sstack_ptr;"++).nl)
+           (("// Memory management: pointer stack pointers (base/current)"++).nl.
+            ("static TP_ *sstack_bottom;"++).nl.
+            ("static TP_ *sstack_ptr;"++).nl)
            id
          LibGC -> id).
       (if (optVerbose opts) then
@@ -684,8 +688,8 @@ mainFunc env opts mainNesting modules =
            tab.("spaceEnd = space + MAXMEMSPACE;"++).nl.
            -- Initialize the explicit pointer stack.
            wrapIfGC
-           (("sstack_bottom = (TP_**)malloc(sizeof(TP_*)*SSTACK_MAX_SIZE);"++).nl.
-            ("if (sstack_bottom == 0) { printf(\"No space for shadow stack.\\n\"); exit(0); };"++).nl.
+           (("sstack_bottom = (TP_*)malloc(sizeof(TP_)*SSTACK_MAX_SIZE);"++).nl.
+            ("if (sstack_bottom == 0) { printf(\"No space for pointer stack.\\n\"); exit(0); };"++).nl.
             ("sstack_ptr = sstack_bottom;"++).nl
            ) id
          LibGC ->
@@ -695,12 +699,12 @@ mainFunc env opts mainNesting modules =
            -- tab.("GC_enable_incremental();"++).nl  -- incremental GC
       ).
       tab.("// initial activation record"++).nl.
-      tab.("TP_ T0=NULL;"++).nl.
+      tab.("TP_ T0_ = NULL;"++).nl.
+      tab.("TP_ AR_TP(T0) = AR_REF(T0_);"++).nl.
       (case gc of
           LibGC  -> id
           SemiGC ->
-            tab.("TP_ t0 = AR(0, "++).shows mainNesting.(");"++).nl.
-            tab.("PUSHAR(t0);"++).nl).
+            tab.("TP_ AR_TP(t0) = PUSHAR(AR(0,"++).shows mainNesting.("));"++).nl).
       initModules modules.
       logGraphStart opts.
       mkMainCall gc m.
@@ -738,22 +742,21 @@ initModules :: [MName] -> ShowS
 initModules [] = id
 initModules (m:ms) = tab.genInitMod m.("(T0);"++).nl.initModules ms
 
--- | The code for a module initializer. So far, it only initializes the module CAFs.
+-- | The code for a module initializer. So far, it only initializes the module-wide
+--   LAR containing the top-level CAFs of the module.
 initMod :: MName -> ConfigLAR -> ShowS
 initMod m config =
   let arityCAF = length (getCAFnmsids config)
       opts     = getOptions config
       nms      = map pprint $ nmsids2nms (getCAFnmsids config)
-      cafLAR   = namegenv m
-  in  ("void "++).genInitMod m.("(TP_ T0) {"++).nl.
+  in  ("void "++).genInitMod m.("(TP_ AR_TP(T0)) {"++).nl.
       (if arityCAF > 0 then
-         tab.cafLAR.(" = "++).
+         tab.namegenv m.(" = "++).
          (case optGC opts of
              SemiGC ->
-               ("AR("++).shows arityCAF.
+               ("PUSHAR(AR("++).shows arityCAF.
                (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++).
-               (");"++).nl.
-               tab.("PUSHAR("++).cafLAR.(");"++).nl
+               ("));"++).nl
              LibGC ->
                (nameGCAF m).("_AR("++).insCommIfMore nms.(");"++)).nl
        else id).
@@ -788,7 +791,7 @@ makeActs f args env config =
         LibGC  -> simpleCall
         SemiGC ->
           if isVar then simpleCall
-          else ("RETVAL("++).pprint f.("("++).fLAR.("))"++)
+          else ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int

@@ -175,3 +175,8 @@ typedef struct T_ {
 /* Thunk constructor, ignores the tag 't'. */
 #define SUSP(c, t, p) ((Susp) {(c), (p)})
 #endif /* USE_TAGS */
+
+/* Dummy LAR wrapper (*-operator). */
+#define AR_TP(tp)  tp
+/* Dummy LAR wrapper (&-operator). */
+#define AR_REF(tp) tp
