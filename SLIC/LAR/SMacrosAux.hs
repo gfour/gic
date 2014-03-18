@@ -56,8 +56,8 @@
 --   whole program text).
 -- 
 
-module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar,
-                            mkGETARG, mkGETSTRICTARG, mkLARMacro,
+module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar, mkGETARG,
+                            mkGETSTRICTARG, mkLARMacro, mkPUSHAR, mkRETVAL,
                             mkLARMacroOpt, mkMainCall, mkNESTED, mkVALS,
                             nameGCAF, namegenv, protoFunc, smFun) where
 
@@ -282,3 +282,20 @@ mkLARMacroOpt opts name arityA arityV nesting =
       (foldl (.) id (map initArg (zip ([0..]) (argsA arityA)))).
       ("      lar;                                               \\"++).nl.
       ("    })"++).nl
+
+-- | Generates the PUSHAR macro that pushes a LAR pointer to the pointer stack.
+mkPUSHAR :: Bool -> ShowS
+mkPUSHAR dbg =
+  let debug_PUSHAR =
+        if dbg then
+          ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ;"++)
+        else id
+  in  ("// Record LAR pointer in the explicit pointer stack."++).nl.
+      ("#define PUSHAR(a) ((TP_*)({ "++).debug_PUSHAR.
+      ("*sstack_ptr = a; sstack_ptr++; }))"++).nl
+
+-- | Generates the RETVAL macro that pops the pointer stack.
+mkRETVAL :: ShowS
+mkRETVAL =
+  ("// get call result and pop activation record"++).nl.
+  ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl

@@ -28,10 +28,10 @@ import SLIC.Front.Defunc (genNApp)
 import SLIC.LAR.LARAux
 import SLIC.LAR.LARBuiltins
 import SLIC.LAR.LARGraph
-import SLIC.LAR.SMacrosAux (declF, nameGCAF, 
-                            namegenv, protoFunc, mkAllocAR, mkDefineVar, 
-                            mkGETSTRICTARG, mkLARMacro, mkLARMacroOpt,
-                            mkNESTED, mkMainCall, mkVALS, smFun)
+import SLIC.LAR.SMacrosAux (declF, nameGCAF, namegenv, protoFunc, mkAllocAR,
+                            mkDefineVar, mkGETSTRICTARG, mkLARMacro,
+                            mkLARMacroOpt, mkMainCall, mkNESTED, mkPUSHAR,
+                            mkRETVAL, mkVALS, smFun)
 import SLIC.LAR.SyntaxLAR
 import SLIC.State
 import SLIC.SyntaxAux
@@ -137,14 +137,8 @@ macrosC opts modName arities pmDepths arityCAF =
             wrapIfGC
             (("// pointer stack maximum size"++).nl.
              ("#define SSTACK_MAX_SIZE "++).shows (optEStackSz opts).nl.
-             ("// Record LAR pointer in the explicit pointer stack."++).nl.
-             (if optDebug opts then
-                error "debug pushar"
-                ("#define PUSHAR(a) { if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; *sstack_ptr = a; sstack_ptr++; }"++).nl
-              else
-                ("#define PUSHAR(a) ((TP_*)({ *sstack_ptr = a; sstack_ptr++; }))"++).nl).
-             ("// get call result and pop activation record"++).nl.
-             ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl)
+             mkPUSHAR (optDebug opts).
+             mkRETVAL)
             -- No pointer stack, dummy macros (use for testing the allocator).
             (("#define PUSHAR(a) (a)"++).nl.
              ("#define RETVAL(x) (x)"++).nl)
@@ -398,11 +392,7 @@ mkCStmBody e@(CaseL _ _ _) env config =
 mkCStmBody (ConstrL (CC c cId cArity)) _ config =
   let opts = getOptions config
   in  logConstr opts c.
-      -- keep the context if the constructor is not nullary (or when debugging)
-      (if (cArity>0) || optDebug opts then
-         ("return (SUSP("++).shows cId.(", "++).uTag.(", T0));"++).nl
-       else
-         ("return (SUSP("++).shows cId.(", "++).uTag.(", NULL));"++)).nl
+      mkSusp opts cId uTag (cArity>0).nl
 mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
 
 -- | Generates C code for a LAR expression. Takes the name of the containing
@@ -516,10 +506,11 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
   in  case cloc of
         CLoc Nothing -> ierr $ "non-enumerated bound variable: "++(pprint bv "")
         CLoc (Just (counter, _)) ->
-          pprint v.("(AR_REF("++).mkNESTED gc compact fname counter argsN.("))"++)
+          ("RETVAL("++).pprint v.
+          ("(PUSHAR("++).mkNESTED gc compact fname counter argsN.(")))"++)
         CFrm i ->
-          -- Read the nested context directly from the formal (no thunk flag check).
-          pprint v.("(FRM_NESTED("++).shows i.("))"++)
+          -- Read the nested context directly from a formal (no thunk flag check).
+          ("RETVAL("++).pprint v.("(PUSHAR(FRM_NESTED("++).shows i.("))))"++)
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -577,7 +568,7 @@ intSusp compact c =
   if compact then
     ("PVAL_C("++).(c++).(")"++)
   else
-    ("(SUSP("++).(c++).(", "++).intTag.(", (TP_)NULL))"++)
+    ("(SUSP("++).(c++).(", "++).intTag.(", NULL))"++)
 
 -- | Generates C macros for accessing function arguments in a LAR block.
 --   Takes into consideration strictness/call-by-name information.
@@ -594,8 +585,7 @@ protoF gc strs cbns fName (n, x)
   | n `elem` strs =
     ("#define " ++).pprint x.("(T0) "++).mkGETSTRICTARG gc fName n.nl
   | x `elem` cbns =
-    ("#define " ++).pprint x.
-    ("(T0) GETCBNARG(" ++).(shows n).(", T0)"++).nl
+    ("#define " ++).pprint x.("(T0) GETCBNARG(" ++).(shows n).(", T0)"++).nl
   | otherwise =
     case gc of
       SemiGC ->
@@ -781,7 +771,7 @@ makeActs f args env config =
       -- nullary functions don't create a new LAR but use the current one (T0)
       -- unless they have nesting > 0
       fLAR =
-        if isVar then ("T0"++)
+        if isVar then ("AR_TP(T0)"++)
         else
           let fArity = length args
               c      = optCompact (getOptions config)
@@ -789,9 +779,7 @@ makeActs f args env config =
       simpleCall = pprint f.("("++).fLAR.(")"++)
   in  case gc of
         LibGC  -> simpleCall
-        SemiGC ->
-          if isVar then simpleCall
-          else ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
+        SemiGC -> ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int
