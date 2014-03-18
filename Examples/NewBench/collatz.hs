@@ -1,5 +1,5 @@
--- It computes the lengths of the Collatz sequences 
--- for the first 100000 natural numbers
+-- Computes the lengths of the Collatz sequences 
+-- for the first 112000 natural numbers.
 
 size :: Int
 size = 112000
