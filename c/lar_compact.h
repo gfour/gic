@@ -190,4 +190,4 @@ typedef struct T_ {
 
 #define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
 
-#define FRM_NESTED(n) (CPTR(GETSTRICTARG(n, AR_TP(T0))))
+#define FRM_NESTED(n) (CPTR(GETSTRICTARG(n, T0)))
