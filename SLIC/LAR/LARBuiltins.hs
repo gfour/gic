@@ -37,7 +37,7 @@ builtins opts =
       b_strToList gc compact.nl.
       b_show gc.nl.
       b_mulI opts.nl.
-      builtinConstrsC.
+      builtinConstrsC opts.
       b_runMainIO.nl.
       b_error.nl.
       b_par gc.nl.
@@ -375,31 +375,27 @@ b_mulI opts =
 
 -- * Built-in constructors
 
-mkBuiltinCstr :: DTName -> CstrName -> ShowS
-mkBuiltinCstr dt cstr =
-  let (cid, nullary) =
+mkBuiltinCstr :: Options -> DTName -> CstrName -> ShowS
+mkBuiltinCstr opts dt cstr =
+  let (cId, hasParams) =
         case Data.Map.lookup cstr builtinCIDs of
-          Just (arC, cidC) -> (cidC, arC==0)
+          Just (arC, cidC) -> (cidC, arC > 0)
           Nothing -> ierr $ "mkBuiltinCstr: no info for "++(qName cstr)
       tag = shows (findTagOfDT dt builtinTags)
-  in  funcHeader cstr.
-      ("return (SUSP("++).shows cid.(", "++).tag.
-      (if nullary then (",  0));"++)
-       else            (", T0));"++)).nl.
-      ("}"++).nl
+  in  funcHeader cstr.mkSusp opts cId tag hasParams.nl.("}"++).nl
 
-b_Cons :: ShowS ; b_Cons = mkBuiltinCstr dtList bf_Cons
-b_Nil  :: ShowS ; b_Nil  = mkBuiltinCstr dtList bf_Nil
-b_Unit :: ShowS ; b_Unit = mkBuiltinCstr dtUnit bf_Unit
-b_Tuple:: Int -> ShowS
-b_Tuple i = mkBuiltinCstr (dtTuple i) (bf_Tuple i)
+b_Cons :: Options -> ShowS ; b_Cons opts = mkBuiltinCstr opts dtList bf_Cons
+b_Nil  :: Options -> ShowS ; b_Nil  opts = mkBuiltinCstr opts dtList bf_Nil
+b_Unit :: Options -> ShowS ; b_Unit opts = mkBuiltinCstr opts dtUnit bf_Unit
+b_Tuple:: Options -> Int -> ShowS
+b_Tuple opts i = mkBuiltinCstr opts (dtTuple i) (bf_Tuple i)
 
-builtinConstrsC :: ShowS
-builtinConstrsC =
-  b_Cons.
-  b_Nil .
-  b_Unit.
-  foldDot b_Tuple b_tupleSizes
+builtinConstrsC :: Options -> ShowS
+builtinConstrsC opts =
+  b_Cons opts.
+  b_Nil  opts.
+  b_Unit opts.
+  foldDot (b_Tuple opts) b_tupleSizes
   
 -- | Generates the declarations for the built-in constructors and their formals.
 builtinConstrsDecls :: Options -> ShowS

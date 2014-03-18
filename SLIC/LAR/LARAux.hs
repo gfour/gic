@@ -1,6 +1,6 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, wrapIfMacro,
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, mkSusp, wrapIfMacro,
                         wrapIfNotMacro,
                         wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfGC) where
 
@@ -37,6 +37,17 @@ mkAct b opts =
     -- for functions, output a graphviz entry for the LAR entered,
     -- if graphviz trace mode is enabled
     logPrev opts
+
+-- | Makes a suspended value (a lazy constructor). Takes the global options,
+--   the compiled constructor ID, the (optional) data type tag, and a flag
+--   that shows if the constructor takes parameters.
+mkSusp :: Options -> CID -> ShowS -> Bool -> ShowS
+mkSusp opts cId tag hasParams =
+  ("return (SUSP("++).shows cId.(", "++).tag.
+  -- Keeps the context if the constructor is not nullary (or when debugging).
+  (if hasParams || optDebug opts then
+        (", AR_TP(T0)));"++)
+   else (", NULL));"++))
 
 -- | Wraps a piece of code in @\#ifdef USE_OMP ... \#else ... \#endif@.
 wrapIfOMP :: ShowS -> ShowS -> ShowS
