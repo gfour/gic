@@ -185,8 +185,8 @@ typedef struct T_ {
 /** Returns the "nesting" field of a LAR. */
 #define AR_n(p)       ((unsigned char)((((uintptr_t)p) >> 48) & 0xff))
 
-#define ARITY(lar)    AR_a(((TP_)lar)->prev)
-#define NESTING(lar)  AR_n(((TP_)lar)->prev)
+#define ARITY(lar)    AR_a((lar)->prev)
+#define NESTING(lar)  AR_n((lar)->prev)
 
 #define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
 
