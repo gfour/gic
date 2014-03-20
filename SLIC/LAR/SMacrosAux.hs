@@ -288,7 +288,7 @@ mkPUSHAR :: Bool -> ShowS
 mkPUSHAR dbg =
   let debug_PUSHAR =
         if dbg then
-          ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ;"++)
+          ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; "++)
         else id
   in  ("// Record LAR pointer in the explicit pointer stack."++).nl.
       ("#define PUSHAR(a) ((TP_*)({ "++).debug_PUSHAR.
