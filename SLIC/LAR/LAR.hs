@@ -506,11 +506,10 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
   in  case cloc of
         CLoc Nothing -> ierr $ "non-enumerated bound variable: "++(pprint bv "")
         CLoc (Just (counter, _)) ->
-          ("RETVAL("++).pprint v.
-          ("(PUSHAR("++).mkNESTED gc compact fname counter argsN.(")))"++)
+          mkCall gc v (mkNESTED gc compact fname counter argsN)
         CFrm i ->
           -- Read the nested context directly from a formal (no thunk flag check).
-          ("RETVAL("++).pprint v.("(PUSHAR(FRM_NESTED("++).shows i.("))))"++)
+          mkCall gc v (("FRM_NESTED("++).shows i.(")"++))
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -732,7 +731,7 @@ initModules :: [MName] -> ShowS
 initModules [] = id
 initModules (m:ms) = tab.genInitMod m.("(T0);"++).nl.initModules ms
 
--- | The code for a module initializer. So far, it only initializes the module-wide
+-- | The code for a module initializer. So far, it only initializes the module
 --   LAR containing the top-level CAFs of the module.
 initMod :: MName -> ConfigLAR -> ShowS
 initMod m config =

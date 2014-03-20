@@ -1,7 +1,7 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, mkSusp, wrapIfMacro,
-                        wrapIfNotMacro,
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, mkCall, mkSusp,
+                        wrapIfMacro, wrapIfNotMacro,
                         wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfGC) where
 
 import SLIC.Constants
@@ -80,3 +80,9 @@ wrapIfNotMacro macroName s =
   ("#ifndef "++).(macroName++).nl.
   s.
   ("#endif /* "++).(macroName++).(" */"++).nl
+
+-- | Makes a function call. If the semi-space collector is enabled, uses
+--   the explicit pointer stack.
+mkCall :: GC -> QName -> ShowS -> ShowS
+mkCall SemiGC v t0 = ("RETVAL("++).pprint v.("(PUSHAR("++).t0.(")))"++)
+mkCall LibGC  v t0 = pprint v.("("++).t0.(")"++)
