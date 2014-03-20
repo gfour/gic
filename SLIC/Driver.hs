@@ -96,9 +96,6 @@ processFL opts dfis inputModule =
          GICTypeInf useAnnot -> typeInferMod useAnnot p1
          GHCTypeInf          -> readTypeSigs p1
 
-     -- merge all typing environments (single environment used by some back-ends)
-     -- let e1 = unions modEnvs
-
      -- sanity check for FL
      let ok = isValidFL p0Lifted e1
       
