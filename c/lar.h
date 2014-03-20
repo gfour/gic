@@ -145,7 +145,7 @@ typedef struct T_ {
 /* *********** Macros of the LAR API *********** */
 
 /** The previous LAR link. */
-#define AR_prev(T0)      T0->prev
+#define AR_prev(T0)      (T0)->prev
 /** Reads a pointer from a field. */
 #define GETPTR(p)        p
 /** The arity of a LAR. */
@@ -180,10 +180,10 @@ typedef struct T_ {
 
 #ifdef USE_TAGS
 /** Thunk constructor: (constructor, tag, ctxt). */
-#define SUSP(c, t, p)      ((Susp) {c, t, AR_TP(p)})
+#define SUSP(c, t, p)      ((Susp) {c, t, p})
 #else
 /** Thunk constructor, ignores the tag 't'. */
-#define SUSP(c, t, p)      ((Susp) {c, AR_TP(p)})
+#define SUSP(c, t, p)      ((Susp) {c, p})
 #endif /* USE_TAGS */
 
 /* ********** Garbage collection ********** */
