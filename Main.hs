@@ -22,7 +22,7 @@ import SLIC.Front.HStoHF (fromHStoHF)
 import SLIC.LAR.LARLinker (linkLAR)
 import SLIC.State
 import SLIC.SyntaxAux (Mod(..))
-import SLIC.Types (FileName, FPath, MName, PPrint(..))
+import SLIC.Types (FileName, FPath, MName, PPrint(..), TEnv)
 
 #ifdef USE_GHC
 import GHC (DynFlags(..), GhcLink(..), GhcMode(..), TypecheckedModule(..),
@@ -34,7 +34,7 @@ import DynFlags (ExtensionFlag(..), defaultFatalMessager, defaultFlushOut, xopt_
 import DynFlags (ExtensionFlag(..), defaultLogAction, xopt_set)
 #endif /* __GLASGOW_HASKELL__ version check */
 import Outputable (Outputable, ppr)
-import SLIC.Front.GHCFrontEnd (getVTypes, showPPr, tcGHC)
+import SLIC.Front.GHCFrontEnd (getVTypes, tcGHC)
 import SLIC.Front.GHCBackEnd (coreGHC, transfCore)
 #endif /* USE_GHC */
 
@@ -235,11 +235,12 @@ parseAndProcessFL files opts =
       useGHC (modsFL, mg) =
         do let mNames = map (fst.modNameF.fst) modsFL
            let fPath = (snd.modNameF.fst) (modsFL !! 0)   -- 1st directory is used
-           s <- runThroughGHC mNames fPath mg opts
-           (if s then
-              contProcFL opts path modsFL []
-            else
-              putStrLn "The GHC front-end failed.")
+           tEnv <- runThroughGHC mNames fPath mg opts
+           let (mFL, tcis) : msFL = modsFL
+           let mFL' = mFL{modTAnnot=tEnv}
+           case msFL of
+             [] -> contProcFL opts path ((mFL', tcis) : msFL) []
+             _  -> error "The GHC modes only support a single module."
       path = pathOf (files !! 0)
   in  if optLink opts then
         case optAction opts of
@@ -259,7 +260,7 @@ parseAndProcessFL files opts =
              NoGHC   -> contProcFL opts path (fst modsFLGraph) []
 
 -- | Runs source modules through the GHC front-end.
-runThroughGHC :: [MName] -> FPath -> [MName] -> Options -> IO Bool
+runThroughGHC :: [MName] -> FPath -> [MName] -> Options -> IO TEnv
 #ifdef USE_GHC
 runThroughGHC mNames fPath mg opts =
   let wrapper func =
@@ -283,17 +284,17 @@ runThroughGHC mNames fPath mg opts =
         NoGHC -> ierr "runThroughGHC: the GHC API is not selected"
         GHCTc ->
           do (dflags, tMod) <- wrapper tcGHC
-             -- let tEnv = getVTypes dflags (tm_typechecked_source tMod)
+             let tEnv = getVTypes dflags (tm_typechecked_source tMod)
              -- putStrLn "---------------------------"
              -- putStr   (pprintE tEnv "")
              -- putStrLn "---------------------------"
              -- force the result (and therefore type checking)
-             return $ (length (showPPr dflags tMod)) >= 42
+             return tEnv
         GHCCore ->
           do (dflags', cMod) <- wrapper coreGHC
              binds <- cMod
              transfCore opts dflags' binds []
-             return True
+             ierr "TODO: No typing reader integrated yet for GHCCore."
 
 instance Outputable TypecheckedModule where
   ppr tmod = ppr $ tm_typechecked_source tmod
