@@ -37,10 +37,12 @@ getVTypes dflags prog =
                      _ -> error "vtBind: only one match is allowed"
             fI   = (f_qn, (f_t, Just f_ar))            
         in  [fI]++(vtMatches mGroup)
-      vtBind _ = ierr "vtBind: unknown binding"
-      vtMatch (Match mPats _ gs) = (map (vtPat.unLoc) mPats)++(vtGRHSs gs)
-      vtMatches (MatchGroup [lMatch] t) = vtMatch $ unLoc lMatch
-      vtMatches (MatchGroup _ _) = error "patterns may not appear in definitions"
+      vtBind (PatBind {}) = ierr "vtBind: found PatBind"
+      vtBind vb@(VarBind {}) = 
+        let (v_qn, v_t) = vtId $ var_id vb
+        in  [(v_qn, (v_t, Nothing))]++(vtExprU $ var_rhs vb)
+      vtMatch (Match mPats _ gs) = (concatMap (vtPat.unLoc) mPats)++(vtGRHSs gs)
+      vtMatches (MatchGroup lMatches t) = concatMap (vtMatch.unLoc) lMatches
       vtGRHSs gs =
         case grhssGRHSs gs of
           []  ->
@@ -65,12 +67,15 @@ getVTypes dflags prog =
       vtExpr (HsPar e) = vtExprU e
       vtExpr (SectionL _ _) = error "vtExpr: found SectionL"
       vtExpr (SectionR _ _) = error "vtExpr: found SectionR"
-      vtExpr (ExplicitTuple _ _) = error "vtExpr: found ExplicitTuple"
-      vtExpr (HsCase _ _) = error "vtExpr: found HsCase"
+      vtExpr (ExplicitTuple args _) = 
+        let vtArg (Present e) = vtExprU e
+            vtArg (Missing _) = [] 
+        in  concatMap vtArg args
+      vtExpr (HsCase e matches) = (vtExprU e)++(vtMatches matches)
       vtExpr (HsIf _ cond eT eF) = (vtExprU cond)++(vtExprU eT)++(vtExprU eF)
       vtExpr (HsLet (HsValBinds vBinds) e) = (vtVBinds vBinds)++(vtExpr $ unLoc e)
       vtExpr (HsDo _ _ _) = error "vtExpr: found HsDo"
-      vtExpr (ExplicitList _ _) = error "vtExpr: found ExplicitList"
+      vtExpr (ExplicitList _ el) = concatMap vtExprU el
       vtExpr (ExplicitPArr _ _) = error "vtExpr: found ExplicitPArr"
       vtExpr (RecordCon _ _ _) = error "vtExpr: found RecordCon"
       vtExpr (RecordUpd _ _ _ _ _) = error "vtExpr: found RecordUpd"
@@ -103,8 +108,13 @@ getVTypes dflags prog =
         concatMap (\(_, lBinds) -> vtBinds lBinds) vBindsOut
       vtPat (VarPat vId) =
         let (vId_qn, vId_t) = vtId vId
-        in  (vId_qn, (vId_t, Nothing))
-      vtPat _ = error "vtPat: pattern not supported"      
+        in  [(vId_qn, (vId_t, Nothing))]
+      vtPat (ListPat lPats _)    = concatMap (vtPat.unLoc) lPats
+      vtPat (TuplePat lPats _ _) = concatMap (vtPat.unLoc) lPats
+      vtPat (LitPat _) = []
+      vtPat (ConPatOut {}) = []
+      vtPat (CoPat _ p _) = vtPat p
+      vtPat p = error $ "vtPat: found pattern: "++(showSDoc dflags $ ppr p)
       vtId vId =
         let v_vn = varName vId
             v_qn = QN Nothing (occNameString (nameOccName v_vn))
