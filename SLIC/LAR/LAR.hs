@@ -79,7 +79,6 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
                     pdeclExts opts imports.
                     pdeclExtApps opts (diEApps $ dfiDfInfo dfi)).
               defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl).
-        genv modName arityCAF.nl.                    -- module CAF
         initMod modName config.nl.                   -- module initializer
         (case cMode of
             Whole -> mainFunc env opts (depthOfMainDef defs) [modName].nl
@@ -616,7 +615,7 @@ genv m arityCAF =
 prologue :: Options -> MName -> Int -> ShowS
 prologue opts modName arityCAF =
   let gc           = optGC opts
-  in  genv modName arityCAF.nl.
+  in  genv modName arityCAF.nl.         -- prototype for module CAF
       (case gc of
          SemiGC ->
            (case optCMode opts of
