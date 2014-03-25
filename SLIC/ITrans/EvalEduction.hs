@@ -18,8 +18,8 @@
 {-# LANGUAGE CPP #-}
 module SLIC.ITrans.EvalEduction (evalZOILLazy) where
 
-import Data.Map (Map, empty, elems, filter, filterWithKey,
-                 insert, keys, lookup, size)
+import Data.Map as M (Map, empty, elems, filter, filterWithKey,
+                      insert, keys, lookup, size)
 import qualified Data.IntMap as IM
 import Data.Maybe (catMaybes, mapMaybe)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
@@ -286,12 +286,12 @@ type Warehouse = Map (QName, CtxtID) WHSlot
 
 -- | The initial empty warehouse.
 initWH :: Warehouse
-initWH = Data.Map.empty
+initWH = M.empty
 
 -- | Looks up the value of a variable in a context, in the warehouse.
 lookupWH :: EOpts -> FProg -> QName -> CtxtID -> EState -> (IValue, EState)
 lookupWH eOpts@(t, _) p v ctxt state@((cmap, cid), whtbl) =
-  case Data.Map.lookup (v, ctxt) whtbl of
+  case M.lookup (v, ctxt) whtbl of
     Just (Memo val) ->
       (if t then
          trace2("found memoized ("++(qName v)++","++(show ctxt)++")="++(pprint val ""))
@@ -340,8 +340,8 @@ gc t ctxt ((cmap, cid), wh) =
       cmap' = markLive wh ctxt cmap      
       -- find all pending computations in the warehouse and mark their
       -- contexts pending as well
-      pendingCtxts = Prelude.map snd $ Data.Map.keys $ 
-                     Data.Map.filter (\x->x==Pending) wh
+      pendingCtxts = Prelude.map snd $ M.keys $ 
+                     M.filter (\x->x==Pending) wh
       cmap'' = foldr (markLive wh) cmap' pendingCtxts
       -- find all contexts that have 'prev' pointers pointing to this context
       nextCtxts = IM.keys $ IM.filterWithKey
@@ -350,13 +350,13 @@ gc t ctxt ((cmap, cid), wh) =
       cmapMarked = cmap'''
       -- naive double traversal, should be single (use 'break' or 'span')
       -- keep only those contexts marked as live
-      -- cmapLive = Data.Map.map (\(idx, prev, ns, _) ->
+      -- cmapLive = M.map (\(idx, prev, ns, _) ->
       --                           (idx, prev, ns, False)) $
-      --            Data.Map.filter (\(_, _, _, gcm)->gcm) cmapMarked
+      --            M.filter (\(_, _, _, gcm)->gcm) cmapMarked
       liveCtxts = IM.keys $ IM.filter (\(_, _, _, gcm)->gcm) cmapMarked
-      -- deadCtxts = Data.Map.keys $ 
-      --             Data.Map.filter (\(_, _, _, gcm)->not gcm) cmapMarked
-      whLive = Data.Map.filterWithKey (\(_, ctx0) _-> ctx0 `elem` liveCtxts) wh
+      -- deadCtxts = M.keys $ 
+      --             M.filter (\(_, _, _, gcm)->not gcm) cmapMarked
+      whLive = M.filterWithKey (\(_, ctx0) _-> ctx0 `elem` liveCtxts) wh
   in  (if t then
           trace2 ("Found "++(show $ length liveCtxts)++" live contexts.") 
        else id)
@@ -393,5 +393,5 @@ findCCtxtsIn :: CtxtID -> Warehouse -> [CtxtID]
 findCCtxtsIn ctxt wh =
   let lConstrCtxt (Memo (VT (_, ctxtC))) = Just ctxtC
       lConstrCtxt _ = Nothing
-  in  mapMaybe lConstrCtxt $ Data.Map.elems $
-      Data.Map.filterWithKey (\(_, ctxt') _ -> ctxt==ctxt') wh 
+  in  mapMaybe lConstrCtxt $ M.elems $
+      M.filterWithKey (\(_, ctxt') _ -> ctxt==ctxt') wh 
