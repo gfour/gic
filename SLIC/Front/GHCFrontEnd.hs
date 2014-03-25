@@ -102,7 +102,7 @@ getVTypes dflags prog =
       vtExpr (HsType {})            = error "vtExpr: found HsType"
       vtExpr (HsWrap _ e)           = vtExpr e
       vtExpr e                      =
-        error $ "vtExpr: unsupported expression: "++(showSDoc dflags $ ppr e) -- ++" of type "++(show $ typeOf1 e)
+        error $ "vtExpr: unsupported expression: "++(showPPr dflags e) -- ++" of type "++(show $ typeOf1 e)
       vtExprU e                     = vtExpr $ unLoc e
       vtVBinds (ValBindsIn {})           = error "vtVBinds: found ValBindsIn"
       vtVBinds (ValBindsOut vBindsOut _) = 
@@ -115,7 +115,7 @@ getVTypes dflags prog =
       vtPat (LitPat _)              = []
       vtPat (ConPatOut {})          = []
       vtPat (CoPat _ p _)           = vtPat p
-      vtPat p = error $ "vtPat: found pattern: "++(showSDoc dflags $ ppr p)
+      vtPat p = error $ "vtPat: found pattern: "++(showPPr dflags p)
       vtId vId =
         let v_vn = varName vId
             v_qn = QN Nothing (occNameString (nameOccName v_vn))
