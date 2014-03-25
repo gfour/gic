@@ -24,7 +24,7 @@
 module SLIC.Driver (processFL) where
 
 import Data.Map (unions)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import SLIC.AuxFun (ierr)
 import SLIC.DFI
 import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfFlags, dfiAppSigs,
@@ -112,7 +112,7 @@ processFL opts dfis inputModule =
      -- _ <- (putStrLn ("* Defunctionalized") >> printLn p0Def)
       
      -- get the total environment
-     let env = dfiTEnv $ p0DefDfi
+     let env = dfiTEnv p0DefDfi
       
      -- enable strictness mode if set with the command-line switch
      let p0DefStr = procModSource (\_ p->markStrict (optStrict opts) p) p0Def
@@ -124,7 +124,7 @@ processFL opts dfis inputModule =
      -- _ <- (putStrLn ("* Bound variables processed") >> printLn p0BVars)
           
      -- inline type classes for statically known instances
-     let tcInfo = mergeTcInfos $ [builtinTcInfo, modTCs p0BVars]
+     let tcInfo = mergeTcInfos [builtinTcInfo, modTCs p0BVars]
      let p0Tc = inlineTcMethods tcInfo env p0BVars
       
      -- final preprocessed and defunctionalized source to be used
@@ -238,7 +238,7 @@ itransfLAR :: Options -> TEnv -> CUnit -> IO (Maybe DFI)
 itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
   let -- generate all apply() signatures from the defunctionalization interfaces  
       dfAppSigs = dfiAppSigs p0Dfi
-      dfiExtInfo = unzip $ catMaybes $ map ideclInfo $ modImports pLAR
+      dfiExtInfo = unzip $ mapMaybe ideclInfo $ modImports pLAR
       fSigs     = unions (fst dfiExtInfo)
       -- add function signatures for built-in and defunctionalization functions
       extSigs = unions [builtinFuncSigs, dfAppSigs, fSigs]
@@ -280,10 +280,10 @@ itransfLAR opts env (p0Final, p3, p0Dfi, cbnVars, stricts) =
                       fm = modNameF pLAR
                   in  do compileModL fm conf env dfi allImps cidsExt finalProgL
                          return $ Just dfi
-        action -> ierr $ "Invalid LAR compiler action: "++(show action)
+        action -> ierr $ "Invalid LAR compiler action: "++show action
 
 callErlBackend :: MName -> ITrans.Syntax.ProgZ -> Options -> IO ()
 callErlBackend m p opts =
   case optAction opts of
     AEvalErl -> putStrLn (makeErlRepr m p)
-    a -> ierr $ "The Erlang back-end cannot handle action "++(show a)
+    a -> ierr $ "The Erlang back-end cannot handle action "++show a

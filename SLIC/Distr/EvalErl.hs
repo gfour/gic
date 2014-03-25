@@ -15,7 +15,7 @@
 
 module SLIC.Distr.EvalErl (makeErlRepr) where
 
-import Data.List
+import Data.List (intercalate)
 import SLIC.AuxFun
 import SLIC.ITrans.Syntax
 import SLIC.SyntaxAux
@@ -26,8 +26,8 @@ makeErlRepr :: MName -> ProgZ -> String
 makeErlRepr m (Prog _ defs) =
     let defsZ = filter isDefZ defs
         actualsZ = filter (not.isDefZ) defs
-        defsErl = concat (intersperse ";\n" 
-                          ((map makeErlDef defsZ)++(makeErlActuals actualsZ)))
+        defsErl = intercalate ";\n"
+                  ((map makeErlDef defsZ)++(makeErlActuals actualsZ))
     in  "-module(main).\n" ++ 
         "-export([init/0, run/6]).\n\n" ++
         "p(Id) -> case Id of\n" ++ defsErl ++ "\nend.\n" ++
@@ -37,7 +37,7 @@ makeErlRepr m (Prog _ defs) =
 makeErlDef :: DefZ -> String
 makeErlDef (DefZ v e) =
     "\'"++(qName v)++"\' -> {def, "++(makeErlE e)++"}"    
-makeErlDef (ActualsZ _ _ _) =
+makeErlDef (ActualsZ {}) =
   ierr "makeErlDef was called for actuals()"  
   
 makeErlActuals :: [DefZ] -> [String]
@@ -49,11 +49,11 @@ makeErlActuals actualsZ =
       makeAct (v, acts) =
         let aux (ActualsZ _ m el) =
               let el' = map makeErlE el
-                  mEl = concat (intersperse ", " el')
+                  mEl = intercalate ", " el'
               in  "'"++m++"' -> ["++mEl++"]"
             aux (DefZ _ _) = ierr "makeErlActuals found function definition"
         in  "\'"++(qName v)++"' -> fun (Module) -> case Module of "++
-            (concat $ intersperse "; " $ map aux acts)++" end end"
+            (intercalate "; " $ map aux acts)++" end end"
   in  map makeAct actGroups
 
 {-
@@ -67,7 +67,7 @@ makeErlVar v = "{id, '"++(qName v)++"'}"
 
 -- | Produces the Erlang representation for a ZOIL expression.
 makeErlE :: ExprZ -> String
-makeErlE (CaseZ _ _ _) = 
+makeErlE (CaseZ {}) = 
   error "Pattern matching clauses are not supported yet in the Erlang interpreter"
 {-
   let erlE = makeErlE e

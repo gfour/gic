@@ -17,7 +17,7 @@ import SLIC.Types
 fromZOILtoLAR :: FuncSigs -> CIDs -> ModZ -> ModL
 fromZOILtoLAR sigs cids m =
   let Prog dt ds = modProg m
-      pL = Prog dt (concat (map (mkBlocks sigs cids) ds))
+      pL = Prog dt (concatMap (mkBlocks sigs cids) ds)
   in  m{modProg=pL}
 
 -- | Translates a 0-order definition to LAR blocks. If the definition is a

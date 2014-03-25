@@ -72,7 +72,7 @@ gatherUsed :: QName -> [DefZ] -> [QName] -> [QName]
 gatherUsed v defs used =
     let def0 = findDef v defs
         vars0 = findUsedVarsD def0
-        newVars = filter (\var -> not (elem var used)) vars0
+        newVars = filter (\var -> notElem var used) vars0
         allVars = used ++ newVars
         recCall = concatMap (\v' -> gatherUsed v' defs allVars) newVars
     in  nub (used ++ newVars ++ recCall)
@@ -174,7 +174,7 @@ findCBNbvs _ (ConF (LitInt _) es) =
     [] -> empty
     _  -> ierr "findCBNbvs: found literal application to expressions"
 findCBNbvs si (FF _ el) = unionsWith max (List.map (findCBNbvs si) el)
-findCBNbvs _ (LetF _ _ _) = ierr "findCBNbvs: encountered let-binding"
-findCBNbvs _ (LamF _ _ _) = ierr "findCBNbvs: encountered lambda"
+findCBNbvs _ (LetF {}) = ierr "findCBNbvs: encountered let-binding"
+findCBNbvs _ (LamF {}) = ierr "findCBNbvs: encountered lambda"
 
 

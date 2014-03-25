@@ -15,7 +15,7 @@ module SLIC.DFI (DfConstrs, DFI(..), DfInfo(..), DFC(..), ExtAppFuns,
 import Data.Char (isUpper)
 import Data.List as List (map)
 import Data.Map (Map, fromList, lookup, member, toList, unions)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import Data.Set (Set, empty, insert, toList, unions)
 
 import SLIC.AuxFun (errM, foldDot, ierr, nameOf, showStrings)
@@ -307,12 +307,10 @@ mergeLARInfo dfis =
       cidsL = List.map (liCIDs.dfiLARInfo) dfis
       pmdsL = List.map (liPMDs.dfiLARInfo) dfis
       rDep  =
-        let rs = catMaybes $ List.map (liDepth.dfiLARInfo) dfis
-        in  case rs of
-                 []  -> Nothing
-                 [r] -> Just r
-                 (_:_) ->
-                   error $ "More than one DFIs define a depth for "++mainDefName
+        case mapMaybe (liDepth.dfiLARInfo) dfis of
+          []  -> Nothing
+          [r] -> Just r
+          (_:_) -> error $ "More than one DFIs define a depth for "++mainDefName
   in  LARInfo (concat cafsL) (Data.Map.unions cidsL) (Data.Map.unions pmdsL) rDep
 
 mergeTcInfo :: [DFI] -> TcInfo

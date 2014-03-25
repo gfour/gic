@@ -11,7 +11,7 @@
 
 module SLIC.ITrans.Eval (evalZOILCBN) where
 
-import Data.List (intersperse)
+import Data.List (intercalate)
 import SLIC.AuxFun (ierr, spaces)
 import SLIC.DFI (DFI)
 import SLIC.Front.Defunc (dfFlags)
@@ -116,9 +116,9 @@ evalZ trace prog d (XZ (V vn)) ls dict pc =
   let (e0, ls0) =
         case searchActuals vn prog of
           [] -> -- this is not an actual variable, find its definition
-            let Just def                  = searchZD vn prog
-                tkExpr (DefZ _ e)         = e
-                tkExpr (ActualsZ _ _ _)   = ierr "tkExpr: ActualsZ..."
+            let Just def             = searchZD vn prog
+                tkExpr (DefZ _ e)    = e
+                tkExpr (ActualsZ {}) = ierr "tkExpr: ActualsZ..."
             in  if isActualsZ def then ierr "searchActuals missed an actuals()"
                 else (tkExpr def, ls)
           actuals ->
@@ -186,7 +186,7 @@ evalZ _ _ _ e _ _ _ = error ("ZOIL interpreter can't handle expression "++(pprin
 
 -- | Prints out a world (stack).
 printWorld :: Ctxt -> IO ()
-printWorld ctxt = putStr $ "[" ++ (concat (intersperse ", " (map show ctxt))) ++ "]"
+printWorld ctxt = putStr $ "[" ++ (intercalate ", " (map show ctxt)) ++ "]"
 -- printWorld []             = return ()
 -- printWorld (l : ls)       = putStr (show l) >> printWorld ls
 

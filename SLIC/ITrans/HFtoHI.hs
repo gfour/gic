@@ -22,10 +22,8 @@ fromHFtoHIe (CaseF cloc e _ pats) =
         let bvars = zip bvs (repeat cloc)
         in  PatB (c, PatInfo (areBound bvars eP)) (fromHFtoHIe eP)
   in  CaseH cloc (fromHFtoHIe e) (map fromHFtoHIpat pats)
-fromHFtoHIe (LetF _ _ _) =
-  ierr "let found when translating from FL to HIL"
-fromHFtoHIe (LamF _ _ _) =
-  ierr "lambda found when translating from FL to HIL"
+fromHFtoHIe (LetF {}) = ierr "let found when translating from FL to HIL"
+fromHFtoHIe (LamF {}) = ierr "lambda found when translating from FL to HIL"
 
 -- | FL to HIL, definition translation.
 fromHFtoHId :: DefF -> DefH

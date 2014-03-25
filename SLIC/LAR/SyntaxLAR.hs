@@ -78,8 +78,8 @@ printLAR eLAR modL =
 
 -- | Filter for function definition blocks.
 isFun :: BlockL -> Bool
-isFun (DefL _ _ _) = True
-isFun (ActualL _ _ _) = False
+isFun (DefL {}) = True
+isFun (ActualL {}) = False
 
 -- | Returns the name of a block.
 getBlockName :: BlockL -> QName
@@ -98,7 +98,7 @@ countPMDepthL (LARC _ args) = maximum (map countPMDepthL args)
 countPMDepthL (CaseL (cn, _) e pats) = 
   let patE (PatB _ eP) = eP
       maxPatDepth [] = 0
-      maxPatDepth ps = maximum (map countPMDepthL (map patE ps))
+      maxPatDepth ps = maximum $ map (countPMDepthL.patE) ps
       cDep = case cn of CLoc _ -> 1 ; CFrm _ -> 0
   in  cDep + (countPMDepthL e) + (maxPatDepth pats)
 
@@ -120,7 +120,7 @@ calcFuncArities mL =
       aux m [] = m
       aux m ((DefL v _ vs) : bs) =
         aux (insertWithKey checker v (length vs) m) bs
-      aux m ((ActualL _ _ _) : bs) = aux m bs
+      aux m ((ActualL {}) : bs) = aux m bs
       checker v a a' =
         if a==a' then a
         else ierr $ "Duplicate function "++(qName v)++" of different arities "++

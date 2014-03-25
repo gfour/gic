@@ -8,7 +8,7 @@ import Data.Graph (SCC(..), stronglyConnComp)
 import Data.List ((\\))
 import Data.Map (Map, fromList, insert, keys, lookup, member, singleton, 
                  toList, union, unions)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import SLIC.AuxFun (pathOf, showStrings)
 import SLIC.DFI
 import SLIC.Driver (processFL)
@@ -41,8 +41,7 @@ readMGraphFor si@(startM, fPath) m visited =
   else
     do dfi <- parseDFI $ dfiFor fPath m
        let (_, ms) = dfiMInfo dfi
-       mg <- readMGraphForL si (ms \\ (keys visited)) (Data.Map.insert m ms visited)
-       return mg
+       readMGraphForL si (ms \\ (keys visited)) (Data.Map.insert m ms visited)
 
 -- | Version of 'readMGraphFor' for module lists.
 readMGraphForL :: (MName, FPath) -> [MName] -> MGNodes -> IO MGNodes
@@ -74,15 +73,13 @@ type ModFPre = (ModF, [TcInstF])
 --   sorted order.
 rearrangeMods :: Bool -> [ModFPre] -> IO ([ModFPre], [MName])
 rearrangeMods showMsg modsFL =
-  let aux [] = []
-      aux (mn:mns) = (Data.Map.lookup mn modTable) : (aux mns)
-      modTable = fromList $ map (\modFL->((fst.modNameF.fst) modFL, modFL)) modsFL
+  let modTable = fromList $ map (\modFL->((fst.modNameF.fst) modFL, modFL)) modsFL
   in  do mNames <- findCompOrder modsFL
          (if showMsg then
             putStrLn $ "Module graph: "++(showStrings ", " mNames "")
           else
             return ())
-         return (catMaybes (aux mNames), mNames)
+         return (mapMaybe (`Data.Map.lookup` modTable) mNames, mNames)
 
 -- * Compilation manager
 

@@ -396,11 +396,11 @@ tString   :: Type         ; tString  = Ta tList tChar    -- String == [Char]
 -- | The list of all built-in data types.
 builtinDTypes :: [DTName]
 builtinDTypes = [dtInt, dtInteger, dtBool, dtUnit, dtList, dtMagic] ++
-                (map dtTuple b_tupleSizes)
+                (map dtTuple bTupleSizes)
 
 -- | The list of all tuple sizes with built-in support.
-b_tupleSizes :: [Arity]
-b_tupleSizes = [2..maxTupleSize]
+bTupleSizes :: [Arity]
+bTupleSizes = [2..maxTupleSize]
 
 -- * Auxiliary types (II)
 
@@ -495,7 +495,7 @@ returnsThunk ve vn =
 --   Closures are not considered nullary data types (use -enum to convert them to
 --   the integer data type for some programs).
 isNullaryGT :: Ground -> Bool
-isNullaryGT (T dt)    = dt == dtInt || dt==dtInteger || dt==dtBool || dt==dtUnit
+isNullaryGT (T dt)    = dt `elem` [dtInt, dtInteger, dtBool, dtUnit]
 isNullaryGT (TDF _ _) = False
 
 -- | Returns the types of all parameters of a type (until but not including
@@ -618,7 +618,7 @@ builtinCIDs :: CIDs
 builtinCIDs = Map.fromList $
               [ (bf_Cons, (2, 0)), (bf_Nil, (0, 1))
               , (bf_Unit, (0, 0)) ]
-              ++ (map (\i->(bf_Tuple i, (i, 0))) b_tupleSizes)
+              ++ (map (\i->(bf_Tuple i, (i, 0))) bTupleSizes)
 
 -- | Generator of the pretty printer function corresponding to a data type.
 pprDT :: DTName -> String -> QName
@@ -660,7 +660,7 @@ builtinTEnv =
   , (bf_cons_1, (Ta tList tv_a, Nothing))
   , (bf_Nil, (Ta tList tv_a, Just 0))
   , (bf_Unit, (tUnit, Just 0))
-  ] ++ (concatMap mkTupleTEnv b_tupleSizes)
+  ] ++ (concatMap mkTupleTEnv bTupleSizes)
 
 -- | For some arity, generate the types of the tuple constructor of that arity,
 --   together with the types of its formals.
@@ -709,7 +709,7 @@ builtinFuncSigs = Map.fromList $
                   , (bf_Cons, [bf_cons_0, bf_cons_1])
                   , (bf_Nil, [])
                   , (bf_Unit, [])
-                  ] ++ (map bf_TupleSig b_tupleSizes)
+                  ] ++ (map bf_TupleSig bTupleSizes)
 
 -- | Checks if a name corresponds to a built-in function.
 isBuiltinFunc :: QName -> Bool
@@ -726,7 +726,7 @@ bf_TupleSig n =
 
 -- | Arity information for all built-in functions.
 builtinArities :: Arities                  
-builtinArities = Map.map (\args->length args) builtinFuncSigs
+builtinArities = Map.map length builtinFuncSigs
                   
 -- | The pattern depths of the built-in functions.
 builtinPmDepths :: PMDepths
@@ -737,7 +737,7 @@ builtinPmDepths = Map.fromList $
                   , (bf_par, 0), (bf_pseq, 0)
                   , (bf_error, 0), (bf_runMainIO, 0)
                   , (bf_Cons, 0), (bf_Nil, 0), (bf_Unit, 0)
-                  ] ++ (map (\i->(bf_Tuple i, 0)) b_tupleSizes)
+                  ] ++ (map (\i->(bf_Tuple i, 0)) bTupleSizes)
 
 -- | Assigns a special built-in pseudo-constructor to integer literals.
 intConstrQN :: Integer -> QName

@@ -37,6 +37,7 @@ import SLIC.Types
 
 -- | A bound variable aliased to a constructor variable of some counter/depth.
 type Alias = (QName, (QName, CaseLoc))
+
 -- | Aliased variables of the program become bound variables of a specific name,
 --   depth, and enclosing function.
 type BVInfo = [Alias]
@@ -54,7 +55,7 @@ constrToFuncs (tc, scrutOpt) modF =
       tAnnot' = if tc == GICTypeInf False then
                   modTAnnot modF
                 else
-                  Map.union (modTAnnot modF) (genProjSelTEnv ds)
+                  (modTAnnot modF) `Map.union` (genProjSelTEnv ds)
   in  modF{modProg=prog'}{modTAnnot=tAnnot'}
 
 -- | Replaces constructor calls in definitions.
@@ -255,9 +256,9 @@ procBVE so m func al d (FF f el) =
     BV _ _  -> ierr "Bound variable found by procBVE, should not appear here"
 procBVE _ _ _ _ _ bv@(XF (BV _ _)) = bv
 procBVE _ _ _ al _ (XF (V v)) = XF (procBVEV al v)
-procBVE _ _ _ _ _ e@(LetF _ _ _) =
+procBVE _ _ _ _ _ e@(LetF {}) =
   ierr $ "procBVE(): let binding not lifted: " ++ (pprint e "")
-procBVE _ _ _ _ _ e@(LamF _ _ _) =
+procBVE _ _ _ _ _ e@(LamF {}) =
   ierr $ "procBVE(): lambda should have already been lifted: " ++ (pprint e "")
 
 -- | The actual function that spots and renames a variable.
@@ -319,7 +320,7 @@ convertFromGHC (Prog ds defs) =
       -- TODO: delete this code
       -- omit the :Main.main = runMainIO ... function of GHC to something
       -- omitMain (DefF (QN (Just ":Main") "main") [] _) = False
-      omitMain (DefF _ _ _) = True
+      omitMain (DefF {}) = True
   in  Prog ds (map elimPrimD (filter omitMain defs))
       
 -- * Syntactic restrictions preprocessor
@@ -462,7 +463,7 @@ qualData info@(_, fm@(m, _)) (Data (QN Nothing dt) as dcs) =
         in  DT (qualT info t) s sel'
   in  Data (QN (Just m) dt) as (map qualDC dcs)
 qualData (_, fm) (Data (QN (Just _) _) _ _) =
-  errM fm $ "found already qualified data declaration"
+  errM fm "found already qualified data declaration"
 
 qualDef :: QInfo -> DefF -> DefF
 qualDef info@(_, (m, _)) (DefF (QN Nothing f) fs e) =
@@ -487,10 +488,10 @@ qualE info@(_, (m, _)) (LamF d (QN Nothing v) e) =
   LamF d (QN (Just m) v) (qualE info e)
 -- sanity checks  
 qualE (_, fm) (FF (BV _ _) _) =
-  errM fm $ "found bound variable application while parsing"
-qualE (_, fm) (XF (BV _ _)) = errM fm $ "found bound variable while parsing"
+  errM fm "found bound variable application while parsing"
+qualE (_, fm) (XF (BV _ _)) = errM fm "found bound variable while parsing"
 qualE (_, fm) (LamF _ (QN (Just _) _) _) =
-  errM fm $ "found qualified lambda-bound variable while parsing"
+  errM fm "found qualified lambda-bound variable while parsing"
 
 qualTcDecl :: QInfo -> TcDecl -> TcDecl
 qualTcDecl info (TcDecl tcn tv methods) =

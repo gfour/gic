@@ -54,7 +54,7 @@ isRecord (DConstr _ dts _) = containSelectors dts
   
 -- | Check if a list of data type components contains a selector.
 containSelectors :: [DT] -> Bool
-containSelectors dts = or $ map (\(DT _ _ sel)->isJust sel) dts
+containSelectors dts = any (\(DT _ _ sel)->isJust sel) dts
 
 -- | Data type declarations. Contain the data type name, a list of binder
 --   variables, and the list of constructors.
@@ -179,7 +179,7 @@ type ImportedNames = Map.Map QName IInfo
 -- | Pretty printer for compilation information of imported names.
 pprintINames :: ImportedNames -> ShowS
 pprintINames impNames =
-  let pprintIN (v, (IInfo _ _ _ _ _)) =
+  let pprintIN (v, IInfo {}) =
         pprint v -- .("::"++).pprintIType it
       --   pprint v.("::"++).pprintIType it.showsCAF caf.showsNesting nesting
       -- showsCAF Nothing      = id
@@ -226,7 +226,7 @@ genBuiltinIDecl mn =
       modTEnv    = Map.filterWithKey filtModNames builtinTEnv
       modCIDs    = Map.filterWithKey filtModNames builtinCIDs
       modConstrs = Map.keys modCIDs
-      modFuncs   = filter (\qn->not (qn `elem` modConstrs)) $ Map.keys modSigs
+      modFuncs   = filter (\qn->qn `notElem` modConstrs) $ Map.keys modSigs
       names      = (map (mkImp NFunc) modConstrs)++
                    (map (mkImp NConstr) modFuncs)
       mkImp ni n =
@@ -299,7 +299,7 @@ data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
 
 -- | The mapping between the built-in operators and their string representation.
 cOps :: Map.Map COp String
-cOps = Map.fromList $
+cOps = Map.fromList
        [ (CPlus, "+"), (CMinus, "-"), (CMult, "*"), (CDivide, "/")
        , (CMod, "mod"), (CDiv, "div")
        , (CAnd, "&&"), (COr, "||"), (CEqu, "=="), (CNEq, "/=")
@@ -358,8 +358,7 @@ prettyConst p (CN cn) el =
       showParen (p > 6) (
         pprintPrec 7 (el !! 0) .
         ((" `" ++ (pprint c "") ++ "` ") ++).pprintPrec 6 (el !! 1))
-    c | c == CEqu || c == CNEq || c == CLt || c == CGt ||
-        c == CLe || c == CGe ->
+    c | (c `elem` [CEqu, CNEq, CLt, CGt, CLe, CGe]) ->
       showParen (p > 4) (
         pprintPrec 5 (el !! 0) .
         ((" " ++ (pprint c "") ++ " ") ++).pprintPrec 5 (el !! 1))

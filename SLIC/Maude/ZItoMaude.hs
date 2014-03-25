@@ -12,7 +12,7 @@
 
 module SLIC.Maude.ZItoMaude (callMaudeBackend) where
 
-import Data.List
+import Data.List (intercalate)
 import SLIC.AuxFun (ierr)
 import SLIC.ITrans.Syntax
 import SLIC.State
@@ -46,7 +46,7 @@ makeMaudeDef (DefZ v e) = "def(\""++(qName v)++"\", "++(makeMaudeE e)++")\n"
 makeMaudeDef (ActualsZ _ _ []) = ""
 makeMaudeDef (ActualsZ v _ el) =
     let el' = map (\x -> "("++(makeMaudeE x)++")") el
-        mEl = concat (intersperse " : " el')
+        mEl = intercalate " : " el'
     in  "def(\""++(qName v)++"\", actuals("++mEl++"))\n"
 
 makeMaudeVar :: QName -> String
@@ -54,7 +54,7 @@ makeMaudeVar v = "$ \""++(qName v)++"\""
 
 -- | Generates the Maude term for a ZOIL expression.
 makeMaudeE :: ExprZ -> String
-makeMaudeE (CaseZ _ _ _) = error "Maude backend doesn't support pattern matching"
+makeMaudeE (CaseZ {}) = error "Maude backend doesn't support pattern matching"
 makeMaudeE (ConstrZ _) = error "Maude backend doesn't support thunks"
 makeMaudeE (XZ (V v)) = makeMaudeVar v
 makeMaudeE (XZ (BV _ _)) = error "Maude backend doesn't support bound variables"

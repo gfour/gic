@@ -5,7 +5,7 @@ module SLIC.Front.Typeclass (TcInst(..), TcInstF, TcInstFH, addTcInsts,
                              inlineTcMethods, tcISig, tc_Monad, tc_Num, tc_Show,
                              tc_Num_Int, tc_Show_Int) where
 
-import Data.List (findIndex)
+import Data.List (elemIndex)
 import Data.Map hiding (map)
 import Data.Maybe (fromJust)
 import SLIC.AuxFun (errM, foldDot, ierr, spaces)
@@ -46,7 +46,7 @@ mkMethodName :: MNameF -> TcName -> Type -> SName -> SName
 mkMethodName fm tcn ti n = 
   let mkStrT (Tg (T dt'))    = pprint dt'
       mkStrT (Ta t' (Tv tv)) = mkStrT t'.("$"++).(tv++)
-      mkStrT _ = errM fm $ "Cannot handle type in instance declaration."
+      mkStrT _ = errM fm "Cannot handle type in instance declaration."
   in  "TC$"++tcn++"$"++(mkStrT ti "")++"$"++n
 
 -- | Integrates a list of type class instance methods with the regular 
@@ -179,7 +179,7 @@ inlineTcMethods tcInfo env modF =
               Nothing -> FF f el'
               Just (tcn, tv, t) ->
                 let -- find which argument is the one with the parametric type
-                    Just argIdx = Data.List.findIndex (==(Tv tv)) $ types t
+                    Just argIdx = Data.List.elemIndex (Tv tv) (types t)
                     arg = el' !! argIdx
                     -- find the type of the argument (if possible)
                     rT x = Just $ last $ types $ fst $ fromJust x
@@ -218,7 +218,7 @@ inlineTcMethods tcInfo env modF =
                       CaseF _ _ _ []      -> Nothing
                       CaseF _ _ _ ((PatB _ eP):_) -> argT eP -- use 1st pattern
                       LetF _ _ eL         -> argT eL
-                      LamF _ _ _          -> Nothing         -- can't handle lambda
+                      LamF {}             -> Nothing         -- can't handle lambda
                       FF (BV _ _) _       -> Nothing         -- can't handle bvars
                 in  case argT arg of
                       Nothing -> FF f el'      -- cannot determine type

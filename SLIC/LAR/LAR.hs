@@ -97,7 +97,7 @@ blockIsLocal m (DefL f@(QN (Just m') _) _ _) =
   if m==m' then True               -- local function
   else if m' == dfMod then False   -- defunctionalization function
   else ierr $ "Found non-local function "++(qName f)
-blockIsLocal _ (ActualL _ _ _) = True
+blockIsLocal _ (ActualL {}) = True
 blockIsLocal _ _ = ierr "blockIsLocal: found unqualified block definition"
 
 -- | The C headers of the generated code.
@@ -243,7 +243,7 @@ predeclarations lblockList config =
                 arityV  = arityA
                 nesting = findPMDepthSafe fname (getPMDepths config)
             in  smFun opts fname arityA arityV nesting
-        predeclF (ActualL _ _ _) = ierr "predeclF: found actual"
+        predeclF (ActualL {}) = ierr "predeclF: found actual"
         lblockListF = Prelude.filter isFun lblockList
     in  foldDot predeclF lblockListF.nl
 
@@ -290,7 +290,7 @@ declarations :: [Data] -> [BlockL] -> ShowS
 declarations dts ds =
     let proto (DefL n _ _) = protoFunc n
         proto (ActualL  n _ _) = protoVar (qName n)
-        idDefs = foldDot (\x -> proto x) ds
+        idDefs = foldDot proto ds
         protoDT d = pprinterSig d.(";"++).nl
         forcingFuncs = foldDot (\(Data d _ _)->protoDT d) dts.
                        foldDot protoDT builtinDTypes
@@ -381,7 +381,7 @@ forceStricts gc strictInds fArity =
 -- | Generates the C code for an expression that is assumed to be the body
 --   of a definition.
 mkCStmBody :: ExprL -> TEnv -> ConfigLAR -> ShowS
-mkCStmBody e@(CaseL _ _ _) env config =
+mkCStmBody e@(CaseL {}) env config =
   tab.("Susp Res;"++).nl.
   -- evaluate the pattern matching clause expression
   mkCExp env config e.nl.
@@ -392,7 +392,7 @@ mkCStmBody (ConstrL (CC c cId cArity)) _ config =
   let opts = getOptions config
   in  logConstr opts c.
       mkSusp opts cId uTag (cArity>0).nl
-mkCStmBody e env config = ("return "++).(mkCExp env config e).semi.nl
+mkCStmBody e env config = ("return "++).mkCExp env config e.semi.nl
 
 -- | Generates C code for a LAR expression. Takes the name of the containing
 --   function (for custom LAR access), the typing environment, the
@@ -402,9 +402,9 @@ mkCExp env config (LARC (CN c) exps) =
   let compact = optCompact $ getOptions config
       useFastOps = compact && (optFastOp $ getOptions config)
   in  case c of
-        CIf  -> ("(PVAL_R("++).(mkCExp env config (exps !! 0) ).(")?"++).
-                 ("("++).(mkCExp env config (exps !! 1)).("):"++).
-                 ("("++).(mkCExp env config (exps !! 2)).("))"++)
+        CIf  -> ("(PVAL_R("++).mkCExp env config (exps !! 0).(")?"++).
+                       ("("++).mkCExp env config (exps !! 1).("):"++).
+                       ("("++).mkCExp env config (exps !! 2).("))"++)
         c' | c' `elem` [ CMinus, CPlus, CMult, CDivide, CEqu, CLe, CGe  
                        , CGt, CLt, CAnd, COr, CMulI, CNEq, CMod, CDiv] ->
           mkBinOp c' exps env config
@@ -422,7 +422,7 @@ mkCExp _ config (LARC (LitInt i) exps) =
     []    -> intSusp (optCompact $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
 mkCExp env config (LARCall n acts) = 
-  if elem n (nmsids2nms (getCAFnmsids config)) then
+  if n `elem` (nmsids2nms (getCAFnmsids config)) then
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)
   else makeActs n acts env config
@@ -457,8 +457,8 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
         --      else id). 
         --      -}
         (case ePB of
-            CaseL _ _ _ -> id
-            _           -> ("Res = "++)).
+            CaseL {} -> id
+            _        -> ("Res = "++)).
         mkCExp env config ePB
       compact = optCompact opts
       argsN = getFuncArity efunc (getArities config)
@@ -476,7 +476,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
       -- if debug mode is off, optimize away constructor choice when there is
       -- only one pattern (will segfault/misbehave if the constructor
       -- reached is missing)
-      (if length pats == 0 then
+      (if null pats then
          -- pattern matching without any patterns, does not get compiled
          ("/* Empty pattern matching */"++)
        else if (length pats == 1) && (not (optDebug opts)) then
@@ -575,7 +575,7 @@ protoB (DefL fName _ bind) _ stricts cbnVars gc =
   let Just cbns = Data.Map.lookup fName cbnVars
       Just strs = Data.Map.lookup fName stricts
   in  foldDot (protoF gc strs cbns fName) (enumNames bind)
-protoB (ActualL _ _ _) _ _ _ _ = id
+protoB (ActualL {}) _ _ _ _ = id
 
 -- | Generates the access macros for the formal variables of a function.
 protoF :: GC -> StrictInds -> [QName] -> QName -> (Int, QName) -> ShowS
@@ -782,8 +782,8 @@ makeActs f args env config =
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int
 depthOfMainDef blocks =
-  let findRes (DefL v _ _)    = (lName v)==mainDefName
-      findRes (ActualL _ _ _) = False
+  let findRes (DefL v _ _) = (lName v)==mainDefName
+      findRes (ActualL {}) = False
       res = Prelude.filter findRes blocks
   in  case res of
         [DefL _ e _] -> countPMDepthL e

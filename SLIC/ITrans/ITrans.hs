@@ -28,8 +28,8 @@ itransM modH = --(Mod fm@(m, _) exports imports p an) =
 -- | Transforms a HIL prog, the output is another HIL program.
 itransP :: MName -> FuncSigs -> ProgH -> ProgH
 itransP m extSigs (Prog cs defs) =
-  let takeDefName (DefH f _ _)     = f
-      takeDefName (ActualsH _ _ _) =
+  let takeDefName (DefH f _ _)  = f
+      takeDefName (ActualsH {}) =
           ierr "actuals() exists in program before the intensional transformation"
       fNames = (map takeDefName defs) ++ (keys extSigs)
       initInds = fromList (zip fNames (repeat (m, 0)))
@@ -48,17 +48,17 @@ createActuals :: MName -> FuncSigs -> [DefH] -> [DefH]
 createActuals m extSigs defs =
   let -- make a table of every (function name, its formals)
       takeDefSig (DefH f vs _) = (f, vs)
-      takeDefSig (ActualsH _ _ _) =
+      takeDefSig (ActualsH {}) =
           ierr "createActuals: found a definition that is already an actuals()"
       allSigs = union (fromList (map takeDefSig defs)) extSigs  -- add external sigs
       -- take all the formals
       allFrms = concat (Data.Map.elems allSigs)
       -- find all actuals of all formals
-      defActs (DefH _ _ e) = getActs allSigs e
-      defActs (ActualsH _ _ _) =
+      defActs (DefH _ _ e)  = getActs allSigs e
+      defActs (ActualsH {}) =
           ierr "can't create new actuals() definitions for existing actuals() definitions"
       allActuals = concatMap defActs defs      
-      actsOf v = map snd $ sortBy cmpActs $ map snd $ (filter (\(v', _) -> v==v') allActuals)
+      actsOf v = map snd $ sortBy cmpActs $ map snd (filter (\(v', _) -> v==v') allActuals)
       cmpActs (i1, _) (i2, _) = if i1>i2 then GT else LT
       -- make a table of every formal and its list of actuals
       acts = zip allFrms (map actsOf allFrms)
@@ -104,7 +104,7 @@ insertCalls :: Inds -> [DefH] -> [DefH]
 insertCalls inds ((DefH f vs e) : defs) =
   let (e', inds') = insertCallsE inds e
   in  (DefH f vs e') : (insertCalls inds' defs)
-insertCalls _ (def@(ActualsH _ _ _) : _) =
+insertCalls _ (def@(ActualsH {}) : _) =
   ierr $ "this definition is already an actuals, the program to be transformed should not have actuals definitions: "++(pprint def "")
 insertCalls _ [] = []
     
@@ -125,7 +125,7 @@ insertCallsE inds (FH NOp f el) =
       inds1   = Data.Map.update (\_ -> Just (addOne iindex)) f inds
       (el', inds') = insertCalls_List inds1 insertCallsE el
   in  (FH callId f el', inds')
-insertCallsE _ fc@(FH _ _ _) =
+insertCallsE _ fc@(FH {}) =
   ierr $ "Cannot insert call(), there is already one in: "++(pprint fc "")
 insertCallsE inds (CaseH d e pats) =
   let (e', inds') = insertCallsE inds e

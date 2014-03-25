@@ -98,11 +98,10 @@ prettyPrinterDT cids (Data dtName _ constrs) =
         dLength (DConstr _ ds _) = length ds
         comps = intersperse ", " (map (\n -> "comp"++(show n)) [1..maxArity])
     in  pprinterSig dtName.(" {"++).nl. -- ("(int constr, TP_ T0) {"++).nl.
-        (if length comps > 0 then
+        (if not (null comps) then
              tab.("Susp "++).((concat comps)++).semi.nl
          else
-             id
-        ).
+             id).
         tab.("TP_ constr_tp = CPTR(i);"++).nl.
         tab.("switch (CONSTR(i)) {"++).nl.
         foldDot (prettyPrinterConstr cids) constrs.
@@ -395,7 +394,7 @@ builtinConstrsC opts =
   b_Cons opts.
   b_Nil  opts.
   b_Unit opts.
-  foldDot (b_Tuple opts) b_tupleSizes
+  foldDot (b_Tuple opts) bTupleSizes
   
 -- | Generates the declarations for the built-in constructors and their formals.
 builtinConstrsDecls :: Options -> ShowS
@@ -413,7 +412,7 @@ builtinConstrsDecls opts =
       mkDefineVar gc bf_cons_1 bf_Cons 1.
       extern.declF opts (bf_Nil, (0, 0, 0)).
       extern.declF opts (bf_Unit, (0, 0, 0)).
-      foldDot declTuple b_tupleSizes
+      foldDot declTuple bTupleSizes
       
 -- | The (value arity, args arity, nesting) data for built-in functions. 
 bfsLARInfo :: [(QName, (Int, Int, Int))]

@@ -10,7 +10,7 @@ module SLIC.Front.TypeInfer (isValidFL, makeTEnv, readTypeSigs,
 import Prelude hiding (lookup)
 import Data.List (lookup, nub, sort)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import SLIC.AuxFun (ierr, errM, trace2)
 import SLIC.Constants (bMod)
 import SLIC.Front.Preprocessor (genProjSelTEnv)
@@ -122,7 +122,7 @@ freeST (STground _)   = []
 freeST (STfunc t1 t2) =
     let l1 = freeST t1
         l2 = freeST t2
-    in  l1 ++ filter (\v -> not (elem v l1)) l2
+    in  l1 ++ filter (\v -> notElem v l1) l2
 
 type STEnv = Map.Map QName SType
 type STSub = Map.Map STVar SType
@@ -412,8 +412,8 @@ inferE cs an e =
               -- return tl
           liftST (Just (STground (T cTypes)))
           -- liftST (Just (STthunk tl))
-        inferE_ (LetF _ _ _) = ierr "type inference does not support let-bindings (is lambda-lifting on?)"
-        inferE_ (LamF _ _ _) = ierr "type inference does not support lambdas (is lambda-lifting on?)"
+        inferE_ (LetF {}) = ierr "type inference does not support let-bindings (is lambda-lifting on?)"
+        inferE_ (LamF {}) = ierr "type inference does not support lambdas (is lambda-lifting on?)"
         inferE_ e' =
           ierr $ "Malformed expression during type inference: "++(pprint e' "")
     in  debugST "goal" ((pprint e "") ++ "\n") >>
@@ -428,8 +428,7 @@ makeFunc (t : tl) tr0 = STfunc t (makeFunc tl tr0)
 typeOfConstr :: CstrName -> [Data] -> DTName
 typeOfConstr c ds =
   let matchedDT = filter (hasConstr c) ds
-      hasConstr c' (Data _ _ constrs) =
-        (length (filter (isTheConstr c') constrs)) > 0
+      hasConstr c' (Data _ _ constrs) = any (isTheConstr c') constrs
       isTheConstr cName (DConstr cName' _ _) = (cName==cName')
       Data dtName _ _ =
         case matchedDT of
@@ -680,7 +679,7 @@ calcImportsTEnv imports =
             case impT imp of
               Just t  -> Just (n, (t, impA imp))
               Nothing -> ierr "type checking found untyped imports"
-  in  Map.fromList $ catMaybes $ map mkImpType $
+  in  Map.fromList $ mapMaybe mkImpType $
       concatMap Map.toList $ Prelude.map ideclINames imports
 
 -- | Runs type inference on a module, returning the typing environment.
@@ -708,7 +707,7 @@ typeInferMod useAnnot (Mod (m, _) _ imports p@(Prog dts defs) tAnnot (TcInfo [] 
             ierr $ "arity not filled in for imported name "++(qName f)
           Nothing ->
             ierr $ "No type found for imported function "++(qName f)
-      frmTypes = Map.mapWithKey (\f frms->typesOfFrms f frms) funcSigs
+      frmTypes = Map.mapWithKey typesOfFrms funcSigs
       frmsEnv  = Map.fromList $ concat $ Map.elems frmTypes 
       -- final environment, no arities
       fEnv = refuncEnv $ Map.union initTEnv frmsEnv

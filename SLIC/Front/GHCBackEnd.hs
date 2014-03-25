@@ -42,7 +42,7 @@ transfCore opts dfs binds tyCons =
       exports   = empty
       tAnnot    = getVTypesCore dfs defaultMod binds
       tcs       = TcInfo [] []     -- TODO: handle type classes in this back-end
-      moduleFL  = (Mod fm exports [] (Prog datatypes defs)) tAnnot tcs      
+      moduleFL  = Mod fm exports [] (Prog datatypes defs) tAnnot tcs      
   in  -- trace2 (showPPr dfs binds) $
       -- trace2 "========================" $
       trace2 (pprint moduleFL "") $
@@ -158,16 +158,16 @@ nm dfs id0 = showPPr dfs (nameOccName (idName id0))
 
 -- | Identifies the constructor of an expression, used for debugging.
 ident :: forall a. CoreExpr -> a
-ident (Var _) = error "@@Var@@"
-ident (Lit _) = error "@@Lit@@"
-ident (App _ _) = error "@@App@@"
-ident (Lam _ _) = error "@@Lam@@"
-ident (Let _ _) = error "@@Let@@"
-ident (Case _ _ _ _) = error "@@Case@@"
-ident (Cast _ _) = error "@@Cast@@"
-ident (Tick _ _) = error "@@Tick@@"
-ident (Type _) = error "@@Type@@"
-ident (Coercion _) = error "@@Coercion@@"
+ident (Var {})      = error "@@Var@@"
+ident (Lit {})      = error "@@Lit@@"
+ident (App {})      = error "@@App@@"
+ident (Lam {})      = error "@@Lam@@"
+ident (Let {})      = error "@@Let@@"
+ident (Case {})     = error "@@Case@@"
+ident (Cast {})     = error "@@Cast@@"
+ident (Tick {})     = error "@@Tick@@"
+ident (Type {})     = error "@@Type@@"
+ident (Coercion {}) = error "@@Coercion@@"
 
 -- | Flattens nested function applications. Translates special GHC Core
 --   functions and operators.
@@ -201,9 +201,9 @@ flatten dfs (Var f) args =
       else if appNameS `elem` (map lName cBuiltinFuncs) then
              case appNameS of
                "I#" ->
-                 if length args /= 1 then 
-                   error "I# should be applied to one integer"
-                 else transArgs !! 0 -- ConF (pprint (transArgs !! 0) "") []
+                 case (args, transArgs) of
+                   ([_], [transArg0]) -> transArg0
+                   _                  -> ierr "I# error"
                -- "unpackCString#" -> 
                --   case args of {
                --     [Lit (MachStr str)] -> mkStrList $ unpackFS str ;
@@ -273,17 +273,15 @@ processPatMatch scrOpt datatypes defs =
                 tPats = filter (testForConstr const_GHC_Types_True ) pats
                 fPats = filter (testForConstr const_GHC_Types_False) pats
             in  if c `elem` cOpsBool then
-                  if length tPats == 1 && length fPats == 1 then
-                    let (PatB _ tExpr) = tPats !! 0
-                        (PatB _ fExpr) = fPats !! 0                        
-                    in  if bnd /= underscoreVar &&
-                           countVarUses si (V bnd) tExpr == 0 &&
-                           countVarUses si (V bnd) fExpr == 0 then
-                          ConF (CN CIf) [e, tExpr, fExpr]
-                        else
-                          error "boolean pattern matching uses binder"
-                  else
-                    error "boolean pattern matching without 2 branches"
+                  case (tPats, fPats) of
+                    ([PatB _ tExpr], [PatB _ fExpr]) ->
+                      if bnd /= underscoreVar &&
+                         countVarUses si (V bnd) tExpr == 0 &&
+                         countVarUses si (V bnd) fExpr == 0 then
+                        ConF (CN CIf) [e, tExpr, fExpr]
+                      else
+                        error "boolean pattern matching uses binder"
+                    _ -> error "boolean pattern matching without 2 branches"
                 else
                   error $ "strange builtin scrutinee: "++(show e)
           _ ->
@@ -327,11 +325,11 @@ processPatMatch scrOpt datatypes defs =
                    LetF Nothing [DefF bnd [] e] (
                      CaseF d (XF (V bnd)) underscoreVar (map (procPMP si) pats)
                    )
-      procPME _ (LetF _ _ _) =
+      procPME _ (LetF {}) =
         error "TODO: procPME/si for let"
       -- procPME si (LetF d binds e) =
         -- LetF d (map procPMD binds) (procPME si e)
-      procPME _ (LamF _ _ _) =
+      procPME _ (LamF {}) =
         error "TODO: procPME/si for lambda"
       -- procPME si (LamF d v e) =
         -- LamF d v (procPME e)
@@ -356,9 +354,9 @@ coreGHC dflags file _ _ =
        -- coreMod <- compileToCoreSimplified file
 #if __GLASGOW_HASKELL__ >= 706
        hscEnv <- getSession
-       corePrep <- return $ corePrepPgm dflags hscEnv (cm_binds coreMod) []
+       let corePrep = corePrepPgm dflags hscEnv (cm_binds coreMod) []
 #else
-       corePrep <- return $ corePrepPgm dflags (cm_binds coreMod) []
+       let corePrep = corePrepPgm dflags (cm_binds coreMod) []
 #endif       
        dflagsFinal <- getSessionDynFlags
-       return $ (dflagsFinal, corePrep)
+       return (dflagsFinal, corePrep)

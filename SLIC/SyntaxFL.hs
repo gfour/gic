@@ -92,7 +92,7 @@ data SimplePat = SPat CstrName [QName]
 -- | Pretty printer for simple patterns.
 instance PPrint SimplePat where
   pprint (SPat c bvs) =
-    pprint c.spaces (if bvs == [] then 0 else 1).showStrings " " (map qName bvs)
+    pprint c.spaces (if null bvs then 0 else 1).showStrings " " (map qName bvs)
 
 -- | Full FL patterns.
 data FullPat = FPatC CstrName [FullPat]      -- ^ constructor pattern
@@ -177,7 +177,7 @@ instance PPrint a => PPrint (ExprFL a) where
 
 instance PPrint a => PPrint (DefFL a) where
   pprintPrec _ (DefF vn ps e) =
-    pprint vn.(if length ps == 0 then id else spaces 1).
+    pprint vn.(if null ps then id else spaces 1).
     showStrings " " (map (qName.fstFrm) ps).(" = " ++).pprintPrec 0 e.semi
 
 -- * Built-in operators and functions in FL
@@ -242,7 +242,7 @@ isConstr [] = ierr "isConstr: empty string"
 constrExists :: [Data] -> CstrName -> Bool
 constrExists [] _ = False
 constrExists ((Data _ _ dcs):ds) c =
-  (length (filter (\(DConstr c' _ _)->c==c') dcs) > 0) || (constrExists ds c)
+  (any (\(DConstr c' _ _)->c==c') dcs) || (constrExists ds c)
 
 -- | Check if the original FL program is valid (does not check datatype sanity).
 isValidFL :: ModF -> TEnv -> Bool
@@ -284,8 +284,8 @@ isValidFL m xl =
         in  pFlag && eFlag
       -- it is assumed that constructors are used correctly
       chk (ConstrF _ el) flag = chkL el flag
-      chk (LetF _ _ _) _ = ierr "chk: let-binding found"
-      chk (LamF _ _ _) _ = ierr "chk: lambda found"
+      chk (LetF {}) _ = ierr "chk: let-binding found"
+      chk (LamF {}) _ = ierr "chk: lambda found"
       chkL [] flag = flag
       chkL (e : el) flag =	    
         let flag' = chk e flag
@@ -348,7 +348,7 @@ countVarUses si v (FF _ el) =
     sum (map (countVarUses si v) el)
 countVarUses si@(scrOpt, frms) v (CaseF _ e _ pats) =
   let maxVU [] = 0
-      maxVU ps = maximum (map (countVarUses si v) (map (\(PatB _ eP)->eP) ps))
+      maxVU ps = maximum (map (countVarUses si v . (\(PatB _ eP)->eP)) ps)
       scrutVU =
         case (e, v) of
           (XF (V eV), V vV) | scrOpt && (eV==vV) && (vV `elem` frms) -> 2
@@ -366,14 +366,14 @@ areBound [] _ = False
 -- assumption: free variables are not bound
 areBound _ (XF (V _)) = False
 areBound bvars (XF (BV v loc)) = (v, loc) `elem` bvars
-areBound bvars (ConF _ el) = or (map (areBound bvars) el)
+areBound bvars (ConF _ el) = any (areBound bvars) el
 -- we do not check the function name in applications, as bound vars
 -- are always first-order
-areBound bvars (FF _ el) = or (map (areBound bvars) el)
-areBound bvars (ConstrF _ el) = or (map (areBound bvars) el)
+areBound bvars (FF _ el) = any (areBound bvars) el
+areBound bvars (ConstrF _ el) = any (areBound bvars) el
 areBound bvars (CaseF _ e' _ pats') = 
   or ((areBound bvars e') : (map (\(PatB _ e) -> areBound bvars e) pats'))
-areBound _ (LetF _ _ _) =
+areBound _ (LetF {}) =
   ierr "areBound: let-binding encountered"
 areBound bvars (LamF _ _ e) = areBound bvars e
 
@@ -391,11 +391,11 @@ gatherStrictVars m =
 -- * Strings
 
 -- | Converts a 'Char' to an FL integer.
-charToInt :: Char -> (ExprFL a)
+charToInt :: Char -> ExprFL a
 charToInt c = ConF (LitInt (ord c)) []
 
 -- | Converts a 'String' to an FL list.
-mkStrList :: String -> (ExprFL a)
+mkStrList :: String -> ExprFL a
 mkStrList [] = FF (V bf_Nil) []
 mkStrList (ch:chs) = FF (V bf_Cons) [charToInt ch, mkStrList chs]
 
@@ -410,8 +410,8 @@ hasLs p =
       hasLE (ConstrF _ el) = any hasLE el
       hasLE (CaseF _ e _ pats) =
         or ((hasLE e):(map (\(PatB _ eP)->hasLE eP) pats))
-      hasLE (LetF _ _ _) = True
-      hasLE (LamF _ _ _) = True
+      hasLE (LetF {}) = True
+      hasLE (LamF {}) = True
   in  any hasLD defs
       
 -- | Generates the pattern-matching-depth table for a list of FL definitions.
@@ -431,6 +431,6 @@ countPMDepths defs =
         let countP (PatB _ eP) = countE eP
         in  maximum ((dOfLoc loc):((countE e):(map countP pats)))
       -- These constructs are not supported, we assume lambda lifted code.
-      countE (LetF _ _ _) = ierr "countE: found let"
-      countE (LamF _ _ _) = ierr "countE: found lambda"
+      countE (LetF {}) = ierr "countE: found let"
+      countE (LamF {}) = ierr "countE: found lambda"
   in  fromList $ map countD defs

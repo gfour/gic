@@ -36,11 +36,11 @@ getVTypes dflags prog =
                        in  length lPats
                      _ -> error "vtBind: only one match is allowed"
             fI   = (f_qn, (f_t, Just f_ar))            
-        in  [fI]++(vtMatches mGroup)
+        in  fI : (vtMatches mGroup)
       vtBind (PatBind {}) = ierr "vtBind: found PatBind"
       vtBind vb@(VarBind {}) = 
         let (v_qn, v_t) = vtId $ var_id vb
-        in  [(v_qn, (v_t, Nothing))]++(vtExprU $ var_rhs vb)
+        in  (v_qn, (v_t, Nothing)) : (vtExprU $ var_rhs vb)
       vtMatch (Match mPats _ gs) = (concatMap (vtPat.unLoc) mPats)++(vtGRHSs gs)
       vtMatches (MatchGroup lMatches t) = concatMap (vtMatch.unLoc) lMatches
       vtGRHSs gs =
@@ -56,64 +56,65 @@ getVTypes dflags prog =
             in  concatMap vtGRHS gs'
       vtGRHS (GRHS [] e) = vtExpr $ unLoc e
       vtGRHS (GRHS _ _) = error "vtGRHSs: full guard is not supported."
-      vtExpr (HsVar _) = []
-      vtExpr (HsIPVar _) = error "vtExpr: HsIPVar is not supported"
-      vtExpr (HsOverLit _) = []
-      vtExpr (HsLit _) = []
-      vtExpr (HsLam matches) = vtMatches matches
-      vtExpr (HsApp f x) = (vtExprU f)++(vtExprU x)
-      vtExpr (OpApp op a _ b) = (vtExprU op)++(vtExprU a)++(vtExprU b)
-      vtExpr (NegApp e _) = vtExprU e
-      vtExpr (HsPar e) = vtExprU e
-      vtExpr (SectionL _ _) = error "vtExpr: found SectionL"
-      vtExpr (SectionR _ _) = error "vtExpr: found SectionR"
+      vtExpr (HsVar _)              = []
+      vtExpr (HsIPVar _)            = error "vtExpr: HsIPVar is not supported"
+      vtExpr (HsOverLit _)          = []
+      vtExpr (HsLit _)              = []
+      vtExpr (HsLam matches)        = vtMatches matches
+      vtExpr (HsApp f x)            = (vtExprU f)++(vtExprU x)
+      vtExpr (OpApp op a _ b)       = (vtExprU op)++(vtExprU a)++(vtExprU b)
+      vtExpr (NegApp e _)           = vtExprU e
+      vtExpr (HsPar e)              = vtExprU e
+      vtExpr (SectionL _ _)         = error "vtExpr: found SectionL"
+      vtExpr (SectionR _ _)         = error "vtExpr: found SectionR"
       vtExpr (ExplicitTuple args _) = 
         let vtArg (Present e) = vtExprU e
             vtArg (Missing _) = [] 
         in  concatMap vtArg args
-      vtExpr (HsCase e matches) = (vtExprU e)++(vtMatches matches)
-      vtExpr (HsIf _ cond eT eF) = (vtExprU cond)++(vtExprU eT)++(vtExprU eF)
+      vtExpr (HsCase e matches)     = (vtExprU e)++(vtMatches matches)
+      vtExpr (HsIf _ cond eT eF)    = (vtExprU cond)++(vtExprU eT)++(vtExprU eF)
       vtExpr (HsLet (HsValBinds vBinds) e) = (vtVBinds vBinds)++(vtExpr $ unLoc e)
-      vtExpr (HsDo _ _ _) = error "vtExpr: found HsDo"
-      vtExpr (ExplicitList _ el) = concatMap vtExprU el
-      vtExpr (ExplicitPArr _ _) = error "vtExpr: found ExplicitPArr"
-      vtExpr (RecordCon _ _ _) = error "vtExpr: found RecordCon"
-      vtExpr (RecordUpd _ _ _ _ _) = error "vtExpr: found RecordUpd"
-      vtExpr (ExprWithTySig _ _) = error "vtExpr: found ExprWithTySig"
-      vtExpr (ExprWithTySigOut _ _) = error "vtExpr: found ExprWithTySigOut"
-      vtExpr (ArithSeq _ _) = error "vtExpr: found ArithSeq"
-      vtExpr (PArrSeq _ _) = error "vtExpr: found PArrSeq"
-      vtExpr (HsSCC _ _) = error "vtExpr: found HsSCC"
-      vtExpr (HsCoreAnn _ _) = error "vtExpr: found HsCoreAnn"
-      vtExpr (HsBracket _) = error "vtExpr: found HsBracket"
-      vtExpr (HsBracketOut _ _) = error "vtExpr: found HsBracket"
-      vtExpr (HsSpliceE _) = error "vtExpr: found HsSpliceE"
-      vtExpr (HsQuasiQuoteE _) = error "vtExpr: found HsQuasiQuoteE"
-      vtExpr (HsProc _ _) = error "vtExpr: found HsProc"
-      vtExpr (HsArrApp _ _ _ _ _) = error "vtExpr: found HsArrApp"
-      vtExpr (HsArrForm _ _ _) = error "vtExpr: found HsArrForm"
-      vtExpr (HsTick _ _) = error "vtExpr: found HsTick"
-      vtExpr (HsBinTick _ _ _) = error "vtExpr: found HsBinTick"
-      vtExpr (HsTickPragma _ _) = error "vtExpr: found HsTickPragma"
-      vtExpr EWildPat = []
-      vtExpr (EAsPat _ _) = error "vtExpr: found EAsPat"
-      vtExpr (EViewPat _ _) = error "vtExpr: found EViewPat"
-      vtExpr (ELazyPat e) = vtExprU e
-      vtExpr (HsType _) = error "vtExpr: found HsType"
-      vtExpr (HsWrap _ e) = vtExpr e
-      vtExpr e = error $ "vtExpr: unsupported expression: "++(showSDoc dflags $ ppr e) -- ++" of type "++(show $ typeOf1 e)
-      vtExprU e = vtExpr $ unLoc e
-      vtVBinds (ValBindsIn _ _) = error "vtVBinds: found ValBindsIn"
+      vtExpr (HsDo {})              = error "vtExpr: found HsDo"
+      vtExpr (ExplicitList _ el)    = concatMap vtExprU el
+      vtExpr (ExplicitPArr {})      = error "vtExpr: found ExplicitPArr"
+      vtExpr (RecordCon {})         = error "vtExpr: found RecordCon"
+      vtExpr (RecordUpd {})         = error "vtExpr: found RecordUpd"
+      vtExpr (ExprWithTySig {})     = error "vtExpr: found ExprWithTySig"
+      vtExpr (ExprWithTySigOut {})  = error "vtExpr: found ExprWithTySigOut"
+      vtExpr (ArithSeq {})          = error "vtExpr: found ArithSeq"
+      vtExpr (PArrSeq {})           = error "vtExpr: found PArrSeq"
+      vtExpr (HsSCC {})             = error "vtExpr: found HsSCC"
+      vtExpr (HsCoreAnn {})         = error "vtExpr: found HsCoreAnn"
+      vtExpr (HsBracket {})         = error "vtExpr: found HsBracket"
+      vtExpr (HsBracketOut {})      = error "vtExpr: found HsBracket"
+      vtExpr (HsSpliceE {})         = error "vtExpr: found HsSpliceE"
+      vtExpr (HsQuasiQuoteE {})     = error "vtExpr: found HsQuasiQuoteE"
+      vtExpr (HsProc {})            = error "vtExpr: found HsProc"
+      vtExpr (HsArrApp {})          = error "vtExpr: found HsArrApp"
+      vtExpr (HsArrForm {})         = error "vtExpr: found HsArrForm"
+      vtExpr (HsTick {})            = error "vtExpr: found HsTick"
+      vtExpr (HsBinTick {})         = error "vtExpr: found HsBinTick"
+      vtExpr (HsTickPragma {})      = error "vtExpr: found HsTickPragma"
+      vtExpr EWildPat               = []
+      vtExpr (EAsPat {})            = error "vtExpr: found EAsPat"
+      vtExpr (EViewPat {})          = error "vtExpr: found EViewPat"
+      vtExpr (ELazyPat e)           = vtExprU e
+      vtExpr (HsType {})            = error "vtExpr: found HsType"
+      vtExpr (HsWrap _ e)           = vtExpr e
+      vtExpr e                      =
+        error $ "vtExpr: unsupported expression: "++(showSDoc dflags $ ppr e) -- ++" of type "++(show $ typeOf1 e)
+      vtExprU e                     = vtExpr $ unLoc e
+      vtVBinds (ValBindsIn {})           = error "vtVBinds: found ValBindsIn"
       vtVBinds (ValBindsOut vBindsOut _) = 
         concatMap (\(_, lBinds) -> vtBinds lBinds) vBindsOut
       vtPat (VarPat vId) =
         let (vId_qn, vId_t) = vtId vId
         in  [(vId_qn, (vId_t, Nothing))]
-      vtPat (ListPat lPats _)    = concatMap (vtPat.unLoc) lPats
-      vtPat (TuplePat lPats _ _) = concatMap (vtPat.unLoc) lPats
-      vtPat (LitPat _) = []
-      vtPat (ConPatOut {}) = []
-      vtPat (CoPat _ p _) = vtPat p
+      vtPat (ListPat lPats _)       = concatMap (vtPat.unLoc) lPats
+      vtPat (TuplePat lPats _ _)    = concatMap (vtPat.unLoc) lPats
+      vtPat (LitPat _)              = []
+      vtPat (ConPatOut {})          = []
+      vtPat (CoPat _ p _)           = vtPat p
       vtPat p = error $ "vtPat: found pattern: "++(showSDoc dflags $ ppr p)
       vtId vId =
         let v_vn = varName vId
@@ -185,4 +186,4 @@ tcGHC _ file mNames mg =
      -- n <- getNamesInScope
      -- c <- return $ coreModule d
      dflagsFinal <- getSessionDynFlags
-     return $ (dflagsFinal, tMod)
+     return (dflagsFinal, tMod)

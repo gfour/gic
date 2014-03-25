@@ -41,8 +41,7 @@ import SLIC.Types
 linkWithDf :: DfFlags -> DFI -> ProgL -> (ModL, ProgInfo)
 linkWithDf flags dfi p =
   let (modDF, pInfo) = genDfModLAR flags dfi
-      pDF = modProg $ modDF
-  in  (modDF{modProg=(concatProgs [p, pDF])}, pInfo)
+  in  (modDF{modProg = concatProgs [p, modProg modDF]}, pInfo)
 
 -- | Generates defunctionalization's LAR module. Also returns information
 --   required by later stages of compilation. Takes the merged DFI of all

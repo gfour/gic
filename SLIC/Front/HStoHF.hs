@@ -6,7 +6,7 @@
 module SLIC.Front.HStoHF (fromHStoHF, mkStrList) where
 
 import Data.Map (empty, filterWithKey, fromList)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 import qualified Language.Haskell.Exts.Syntax as S
 import SLIC.AuxFun (errM, ierr)
 import SLIC.Constants (tcMod)
@@ -48,9 +48,9 @@ fromHStoHF :: Options -> FPath -> S.Module -> (ModF, [TcInstF])
 fromHStoHF opts fp (S.Module _ (S.ModuleName m) _ _ exports imports decls) =
     let fm = (m, fp)
         dataDecls [] = []
-        dataDecls (d@(S.DataDecl _ _ _ _ _ _ _) : ds) =
+        dataDecls (d@(S.DataDecl {}) : ds) =
             (transl_dt fm d) : (dataDecls ds)
-        dataDecls (d@(S.GDataDecl _ _ _ _ _ _ _ _) : ds) =
+        dataDecls (d@(S.GDataDecl {}) : ds) =
             (transl_dt fm d) : (dataDecls ds)
         dataDecls (_ : ds) = dataDecls ds
         (st1, fDecls) = funDecls opts fm decls (0)
@@ -78,7 +78,7 @@ funDecls :: Options -> MNameF -> [S.Decl] -> TState -> TInfo [DefFH]
 funDecls opts fm decls stI =
   let funDecls_aux :: [S.Decl] -> TState -> TInfo [DefFH]
       funDecls_aux [] st = (st, [])
-      funDecls_aux (d@(S.PatBind _ _ _ _ _) : ds) st =
+      funDecls_aux (d@(S.PatBind {}) : ds) st =
         let (st1, d' ) = transl_def opts fm d st
             (st2, ds') = funDecls_aux ds st1
         in  (st2, d' : ds')
@@ -90,13 +90,13 @@ funDecls opts fm decls stI =
         let (st1, d' ) = transl_fbind opts fm matches st
             (st2, ds') = funDecls_aux ds st1
         in  (st2, d' : ds')
-      funDecls_aux ((S.DataDecl _ _ _ _ _ _ _) : ds) st = funDecls_aux ds st
-      funDecls_aux ((S.ClassDecl _ _ _ _ _ _) : ds) st  = funDecls_aux ds st
-      funDecls_aux ((S.InstDecl _ _ _ _ _) : ds) st     = funDecls_aux ds st
-      funDecls_aux ((S.TypeSig _ _ _) : ds) st          = funDecls_aux ds st
-      funDecls_aux ((S.GDataDecl _ _ _ _ _ _ _ _) : ds) st = funDecls_aux ds st
+      funDecls_aux ((S.DataDecl {}) : ds) st  = funDecls_aux ds st
+      funDecls_aux ((S.ClassDecl {}) : ds) st = funDecls_aux ds st
+      funDecls_aux ((S.InstDecl {}) : ds) st  = funDecls_aux ds st
+      funDecls_aux ((S.TypeSig {}) : ds) st   = funDecls_aux ds st
+      funDecls_aux ((S.GDataDecl {}) : ds) st = funDecls_aux ds st
       funDecls_aux (e : _) _ =
-        errM fm $ "unsupported piece of Haskell syntax: " ++ (show e)
+        errM fm $ "unsupported piece of Haskell syntax: "++(show e)
   in  funDecls_aux decls stI
 
 -- | Translates Haskell type class declarations to FL metadata information, to
@@ -120,10 +120,10 @@ tcDecls fm decls =
         errM fm "Class type list length not 1 (feature not supported yet)."
       tcDecl (S.ClassDecl _ [] _ [S.KindedVar _ _] _ _) =
         errM fm "Kinded variables in class declarations are not supported."
-      tcDecl (S.ClassDecl _ _ _ _ _ _) =
+      tcDecl (S.ClassDecl {}) =
         ierr "Malformed class declaration."
       tcDecl _ = Nothing
-  in  catMaybes $ map tcDecl decls
+  in  mapMaybe tcDecl decls
 
 -- | Translate type class instance methods to FL instance definitions (to
 --   be desugared to plain FL definitions at a later stage).
@@ -136,18 +136,18 @@ tcInstDecls opts fm ((S.InstDecl _ ctxt clName iTypes iDecls) : ds) st =
         if all isInsDecl decls then
           funDecls opts fm (map (\(S.InsDecl d)->d) decls) st0
         else
-          errM fm $ "clInstDecls: found special instance declaration."
+          errM fm "clInstDecls: found special instance declaration."
   in  case ctxt of
       [] ->
         case iTypes of
           [] -> errM fm $ "class instance "++clNameStr++" has no types"
-          (_:_:_) -> errM fm $ "class instance has > 1 types"
+          (_:_:_) -> errM fm "class instance has > 1 types"
           [iType] ->
             let (st1, tcInstMethods) = clInstDecls iDecls st
                 tcInst = TcInst clNameStr (transl_type fm iType) tcInstMethods
                 (st2, tcInsts) = tcInstDecls opts fm ds st1
             in  (st2, tcInst:tcInsts)
-      _  -> errM fm $ "class instance contexts are not supported yet"
+      _  -> errM fm "class instance contexts are not supported yet"
 tcInstDecls _ _ [] st = (st, [])
 tcInstDecls opts fm (_:ds) st = tcInstDecls opts fm ds st
 
@@ -236,7 +236,7 @@ transl_dt fm (S.GDataDecl _ S.DataType _ gadtName tvs _ constrs _) =
       as = map transl_dt_tv tvs
   in  Data dtId as cs
 transl_dt fm x =
-    errM fm $ "transl_dt: unhandled Haskell construct" ++ (show x)
+    errM fm $ "transl_dt: unhandled Haskell construct"++(show x)
 
 -- | Translates the type variable bindings in data type declarations.
 transl_dt_tv :: S.TyVarBind -> SName
@@ -308,8 +308,7 @@ transl_type fm typ =
                         (show maxTupleSize)
               else
                 mkTupleT $ map (transl_type fm) hts
-        S.TyTuple S.Unboxed _ ->
-          error $ "Unboxed tuples are not supported."
+        S.TyTuple S.Unboxed _ -> error "Unboxed tuples are not supported."
         _ ->  errM fm $ "Unsupported type in data declaration: "++(show typ)
 
 -- | Definition translation.
@@ -334,7 +333,7 @@ transl_def opts fm (S.FunBind [S.Match _ hsName pats _ rhs _]) st =
         (st1, eFL) = transl_e opts fm body st
     in  (st1, DefF defQName formals eFL)
 transl_def _ fm x _ =
-    errM fm $ "transl_def: unhandled Haskell construct: " ++ (show x)
+    errM fm $ "transl_def: unhandled Haskell construct: "++(show x)
 
 -- | Generate an FL definition from a simple "x = ..." binding.
 mkDefF :: Options -> MNameF -> S.Pat -> S.Exp -> TState -> TInfo DefFH
@@ -359,33 +358,32 @@ transl_e opts fm app@(S.App _ _) st =
       findFName (S.App f _)         = findFName f
       findFName (S.Paren x)         = findFName x
       findFName x =
-          errM fm $ "findFName: unhandled Haskell construct, " ++ (show x)
+          errM fm $ "findFName: unhandled Haskell construct, "++(show x)
       gatherArgs (S.App (S.Var _) arg) = [arg]
       gatherArgs (S.App (S.Con _) arg) = [arg]
       gatherArgs (S.App (S.Lambda _ _ _) arg) = [arg]
       gatherArgs (S.App (S.Paren f) arg) = gatherArgs (S.App f arg)
       gatherArgs (S.App f arg)         = (gatherArgs f) ++ [arg]
       gatherArgs (S.Paren x)           = gatherArgs x
-      gatherArgs lam@(S.Lambda _ _ _)  = [lam]
+      gatherArgs lam@(S.Lambda {})     = [lam]
       gatherArgs x =
-          errM fm $ "gatherArgs: unhandled Haskell construct, " ++ (show x)
+          errM fm $ "gatherArgs: unhandled Haskell construct, "++(show x)
       isConstructor (S.App (S.Var _) _) = False
       isConstructor (S.App (S.Con _) _) = True
       isConstructor (S.InfixApp _ f _)  =
         case f of S.QVarOp _ -> False ; S.QConOp _ -> True
       isConstructor (S.App f _)         = isConstructor f
       isConstructor (S.Paren x)         = isConstructor x
-      isConstructor (S.Lambda _ _ _)    = False
+      isConstructor (S.Lambda {})       = False
       isConstructor x =
-          errM fm $ "isConstructor: unhandled Haskell construct, " ++ (show x)
-      isLam (S.Var _)           = False
-      isLam (S.Con _)           = False
-      isLam (S.InfixApp _ _ _)  = False
-      isLam (S.App f _)         = isLam f
-      isLam (S.Paren x)         = isLam x
-      isLam (S.Lambda _ _ _)    = True
-      isLam x =
-          errM fm $ "isLam: unhandled Haskell construct, " ++ (show x)
+          errM fm $ "isConstructor: unhandled Haskell construct, "++(show x)
+      isLam (S.Var _)       = False
+      isLam (S.Con _)       = False
+      isLam (S.InfixApp {}) = False
+      isLam (S.App f _)     = isLam f
+      isLam (S.Paren x)     = isLam x
+      isLam (S.Lambda {})   = True
+      isLam x = errM fm $ "isLam: unhandled Haskell construct, "++(show x)
       fName = findFName app
       (st1, argsF) =
         mapTI st (transl_e opts fm) (gatherArgs app)
@@ -393,7 +391,7 @@ transl_e opts fm app@(S.App _ _) st =
         (st1, ConstrF fName argsF)
       else if isLam app then
              let (st2, lamName) = freshName st1
-                 innerLam lam@(S.Lambda _ _ _) = lam
+                 innerLam lam@(S.Lambda {}) = lam
                  innerLam (S.App f _) = innerLam f
                  innerLam (S.Paren x) = innerLam x
                  innerLam x = ierr $ "leftmost expression is not lambda: "++(show x)
@@ -442,7 +440,7 @@ transl_e _ fm (S.Lit l) st =
   let l' = case l of
              S.Char ch    -> charToInt ch
              S.String str -> mkStrList str
-             _            -> errM fm $ "unhandled literal " ++ (show l)
+             _            -> errM fm $ "unhandled literal "++(show l)
   in  (st, l')
 transl_e opts fm (S.Let binds e) st =
   let (st1, bindsFL) = transl_let_binds opts fm binds st
@@ -492,7 +490,7 @@ transl_e opts fm (S.Tuple el) st =
       else
         (st1, ConstrF (bf_Tuple elN) el1)
 transl_e _ fm x _ =
-  errM fm $ "transl_e: unhandled Haskell construct, " ++ (show x)
+  errM fm $ "transl_e: unhandled Haskell construct, "++(show x)
 
 mkLambdaLet :: Options -> QName -> [QName] -> ExprFH -> ExprFH -> ExprFH
 mkLambdaLet opts lamName fs eBind e =
@@ -505,10 +503,10 @@ transl_fbind opts fm matches st =
       fQ = getQNameN f
       newFrms = map (\i ->procLName (\x->x++"$"++(show i)) fQ) [0..length ps-1]
       mkFrm qn = Frm qn False      -- assumed non-strict as in transl_def
-      mkExp qn = XF $ V $ qn
+      mkExp qn = XF (V qn)
       mkMatch (S.Match _ _ pats _ (S.UnGuardedRhs eR) _) st0 =
         let (st1, eR') = transl_e opts fm eR st0
-        in  (st1, (map (\p->mkPat fm p) pats, Nothing, eR'))
+        in  (st1, (map (mkPat fm) pats, Nothing, eR'))
       mkMatch (S.Match _ _ _ _ (S.GuardedRhss _) _) _ =
         error "The parser doesn't support guarded rhs's in fbinds."
       (st2, matchesFH) = mapTI st mkMatch matches
@@ -595,7 +593,7 @@ transl_let_patbind opts fm (S.PatBind _ pat _ rhs _) st =
                     filter (\(v', _)->v'/=underscoreVar) $ zip ps' [0..]
           in  (st3, eDef : (concatMap mkBindDefs bnds))
     _ -> errM fm $ "let-pattern not supported: "++(show pat)
-transl_let_patbind opts fm fbind@(S.FunBind [S.Match _ _ _ _ _ _]) st =
+transl_let_patbind opts fm fbind@(S.FunBind [S.Match {}]) st =
   mapTI st (transl_def opts fm) [fbind]
 transl_let_patbind _ fm decl _ = 
   errM fm $ "let-binding not supported: "++(show decl)
@@ -637,7 +635,7 @@ fp2sp (FPatC c ps) st =
           in  (st''', (eName1, newBnd : (concatMap snd newBnds)))
         (st1, ps') = mapTI st p2s ps
         bvars = map fst ps'
-        -- newBindings = catMaybes $ map snd ps'
+        -- newBindings = mapMaybe snd ps'
     in  (st1, (SPat c bvars, catMaybes $ concatMap snd ps'))
               
 pv2v :: MNameF -> S.Pat -> QName
@@ -668,7 +666,7 @@ mkPat :: MNameF -> S.Pat -> FullPat
 mkPat fm@(m, _) pat =
   case pat of
     S.PVar bv -> FPatV $ QN (Just m) (getName bv)
-    S.PWildCard -> FPatV $ underscoreVar
+    S.PWildCard -> FPatV underscoreVar
     S.PParen pat' -> mkPat fm pat'
     S.PList [] -> FPatC bf_Nil []
     S.PApp (S.Special S.UnitCon) [] -> FPatC bf_Unit []

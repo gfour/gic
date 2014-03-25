@@ -25,7 +25,7 @@ data Nested = N [Maybe Token]
 
 -- | Creates /n/ nested fields, not yet initialized.
 dummyNested :: Int -> Nested
-dummyNested n = N $ take n $ repeat Nothing
+dummyNested n = N $ replicate n Nothing
 
 -- | Branches are used by instructions that depend on other instructions.
 data Branch = Branch Int
@@ -185,7 +185,7 @@ sendMsg p (Msg src dest (token, dchain) rVal@(Response val)) =
               color' = ((i, updNested):token',
                         (src', Branch brn', Just updNested):dchain')
           in  Msgs [ Msg dest patID color' Demand ]
-        Just (CaseT _ _ _) | (brn/=0) ->
+        Just (CaseT {}) | (brn/=0) ->
           Msgs [ Msg dest src' (token, dchain') (Response val) ]
         Just instrT -> ierr $ "no dispatch for Response: "++(pprint instrT "")
         Nothing     -> ierr $ "no instruction #"++(show dest)++" for Response"

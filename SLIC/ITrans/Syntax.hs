@@ -130,13 +130,9 @@ searchDefCaseZ vn1  (Prog cs (_:restdefs)) =
 -- | Searches for a variable declaration in the ZOIL program.
 searchZD :: QName -> ProgZ -> Maybe DefZ
 searchZD vn prog = 
-   if (sDef == Nothing) then 
-      if (sDefCase == Nothing) then Nothing
-       else sDefCase
-    else sDef
-      where
-      sDef	= searchDefZ vn prog
-      sDefCase	= searchDefCaseZ vn prog
+  case searchDefZ vn prog of
+    Nothing -> searchDefCaseZ vn prog
+    sDef -> sDef
 
 -- | Searches a 0-order program for the actuals of a variable.
 searchActuals :: QName -> ProgZ -> [DefZ]
@@ -157,13 +153,13 @@ defVarZ (ActualsZ v _ _) = v
 
 -- | Filter for actuals definitions.
 isActualsZ :: DefZ -> Bool
-isActualsZ (DefZ _ _)       = False
-isActualsZ (ActualsZ _ _ _) = True
+isActualsZ (DefZ {})     = False
+isActualsZ (ActualsZ {}) = True
 
 -- | Filter for function definitions.
 isDefZ :: DefZ -> Bool
-isDefZ (DefZ _ _)       = True
-isDefZ (ActualsZ _ _ _) = False
+isDefZ (DefZ {})     = True
+isDefZ (ActualsZ {}) = False
 
 -- * 0-order program representation for fast lookup
 

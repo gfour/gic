@@ -20,7 +20,7 @@ module SLIC.ITrans.EvalEduction (evalZOILLazy) where
 
 import Data.Map (Map, empty, elems, filter, filterWithKey,
                  insert, keys, lookup, size, toList, update)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
 import SLIC.Constants
 import SLIC.DFI (DFI)
@@ -90,7 +90,7 @@ allocCtxt (t, maxWhSize) idx ctxt st@((_, nextID), wh) =
                 gc t ctxt st
           in  if size whGC' > maxWhSize then
                 error $ "More memory needed, adjust with -maxwh, current value="++
-                        (show $ maxWhSize)
+                        (show maxWhSize)
               else
                 stGC'
         else
@@ -393,5 +393,5 @@ findCCtxtsIn :: CtxtID -> Warehouse -> [CtxtID]
 findCCtxtsIn ctxt wh =
   let lConstrCtxt (Memo (VT (_, ctxtC))) = Just ctxtC
       lConstrCtxt _ = Nothing
-  in  catMaybes $ Prelude.map lConstrCtxt $ Data.Map.elems $
+  in  mapMaybe lConstrCtxt $ Data.Map.elems $
       Data.Map.filterWithKey (\(_, ctxt') _ -> ctxt==ctxt') wh 

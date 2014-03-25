@@ -12,8 +12,8 @@ import SLIC.SyntaxAux (Mod(Mod), Prog(Prog))
 -- | Removes the actuals() operator from constant formals.
 inlineActs :: ModL -> ModL
 inlineActs (Mod m es is (Prog dts blocks) an tcs) =
-  let inlineActsB b@(DefL _ _ _) = b
+  let inlineActsB b@(DefL {}) = b
       inlineActsB   (ActualL v True e@(LARC _ [])) =
         ActualL v False e
-      inlineActsB b@(ActualL _ _ _) = b
+      inlineActsB b@(ActualL {}) = b
   in  Mod m es is (Prog dts (map inlineActsB blocks)) an tcs
