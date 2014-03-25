@@ -19,7 +19,8 @@
 module SLIC.ITrans.EvalEduction (evalZOILLazy) where
 
 import Data.Map (Map, empty, elems, filter, filterWithKey,
-                 insert, keys, lookup, size, toList, update)
+                 insert, keys, lookup, size)
+import qualified Data.IntMap as IM
 import Data.Maybe (catMaybes, mapMaybe)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
 import SLIC.Constants
@@ -41,7 +42,7 @@ type EOpts = (Verb, Int)
 
 -- | A context ID is just an integer that points to the table of allocated
 --   contexts.
-type CtxtID = Integer
+type CtxtID = Int
 
 -- | The flag used during garbage collection to mark live contexts.
 type GCLive = Bool
@@ -59,12 +60,12 @@ pprintECtxt (iidx, cid, n, gcm) =
    in  (", nested: { "++).showStrings ", " nctxts.(" }"++)).
   (", GC: "++).shows gcm.nl
 
-type CTMap = Map CtxtID ECtxt
+type CTMap = IM.IntMap ECtxt
 
 pprintCTMap :: CTMap -> ShowS
 pprintCTMap cmap =
   let aux (ci, ectxt) = (" * "++).shows ci.(" | "++).pprintECtxt ectxt
-  in  foldDot aux (toList cmap)
+  in  foldDot aux (IM.toList cmap)
 
 -- | A table that contains the contexts allocated so far and the next free
 --   context ID.
@@ -95,7 +96,7 @@ allocCtxt (t, maxWhSize) idx ctxt st@((_, nextID), wh) =
                 stGC'
         else
           st
-  in  let tbl' = (insert nextID (idx, ctxt, [], False) tblGC, nextID+1)
+  in  let tbl' = (IM.insert nextID (idx, ctxt, [], False) tblGC, nextID+1)
       in  (if t then
               trace2 $ "Allocated context ["++(pprintIdx idx "")++
                        ":"++(show ctxt)++"] := "++(show nextIDGC) 
@@ -109,7 +110,7 @@ getCtxt ctxtID cmap =
     ierr $ "Cannot look up the top-level context "++(show ctxtID)++".\n"++
            (pprintCTMap cmap "")
   else
-    case Data.Map.lookup ctxtID cmap of
+    case IM.lookup ctxtID cmap of
       Just ctxt -> ctxt
       Nothing   ->
         ierr $ "Could not find context "++(show ctxtID)++" in the contexts table"
@@ -125,14 +126,14 @@ nestCtxtUnder ctxt ctxtTarget (cmap, cn) i =
         (show i)++" but context has size "++(show nLen)
       else let nested' = nested++[Just ctxt]
                newCtxt = (idx, prevCtxt, nested', gcm)
-           in  (Data.Map.update (\_->Just newCtxt) ctxtTarget cmap, cn)
+           in  (IM.update (\_->Just newCtxt) ctxtTarget cmap, cn)
 
 -- | The initial contexts table.
 initCtxtsTable :: CtxtsTable
-initCtxtsTable = (Data.Map.empty, initCtxtID+1)
+initCtxtsTable = (IM.empty, initCtxtID+1)
 
 -- | The context ID of the top-level context.
-initCtxtID :: Integer
+initCtxtID :: Int
 initCtxtID = 0
 
 -- | Returns the i-th context already nested under another context.
@@ -343,7 +344,7 @@ gc t ctxt ((cmap, cid), wh) =
                      Data.Map.filter (\x->x==Pending) wh
       cmap'' = foldr (markLive wh) cmap' pendingCtxts
       -- find all contexts that have 'prev' pointers pointing to this context
-      nextCtxts = Data.Map.keys $ Data.Map.filterWithKey
+      nextCtxts = IM.keys $ IM.filterWithKey
                   (\_ (_, prevCtxt', _, _)->prevCtxt'==ctxt) cmap''
       cmap''' = foldr (markLive wh) cmap'' nextCtxts
       cmapMarked = cmap'''
@@ -352,8 +353,7 @@ gc t ctxt ((cmap, cid), wh) =
       -- cmapLive = Data.Map.map (\(idx, prev, ns, _) ->
       --                           (idx, prev, ns, False)) $
       --            Data.Map.filter (\(_, _, _, gcm)->gcm) cmapMarked
-      liveCtxts = Data.Map.keys $ 
-                  Data.Map.filter (\(_, _, _, gcm)->gcm) cmapMarked
+      liveCtxts = IM.keys $ IM.filter (\(_, _, _, gcm)->gcm) cmapMarked
       -- deadCtxts = Data.Map.keys $ 
       --             Data.Map.filter (\(_, _, _, gcm)->not gcm) cmapMarked
       whLive = Data.Map.filterWithKey (\(_, ctx0) _-> ctx0 `elem` liveCtxts) wh
@@ -373,7 +373,7 @@ markLive wh ctxt cmap =
         cmap
       else
         let -- set GC flag
-            cmap1 = Data.Map.update (\_->Just (idx, prevCtxt, ns, True)) ctxt cmap
+            cmap1 = IM.update (\_->Just (idx, prevCtxt, ns, True)) ctxt cmap
             -- mark live its previous context and its nested contexts
             -- TODO: maybe we don't need marking the nested since we mark formals
             liveCtxts =
