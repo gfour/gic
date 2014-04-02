@@ -317,17 +317,6 @@ mainProg ds env config = foldDot (\x -> (mkCBlock x env config).nl) ds
 epilogue :: Options -> ShowS
 epilogue opts = builtins opts.nl
 
--- | Generates a debugging prologue before each function body.
-debugFuncProlog :: GC -> QName -> ShowS
-debugFuncProlog LibGC _ = id
-debugFuncProlog SemiGC f =
-  -- verify that the LAR on the stack is the same as the current LAR visible
-  wrapIfGC
-  (("printf(\"Entered func "++).pprint f.
-   ("(T0 = %p -> %p)\\n\", T0, *T0);"++).nl)
-   -- ("*(sstack_ptr-1), (*(sstack_ptr-1)==*T0? \"true\": \"false\"));"++).nl) id
-   id
-  
 -- | Generates C code for a block.
 mkCBlock :: BlockL -> TEnv -> ConfigLAR -> ShowS
 mkCBlock (DefL f e bind) env config =
@@ -339,7 +328,7 @@ mkCBlock (DefL f e bind) env config =
           LibGC | fArity > 0 ->
             ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl
           _ -> id).
-      (if optDebug opts then debugFuncProlog gc f else id).
+      debugFuncPrologue (optDebug opts) gc f.
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
           Just strictFrms -> forceStricts gc strictFrms fArity).
