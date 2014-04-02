@@ -23,3 +23,10 @@
 #else
 #define THE_ARGS(T)   ((byte *) &((T)->data))
 #endif /* GC */
+
+/** Printer for activation records (used for debugging). */
+#ifdef GC
+#define DEBUG_PRINT_AR(a) { printf("{ prev=%p, a=%d, n=%d } [size=%ld] ", AR_prev(a), ARITY(a), NESTING(a), AR_SIZE(a)); }
+#else
+#define DEBUG_PRINT_AR() { }
+#endif /* GC */
