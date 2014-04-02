@@ -769,7 +769,7 @@ makeActs f args env config =
       -- nullary functions don't create a new LAR but use the current one (T0)
       -- unless they have nesting > 0
       fLAR =
-        if isVar then ("AR_TP(T0)"++)
+        if isVar then ("T0"++)
         else
           let fArity = length args
               c      = optCompact (getOptions config)
@@ -777,7 +777,11 @@ makeActs f args env config =
       simpleCall = pprint f.("("++).fLAR.(")"++)
   in  case gc of
         LibGC  -> simpleCall
-        SemiGC -> ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
+        SemiGC -> 
+          if isVar then
+            simpleCall
+          else
+            ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int
