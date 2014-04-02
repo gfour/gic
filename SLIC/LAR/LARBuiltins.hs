@@ -12,6 +12,7 @@ import SLIC.AuxFun
 import SLIC.Constants
 import SLIC.Front.Defunc (dfDT)
 import SLIC.LAR.LARAux
+import SLIC.LAR.LARDebug
 import SLIC.LAR.SMacrosAux (declF, mkDefineVar, mkAllocAR, mkGETARG, mkVALS)
 import SLIC.LAR.SyntaxLAR
 import SLIC.State

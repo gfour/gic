@@ -20,7 +20,7 @@ static void MM_compare_heaps(byte* old_space);
 static void MM_compare(TP_ lar);
 
 // The minimum amount of space that should be left after garbage collection.
-#define GC_HEADROOM 1000
+#define GC_HEADROOM 10
 
 #if GC_STATS
 // Statistics: count the copied LARs & processed LAR pointers in the stack
@@ -188,22 +188,23 @@ static TP_ MM_forward(TP_ lar) {
   */
 
   int j;
-  // poor man's memcpy
-  byte *from_space_limit = from_space+MAXMEMSPACE;
-  if (space+sz < from_space_limit) {
+  byte *to_space_limit = to_space+MAXMEMSPACE;
+  if (space+sz < to_space_limit) {
     //  if ( (ISSPACE1(space) && ((space+sz)<(space1+MAXMEMSPACE))) ||
     //   (ISSPACE2(space) && ((space+sz)<(space2+MAXMEMSPACE)))) {
-    byte *lar0 = (byte*)lar;
-    for (j=0; j<sz; j++)
-      space[j] = lar0[j];
+    memcpy(space, lar, sz);
+    // poor man's memcpy, for debugging:
+    // byte *lar0 = (byte*)lar;
+    // for (j=0; j<sz; j++)
+    //   space[j] = lar0[j];
   }
   else {
-    printf("Out of from-space: %p + %ld = %p >= %p.\n",
-	   space, sz, space+sz, from_space_limit);
-    printf("heap=%d\n", MM_heap_ptr((TP_)space));
+    printf("Out of to-space: %p + %ld = %p >= %p.\n",
+	   space, sz, space+sz, to_space_limit);
+    printf("Test MM_heap_ptr() returns %d.\n", MM_heap_ptr((TP_)space));
     printf("Spaces: space1 = [%p...%p], space2 = [%p...%p]\n",
 	   space1, space1+MAXMEMSPACE, space2, space2+MAXMEMSPACE);
-    printf("spaceStart=%p, spaceEnd=%p, test=%d\n", spaceStart, spaceEnd,
+    printf("spaceStart=%p, spaceEnd=%p, 'belongs'=%d\n", spaceStart, spaceEnd,
 	   (space >= spaceStart) && (space <= spaceEnd));
     printf("Type of this space: %s.\n",
 	   (ISSPACE1(space)? "space1" : (ISSPACE2(space)? "space2" : "??")));
@@ -310,7 +311,7 @@ static void MM_compare_heaps(byte* old_space) {
 }
 
 #ifdef LAR_COMPACT
-static void MM_print_Susp(int n, TP_ lar) {
+static void MM_printThunk(int n, TP_ lar) {
   if (IS_VAL(n, AR_REF(lar))) {
     Susp s = VALS(n, AR_REF(lar));
     if (IS_PVAL(s)) {
@@ -324,12 +325,15 @@ static void MM_print_Susp(int n, TP_ lar) {
     }
     else printf("Unknown Susp found.");
   } else {
-    printf("code{%p}", (LarArg)CODE(n, AR_REF(lar)));
+    LarArg symbolAddr = (LarArg)CODE(n, AR_REF(lar));
+    printf("code{");
+    DEBUG_printSymbol(symbolAddr);
+    printf("::%p}", symbolAddr);
   }
 }
 #else
-static void MM_print_Susp(int n, TP_ lar) {
-  TODO("MM_print_Susp missing");
+static void MM_printThunk(int n, TP_ lar) {
+  TODO("MM_printThunk missing");
 }
 #endif /* LAR_COMPACT */
 
@@ -395,8 +399,8 @@ static void MM_compare(TP_ lar) {
 	(!MM_compare_vals(n, lar, copy))) {
       printf("GC: val[%d] mismatch between %p and %p: %lx != %lx, details:\n",
 	     n, lar, copy, VALS(n, AR_REF(lar)), VALS(n, AR_REF(copy)));
-      MM_print_Susp(n, lar) ; printf(" != ");
-      MM_print_Susp(n, copy); printf("\n");
+      MM_printThunk(n, lar) ; printf(" != ");
+      MM_printThunk(n, copy); printf("\n");
       exit(EXIT_FAILURE);
     }
 #else

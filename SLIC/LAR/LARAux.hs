@@ -1,7 +1,7 @@
 -- | Helper definitions for the LAR back-end.
 
-module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, debugFuncPrologue, mkAct,
-                        mkCall, mkSusp, wrapIfMacro, wrapIfNotMacro,
+module SLIC.LAR.LARAux (ConfigLAR(..), enumNames, mkAct, mkCall, mkSusp,
+                        wrapIfMacro, wrapIfNotMacro,
                         wrapIfARGTAGS, wrapIfGMP, wrapIfOMP, wrapIfGC) where
 
 import SLIC.Constants
@@ -86,15 +86,3 @@ wrapIfNotMacro macroName s =
 mkCall :: GC -> QName -> ShowS -> ShowS
 mkCall SemiGC v t0 = ("RETVAL("++).pprint v.("(PUSHAR("++).t0.(")))"++)
 mkCall LibGC  v t0 = pprint v.("("++).t0.(")"++)
-
--- | Generates a debugging prologue before each function body. If the
---   first argument is False, it returns an empty prologue.
-debugFuncPrologue :: Bool -> GC -> QName -> ShowS
-debugFuncPrologue True SemiGC f =
-  -- verify that the LAR on the stack is the same as the current LAR visible
-  wrapIfGC
-  (("printf(\"Entered func "++).pprint f.
-   ("(T0 = %p -> %p)\\n\", T0, *T0); "++).nl)
-   -- ("*(sstack_ptr-1), (*(sstack_ptr-1)==*T0? \"true\": \"false\"));"++).nl) id
-   id
-debugFuncPrologue _ _ _ = id

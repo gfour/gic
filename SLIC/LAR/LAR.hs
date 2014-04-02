@@ -27,6 +27,7 @@ import SLIC.Front.CAF
 import SLIC.Front.Defunc (genNApp)
 import SLIC.LAR.LARAux
 import SLIC.LAR.LARBuiltins
+import SLIC.LAR.LARDebug
 import SLIC.LAR.LARGraph
 import SLIC.LAR.SMacrosAux (declF, nameGCAF, namegenv, protoFunc, mkAllocAR,
                             mkDefineVar, mkGETSTRICTARG, mkLARMacro,
@@ -81,8 +82,11 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
               defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl).
         initMod modName config.nl.                   -- module initializer
         (case cMode of
-            Whole -> mainFunc env opts (depthOfMainDef defs) [modName].nl
-            CompileModule -> id).
+            Whole ->
+              debugPrintSymbol (optDebug opts) (map getBlockName defs).
+              mainFunc env opts (depthOfMainDef defs) [modName].nl
+            CompileModule ->
+              debugPrintSymbol False []).
         mainProg defs' env config.
         (case cMode of
             Whole -> prettyPrintersC (optCompact opts).epilogue opts
@@ -711,10 +715,11 @@ mainFunc env opts mainNesting modules =
             ierr $ "result variable has unsupported type: "++(pprint t "")
       ).
       tab.("printf(\"c time = %.10f sec\\n\", ((double)(t2 - t1)/CLOCKS_PER_SEC));"++).nl.
+      debugMainFinish opts.
       logGraphEnd opts.
       tab.("return 0;"++).nl.
       ("}"++).nl
-  
+
 -- | Generates the calls to the modules initializers.
 initModules :: [MName] -> ShowS
 initModules [] = id
@@ -798,4 +803,3 @@ compileModL fm config env dfi allImps cidsExt finalProgLAR =
   in  writeFile moduleC (makeC
         finalProgLAR env config (dfi, allImps, cidsExt) "") >>
       writeFile moduleDFI (show dfi)
-  
