@@ -302,7 +302,11 @@ mkPUSHAR dbg =
       ("*sstack_ptr = "++).larVar.("; sstack_ptr++; }))"++).nl
 
 -- | Generates the RETVAL macro that pops the pointer stack.
-mkRETVAL :: ShowS
-mkRETVAL =
-  ("// get call result and pop activation record"++).nl.
-  ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; r; }))"++).nl
+mkRETVAL :: Bool -> ShowS
+mkRETVAL dbg =
+  let debug_RETVAL =
+        if dbg then ("printf(\"pop sstack_ptr := %p\\n\", sstack_ptr);"++) else id
+  in  ("// get call result and pop activation record"++).nl.
+      ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--;"++).
+      debug_RETVAL.
+      (" r; }))"++).nl
