@@ -188,6 +188,6 @@ typedef struct T_ {
 #define ARITY(lar)    AR_a((lar)->prev)
 #define NESTING(lar)  AR_n((lar)->prev)
 
-#define AR_SIZE(ar)   ((1 + AR_a(ar->prev) + AR_n(ar->prev))*sizeof(TP_))
+#define AR_SIZE(ar)   ((1 + AR_a((ar)->prev) + AR_n((ar)->prev))*sizeof(TP_))
 
 #define FRM_NESTED(n) (CPTR(GETSTRICTARG(n, T0)))
