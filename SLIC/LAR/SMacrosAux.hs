@@ -295,7 +295,7 @@ mkPUSHAR dbg =
           ("DEBUG_PRINT_AR("++).tmp_a.("); "++).
           ("printf(\"\\n\"); "++)
         else id
-      larVar = if dbg then tmp_a else id
+      larVar = if dbg then tmp_a else ("a"++)      
       tmp_a  = ("tmp_a"++)
   in  ("// Record LAR pointer in the explicit pointer stack."++).nl.
       ("#define PUSHAR(a) ((TP_*)({ "++).debug_PUSHAR.
