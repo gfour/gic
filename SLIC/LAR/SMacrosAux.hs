@@ -291,7 +291,7 @@ mkPUSHAR dbg =
           ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; "++).
           ("printf(\"push sstack_ptr := %p -> \", sstack_ptr); "++).
           -- Use a temporary to escape multiple unfolding of the same macro arg.
-          ("TP_ "++).tmp_a.(" = a; ").
+          ("TP_ "++).tmp_a.(" = a; "++).
           ("DEBUG_PRINT_AR("++).tmp_a.("); "++).
           ("printf(\"\\n\"); "++)
         else id
