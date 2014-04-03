@@ -289,13 +289,17 @@ mkPUSHAR dbg =
   let debug_PUSHAR =
         if dbg then
           ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; "++).
-          ("printf(\"sstack_ptr := %p -> \", sstack_ptr); "++).
-          ("DEBUG_PRINT_AR(a); "++).
+          ("printf(\"push sstack_ptr := %p -> \", sstack_ptr); "++).
+          -- Use a temporary to escape multiple unfolding of the same macro arg.
+          ("TP_ "++).tmp_a.(" = a; ").
+          ("DEBUG_PRINT_AR("++).tmp_a.("); "++).
           ("printf(\"\\n\"); "++)
         else id
+      larVar = if dbg then tmp_a else id
+      tmp_a  = ("tmp_a"++)
   in  ("// Record LAR pointer in the explicit pointer stack."++).nl.
       ("#define PUSHAR(a) ((TP_*)({ "++).debug_PUSHAR.
-      ("*sstack_ptr = a; sstack_ptr++; }))"++).nl
+      ("*sstack_ptr = "++).larVar.("; sstack_ptr++; }))"++).nl
 
 -- | Generates the RETVAL macro that pops the pointer stack.
 mkRETVAL :: ShowS
