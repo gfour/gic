@@ -2,9 +2,9 @@
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.State (Action(..), CompactOpt, CompileMode(..), DoNullDf, GC(..),
-                   GHCAPI(..), Options(..), ScrutOpt, TypeChecker(..), Verb,
-                   defaultOptions, opt) where
+module SLIC.State (Action(..), CompactOpt, CompileMode(..), DebugFlag, DoNullDf,
+                   GC(..), GHCAPI(..), Options(..), ScrutOpt, TypeChecker(..),
+                   Verb, defaultOptions, opt) where
 
 import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
                        defaultMemSize, defaultMaxCtxts, defaultWorkers, nl)
@@ -81,12 +81,15 @@ opt v x = if v then x else return ()
 -- | The flag that enables nullary defunctionalization.
 type DoNullDf = Bool
 
+-- | Enable debugging mode in the generated program.
+type DebugFlag = Bool
+
 -- | The state of the compiler, as defined by the user options.
 data Options = Options
   { optAction  :: Action           -- ^ what to do
   , optInput   :: Maybe [FileName] -- ^ where to read the input (Nothing=stdin, otherwise list of files)
   , optVerbose :: Verb             -- ^ verbose flag
-  , optDebug   :: Bool             -- ^ debugging flag
+  , optDebug   :: DebugFlag        -- ^ debugging flag
   , optHeap    :: Bool             -- ^ allocate all lazy activation records on the heap
   , optGC      :: GC               -- ^ enable garbage collection
   , optTC      :: TypeChecker      -- ^ which type checker to use

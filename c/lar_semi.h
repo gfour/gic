@@ -26,7 +26,7 @@
 
 /** Printer for activation records (used for debugging). */
 #ifdef GC
-#define DEBUG_PRINT_AR(a) { printf("{ prev=%p, a=%d, n=%d } [size=%ld] ", AR_prev(a), ARITY(a), NESTING(a), AR_SIZE(a)); }
+#define DEBUG_PRINT_AR(a) { printf("%p@{ prev=%p, a=%d, n=%d } [size=%ld] ", a, AR_prev(a), ARITY(a), NESTING(a), AR_SIZE(a)); printf("thunks: "); int i; for (i=0; i<ARITY(a); i++) { printf("<"); MM_printThunk(i, a); ; printf("> "); }; }
 #else
-#define DEBUG_PRINT_AR() { }
+#define DEBUG_PRINT_AR(a) { }
 #endif /* GC */

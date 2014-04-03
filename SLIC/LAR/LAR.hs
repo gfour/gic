@@ -126,6 +126,7 @@ macrosC :: Options -> MName -> Arities -> PMDepths -> Int -> ShowS
 macrosC opts modName arities pmDepths arityCAF =
   let gc   = optGC opts
       co   = optCompact opts
+      dbg  = optDebug opts
   in  ("// Macros"++).nl.nl.
       (if optTag opts then
           ("#ifndef USE_TAGS"++).nl.
@@ -140,8 +141,8 @@ macrosC opts modName arities pmDepths arityCAF =
             wrapIfGC
             (("// pointer stack maximum size"++).nl.
              ("#define SSTACK_MAX_SIZE "++).shows (optEStackSz opts).nl.
-             mkPUSHAR (optDebug opts).
-             mkRETVAL)
+             mkPUSHAR dbg.
+             mkRETVAL dbg)
             -- No pointer stack, dummy macros (use for testing the allocator).
             (("#define PUSHAR(a) (a)"++).nl.
              ("#define RETVAL(x) (x)"++).nl)
@@ -337,13 +338,16 @@ mkCBlock (DefL f e bind) env config =
           Nothing -> id
           Just strictFrms -> forceStricts gc strictFrms fArity).
       logPrev opts.
-      (mkCFuncBody config env f e).
+      mkCFuncBody config env f e.
       ("}"++).nl
 mkCBlock (ActualL v act e) env config =
-  ("VAR("++).pprint v.("){"++).nl.
-  (mkAct act (getOptions config)).
-  ("return "++).(mkCExp env config e).semi.nl.
-  ("}"++).nl
+  let opts = getOptions config
+      gc = optGC opts
+  in  ("VAR("++).pprint v.("){"++).nl.
+      debugVarPrologue (optDebug opts) gc v.
+      mkAct act opts.
+      ("return "++).(mkCExp env config e).semi.nl.
+      ("}"++).nl
 
 -- | Generate C code for a function body.
 mkCFuncBody :: ConfigLAR -> TEnv -> QName -> ExprL -> ShowS
@@ -715,7 +719,7 @@ mainFunc env opts mainNesting modules =
             ierr $ "result variable has unsupported type: "++(pprint t "")
       ).
       tab.("printf(\"c time = %.10f sec\\n\", ((double)(t2 - t1)/CLOCKS_PER_SEC));"++).nl.
-      debugMainFinish opts.
+      debugMainFinish (optDebug opts).
       logGraphEnd opts.
       tab.("return 0;"++).nl.
       ("}"++).nl
