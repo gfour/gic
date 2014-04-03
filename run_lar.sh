@@ -23,8 +23,6 @@ if [ "$GC" = "1" ]; then
     # Add -DGC to the gcc flags to use the semi-space collector.
     USE_GC="-DGC"
     # USE_GC="-DGC -DVERBOSE_GC"
-    # Add the libunwind linking flag.
-    LIBUNWIND="-lunwind"
 else
     USE_GC=""
     LIBUNWIND=""
