@@ -311,33 +311,6 @@ static void MM_compare_heaps(byte* old_space) {
 }
 
 #ifdef LAR_COMPACT
-static void MM_printThunk(int n, TP_ lar) {
-  if (IS_VAL(n, AR_REF(lar))) {
-    Susp s = VALS(n, AR_REF(lar));
-    if (IS_PVAL(s)) {
-      printf("val(int=%ld)", PVAL_R(s));
-    }
-    else if (IS_CONSTR(s)) {
-      TP_ c = CPTR(s);
-      printf("val(constructor={%d, %p(fw=%d, from-heap=%d)})", 
-	     CONSTR(s), c, IS_FORWARDED(c), MM_heap_ptr(c));
-      if (IS_FORWARDED(c)) printf("(=>%p)", FORWARDED_ADDR(c));
-    }
-    else printf("Unknown Susp found.");
-  } else {
-    LarArg symbolAddr = (LarArg)CODE(n, AR_REF(lar));
-    printf("code{");
-    DEBUG_printSymbol(symbolAddr);
-    printf("::%p}", symbolAddr);
-  }
-}
-#else
-static void MM_printThunk(int n, TP_ lar) {
-  TODO("MM_printThunk missing");
-}
-#endif /* LAR_COMPACT */
-
-#ifdef LAR_COMPACT
 /** Compares two thunks.
     \param  A thunk in from-space.
     \param  A thunk in to-space.
@@ -428,6 +401,37 @@ static void MM_compare(TP_ lar) {
 
 #endif /* GC */
 
+/** Pretty printer for LAR thunks.
+    \param n   The position of a thunk in a LAR.
+    \param lar The LAR. */
+#ifdef LAR_COMPACT
+static void MM_printThunk(int n, TP_ lar) {
+  if (IS_VAL(n, AR_REF(lar))) {
+    Susp s = VALS(n, AR_REF(lar));
+    if (IS_PVAL(s)) {
+      printf("val(int=%ld)", PVAL_R(s));
+    }
+    else if (IS_CONSTR(s)) {
+      TP_ c = CPTR(s);
+      printf("val(constructor={%d, %p})", CONSTR(s), c);
+#ifdef GC
+      printf("(fw=%d, from-heap=%d)})", IS_FORWARDED(c), MM_heap_ptr(c));
+#endif /* GC */
+      if (IS_FORWARDED(c)) printf("(=>%p)", FORWARDED_ADDR(c));
+    }
+    else printf("Unknown Susp found.");
+  } else {
+    LarArg symbolAddr = (LarArg)CODE(n, AR_REF(lar));
+    printf("code{");
+    DEBUG_printSymbol(symbolAddr);
+    printf("::%p}", symbolAddr);
+  }
+}
+#else
+static void MM_printThunk(int n, TP_ lar) {
+  TODO("MM_printThunk missing");
+}
+#endif /* LAR_COMPACT */
 
 /** Proper alignment of the bytes to be allocated. */
 #define ALIGN(x) (((x) + (sizeof(int) - 1)) & ~(sizeof(int) - 1))
