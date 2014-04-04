@@ -18,5 +18,7 @@ Susp mulI(Susp a, Susp b);
 */
 Susp strToList(char *str, int chars, TP_ AR_TP(T0));
 
+#if defined(GC) || defined(LAR_COMPACT)
 /** Prints a thunk value at position 'n' in a LAR. */
 static void MM_printThunk(int n, TP_ lar);
+#endif /* GC, LAR_COMPACT */
