@@ -288,7 +288,7 @@ mkPUSHAR :: Bool -> ShowS
 mkPUSHAR dbg =
   let debug_PUSHAR =
         if dbg then
-          ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow.\\n\"); exit(EXIT_FAILURE); } ; "++).
+          ("if (sstack_ptr >= sstack_bottom + SSTACK_MAX_SIZE) { printf(\"Pointer stack overflow, reserve more space with -estack.\\n\"); exit(EXIT_FAILURE); } ; "++).
           ("printf(\"push sstack_ptr := %p -> \", sstack_ptr); "++).
           -- Use a temporary to escape multiple unfolding of the same macro arg.
           ("TP_ "++).tmp_a.(" = a; "++).
