@@ -27,4 +27,4 @@ OPT="-falign-functions"
 set -e
 
 echo Compiling $1.g.o...
-./gic $TC $STACKTRACE -debug -cmod $1.hs && gcc $OPT $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall
+./gic $TC $STACKTRACE -cmod $1.hs && gcc $OPT $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall
