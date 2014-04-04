@@ -85,8 +85,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
             Whole ->
               debugPrintSymbol (optDebug opts) (map getBlockName defs).
               mainFunc env opts (depthOfMainDef defs) [modName].nl
-            CompileModule ->
-              debugPrintSymbol False []).
+            CompileModule -> id).
         mainProg defs' env config.
         (case cMode of
             Whole -> prettyPrintersC (optCompact opts).epilogue opts
