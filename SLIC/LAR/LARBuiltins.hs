@@ -383,7 +383,7 @@ mkBuiltinCstr opts dt cstr =
           Nothing -> ierr $ "mkBuiltinCstr: no info for "++(qName cstr)
       tag = shows (findTagOfDT dt builtinTags)
   in  funcHeader cstr.
-      debugFuncPrologue (optDebug opts) (optGC opts) cstr.
+      debugFuncPrologue (optDebug opts) cstr.
       mkSusp opts cId tag hasParams.nl.("}"++).nl
 
 b_Cons :: Options -> ShowS ; b_Cons opts = mkBuiltinCstr opts dtList bf_Cons

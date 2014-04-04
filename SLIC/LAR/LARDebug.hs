@@ -8,24 +8,24 @@ import SLIC.LAR.LARAux (wrapIfGC)
 import SLIC.State (DebugFlag, GC(..))
 import SLIC.Types
 
-debugPrologueSemiGC :: String -> QName -> ShowS
-debugPrologueSemiGC descr f =
-  wrapIfGC
-  (("printf(\"\\\\-> Entered "++).(descr++).(" "++).pprint f.
-   ("(T0 = %p -> %p)\\n\", T0, *T0);"++).nl)
-   id
+debugPrologue :: String -> QName -> ShowS
+debugPrologue descr f =
+  let printfHalf = ("printf(\"\\\\-> Entered "++).(descr++).(" "++).pprint f
+  in  wrapIfGC
+      (printfHalf.("(T0 = %p -> %p)\\n\", T0, *T0);"++).nl)
+      (printfHalf.("(T0 = %p)\\n\", T0);"++).nl)
   
 -- | Generates a debugging prologue before each function body. If the
 --   first argument is False, it returns an empty prologue.
-debugFuncPrologue :: DebugFlag -> GC -> QName -> ShowS
-debugFuncPrologue True SemiGC f = debugPrologueSemiGC "function" f
-debugFuncPrologue _ _ _ = id
+debugFuncPrologue :: DebugFlag -> QName -> ShowS
+debugFuncPrologue True f = debugPrologue "function" f
+debugFuncPrologue _ _ = id
 
 -- | Generates a debugging prologue before an actual. If the
 --   first argument is False, it returns an empty prologue.
-debugVarPrologue :: DebugFlag -> GC -> QName -> ShowS
-debugVarPrologue True SemiGC v = debugPrologueSemiGC "actual" v
-debugVarPrologue _ _ _ = id
+debugVarPrologue :: DebugFlag -> QName -> ShowS
+debugVarPrologue True v = debugPrologue "actual" v
+debugVarPrologue _ _ = id
 
 -- | Generate debugging information after program finishes with a value.
 debugMainFinish :: DebugFlag -> ShowS

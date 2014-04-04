@@ -332,7 +332,7 @@ mkCBlock (DefL f e bind) env config =
           LibGC | fArity > 0 ->
             ("INIT_ARG_LOCKS("++).shows fArity.(");"++).nl
           _ -> id).
-      debugFuncPrologue (optDebug opts) gc f.
+      debugFuncPrologue (optDebug opts) f.
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
           Just strictFrms -> forceStricts gc strictFrms fArity).
@@ -341,9 +341,8 @@ mkCBlock (DefL f e bind) env config =
       ("}"++).nl
 mkCBlock (ActualL v act e) env config =
   let opts = getOptions config
-      gc = optGC opts
   in  ("VAR("++).pprint v.("){"++).nl.
-      debugVarPrologue (optDebug opts) gc v.
+      debugVarPrologue (optDebug opts) v.
       mkAct act opts.
       ("return "++).(mkCExp env config e).semi.nl.
       ("}"++).nl
