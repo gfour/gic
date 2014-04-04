@@ -51,3 +51,13 @@ debugPrintSymbol False _ =
   ("void DEBUG_printSymbol(LarArg sym) {"++).nl.
   ("printf(\"<optimized out>\");"++).nl.
   ("}"++).nl
+
+-- | Generates a debug message when a LAR for a CAF is allocated.
+debugCreateCAF :: DebugFlag -> ShowS -> ShowS
+debugCreateCAF True  caf = ("printf(\"Allocating CAF "++).caf.(":\\n\");"++).nl
+debugCreateCAF False _   = id
+
+-- | Generates a debug message when the top-level LAR is allocated.
+debugCreateTopLAR :: DebugFlag -> ShowS
+debugCreateTopLAR True  = ("printf(\"Allocating dummy top-level CAF:\\n\");"++).nl
+debugCreateTopLAR False = id

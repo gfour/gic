@@ -646,11 +646,12 @@ prologue opts modName arityCAF =
 --   the list of modules (to initialize at runtime).
 mainFunc :: TEnv -> Options -> PMDepth -> [MName] -> ShowS
 mainFunc env opts mainNesting modules =
-  let gc      = optGC opts
-      m       = case modules of [m'] -> m' ; _ -> "Main"
+  let m       = case modules of [m'] -> m' ; _ -> "Main"
       mainDef = mainDefQName m
       printResDT dt = tab.pprinterName dt.("(res); printf(\"  \");"++).nl
       compact = optCompact opts
+      dbg     = optDebug   opts
+      gc      = optGC      opts
   in  ("int main(int argc, char* argv[]){\n"++).
       tab.("clock_t t1, t2;"++).nl.
       tab.("Susp res;"++).nl.
@@ -690,6 +691,7 @@ mainFunc env opts mainNesting modules =
       (case gc of
           LibGC  -> id
           SemiGC ->
+            tab.debugCreateTopLAR dbg.
             tab.("TP_ AR_TP(t0) = PUSHAR(AR(0,"++).shows mainNesting.("));"++).nl).
       initModules modules.
       logGraphStart opts.
@@ -719,7 +721,7 @@ mainFunc env opts mainNesting modules =
             ierr $ "result variable has unsupported type: "++(pprint t "")
       ).
       tab.("printf(\"c time = %.10f sec\\n\", ((double)(t2 - t1)/CLOCKS_PER_SEC));"++).nl.
-      debugMainFinish (optDebug opts).
+      debugMainFinish dbg.
       logGraphEnd opts.
       tab.("return 0;"++).nl.
       ("}"++).nl
@@ -736,9 +738,11 @@ initMod m config =
   let arityCAF = length (getCAFnmsids config)
       opts     = getOptions config
       nms      = map pprint $ nmsids2nms (getCAFnmsids config)
+      cafName  = namegenv m
   in  ("void "++).genInitMod m.("(TP_ AR_TP(T0)) {"++).nl.
       (if arityCAF > 0 then
-         tab.namegenv m.(" = "++).
+         debugCreateCAF (optDebug opts) cafName.
+         tab.cafName.(" = "++).
          (case optGC opts of
              SemiGC ->
                ("PUSHAR(AR("++).shows arityCAF.
