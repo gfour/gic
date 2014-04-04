@@ -12,7 +12,7 @@ debugPrologueSemiGC :: String -> QName -> ShowS
 debugPrologueSemiGC descr f =
   wrapIfGC
   (("printf(\"\\\\-> Entered "++).(descr++).(" "++).pprint f.
-   ("(T0 = %p -> %p)\\n\", T0, *T0); "++).nl)
+   ("(T0 = %p -> %p)\\n\", T0, *T0);"++).nl)
    id
   
 -- | Generates a debugging prologue before each function body. If the
