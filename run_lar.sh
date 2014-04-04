@@ -5,7 +5,7 @@
 # Reads the following environment variables:
 # 
 #   CC       : the C compiler to use (default=gcc)
-#   GICFLAGS : flags passed on to gic (e.g. the type checker to use)
+#   GICFLAGS : flags passed on to gic
 #   CFLAGS2  : extra flags passed to the C compiler
 # 
 
@@ -25,7 +25,6 @@ if [ "$GC" = "1" ]; then
     # USE_GC="-DGC -DVERBOSE_GC"
 else
     USE_GC=""
-    LIBUNWIND=""
 fi
 
 CFLAGS="-O3 -I . -ggdb3"
@@ -36,7 +35,7 @@ CFLAGS="-O3 -I . -ggdb3"
 
 cat c/gc.c >> main.c
 
-CMD="${CC} main.c ${CFLAGS} ${CFLAGS2} ${USE_GC} ${USE_GMP} ${LIBUNWIND}"
+CMD="${CC} main.c ${CFLAGS} ${CFLAGS2} ${USE_GC} ${USE_GMP}"
 # echo $CMD
 $CMD
 
