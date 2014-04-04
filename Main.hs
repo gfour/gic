@@ -117,81 +117,81 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
 processArgs :: [String] -> IO Options
 processArgs cmdArgs =
     let aux [] opts = return opts
-        aux ("-p0"    : args) opts = aux args opts{optAction = APrintFL}
-        aux ("-p0pre" : args) opts = aux args opts{optAction = APrintFLPre}
-        aux ("-p1"    : args) opts = aux args opts{optAction = APrintHIL1}
-        aux ("-p2"    : args) opts = aux args opts{optAction = APrintHIL2}
-        aux ("-s"     : args) opts = aux args opts{optAction = ACheck}
-        aux ("-penv"  : args) opts = aux args opts{optAction = APrintEnv}
-        aux ("-pz"    : args) opts = aux args opts{optAction = APrintZOIL}
-        aux ("-plar"  : args) opts = aux args opts{optAction = APrintLAR}
-        aux ("-pttd"  : args) opts = aux args opts{optAction = APrintTTD}
-        aux ("-pdfi"  : args) opts = aux args opts{optAction = APrintDFI}
-        aux ("-cl"    : args) opts = aux args opts{optAction = ACompileLAR}
-        aux ("-ecbn"  : args) opts = aux args opts{optAction = AEvalZOILCBN}
-        aux ("-e"     : args) opts = aux args opts{optAction = AEvalZOILLazy}
-        aux ("-fl"    : args) opts = aux args opts{optAction = AEvalFL}
-        aux ("-cm"    : args) opts = aux args opts{optAction = ACompileMaude}
-        aux ("-ettd"  : args) opts = aux args opts{optAction = AEvalTTD}
-        aux ("-erl"   : args) opts = aux args opts{optAction = AEvalErl}
-        aux ("-df"    : args) opts = aux args opts{optAction = APrintDF}
-        aux ("-debug" : args) opts = aux args opts{optDebug = True}
-        aux ("-v"     : args) opts = aux args opts{optVerbose = True}
-        aux ("-enum"  : args) opts = aux args opts{optOptEnums = True}
-        aux ("-null-df":args) opts = aux args opts{optNullDf = True}
-        aux ("-strict": args) opts = aux args opts{optStrict = True}
-        aux ("-semigc": args) opts = aux args opts{optGC = SemiGC}
-        aux ("-libgc" : args) opts = aux args opts{optGC = LibGC}
-        aux ("-compact":args) opts = aux args opts{optCompact = True}{optGC=SemiGC}{optScrut=True}
-        aux ("-fop"   : args) opts = aux args opts{optFastOp = True}
-        aux ("-tag"   : args) opts = aux args opts{optTag = True}
+        aux ("-p0"    : args) opts = aux args opts{optAction=APrintFL}
+        aux ("-p0pre" : args) opts = aux args opts{optAction=APrintFLPre}
+        aux ("-p1"    : args) opts = aux args opts{optAction=APrintHIL1}
+        aux ("-p2"    : args) opts = aux args opts{optAction=APrintHIL2}
+        aux ("-s"     : args) opts = aux args opts{optAction=ACheck}
+        aux ("-penv"  : args) opts = aux args opts{optAction=APrintEnv}
+        aux ("-pz"    : args) opts = aux args opts{optAction=APrintZOIL}
+        aux ("-plar"  : args) opts = aux args opts{optAction=APrintLAR}
+        aux ("-pttd"  : args) opts = aux args opts{optAction=APrintTTD}
+        aux ("-pdfi"  : args) opts = aux args opts{optAction=APrintDFI}
+        aux ("-cl"    : args) opts = aux args opts{optAction=ACompileLAR}
+        aux ("-ecbn"  : args) opts = aux args opts{optAction=AEvalZOILCBN}
+        aux ("-e"     : args) opts = aux args opts{optAction=AEvalZOILLazy}
+        aux ("-fl"    : args) opts = aux args opts{optAction=AEvalFL}
+        aux ("-cm"    : args) opts = aux args opts{optAction=ACompileMaude}
+        aux ("-ettd"  : args) opts = aux args opts{optAction=AEvalTTD}
+        aux ("-erl"   : args) opts = aux args opts{optAction=AEvalErl}
+        aux ("-df"    : args) opts = aux args opts{optAction=APrintDF}
+        aux ("-debug" : args) opts = aux args opts{optDebug=True}
+        aux ("-v"     : args) opts = aux args opts{optVerbose=True}
+        aux ("-enum"  : args) opts = aux args opts{optOptEnums=True}
+        aux ("-null-df":args) opts = aux args opts{optNullDf=True}
+        aux ("-strict": args) opts = aux args opts{optStrict=True}
+        aux ("-semigc": args) opts = aux args opts{optGC=SemiGC}
+        aux ("-libgc" : args) opts = aux args opts{optGC=LibGC}
+        aux ("-compact":args) opts = aux args opts{optCompact=True}{optGC = SemiGC}{optScrut = True}
+        aux ("-fop"   : args) opts = aux args opts{optFastOp=True}
+        aux ("-tag"   : args) opts = aux args opts{optTag=True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
         aux ("-gic-tc": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf True}
-        aux ("-gic-tc-nsig": args) opts = aux args opts{optGHC = NoGHC}{optTC=GICTypeInf False}
-        aux ("-ghc-core": args) opts = aux args opts{optGHC = GHCCore}{optTC=GHCTypeInf}
-        aux ("-heap"  : args) opts = aux args opts{optHeap = True}
-        aux ("-redis" : args) opts = aux args opts{optWhRedis = True}
-        aux ("-whole" : args) opts = aux args opts{optCMode = Whole}
-        aux ("-cmod"  : args) opts = aux args opts{optCMode = CompileModule}
-        aux ("-link"  : args) opts = aux args opts{optLink = True}
-        aux ("-dfg"   : args) opts = aux args opts{optAction = AGenerateDFG}
+        aux ("-gic-tc-nsig": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf False}
+        aux ("-ghc-core": args) opts = aux args opts{optGHC=GHCCore}{optTC=GHCTypeInf}
+        aux ("-heap"  : args) opts = aux args opts{optHeap=True}
+        aux ("-redis" : args) opts = aux args opts{optWhRedis=True}
+        aux ("-whole" : args) opts = aux args opts{optCMode=Whole}
+        aux ("-cmod"  : args) opts = aux args opts{optCMode=CompileModule}
+        aux ("-link"  : args) opts = aux args opts{optLink=True}
+        aux ("-dfg"   : args) opts = aux args opts{optAction=AGenerateDFG}
         aux ("-wh"    : arg : args) opts =
             let nml :: [(Int, String)]
                 nml = reads arg
             in  case nml of
-                   [(n, "")] -> aux args opts{optWhNum = n}
-                   _         -> usage >> return opts{optAction = ANone}
+                   [(n, "")] -> aux args opts{optWhNum=n}
+                   _         -> usage >> return opts{optAction=ANone}
         aux ("-maxwh" : arg : args) opts =
             let nml :: [(Int, String)]
                 nml = reads arg
             in  case nml of
-                   [(n, "")] -> aux args opts{optWhSize = n}
-                   _         -> usage >> return opts{optAction = ANone}
+                   [(n, "")] -> aux args opts{optWhSize=n}
+                   _         -> usage >> return opts{optAction=ANone}
         aux ("-mem"   : arg : args) opts =
             let mem :: [(Int, String)]
                 mem = reads arg
             in  case mem of
-                   [(memSz, "")] -> aux args opts{optMaxMem = memSz}
-                   _             -> usage >> return opts{optAction = ANone}
+                   [(memSz, "")] -> aux args opts{optMaxMem=memSz}
+                   _             -> usage >> return opts{optAction=ANone}
         aux ("-estack": arg : args) opts =
             let estack :: [(Int, String)]
                 estack = reads arg
             in  case estack of
-                   [(estackSz, "")] -> aux args opts{optEStackSz = estackSz}
-                   _             -> usage >> return opts{optAction = ANone}
+                   [(estackSz, "")] -> aux args opts{optEStackSz=estackSz}
+                   _             -> usage >> return opts{optAction=ANone}
         aux ("-ctxts" : arg : args) opts =
             let ctxts :: [(Int, String)]
                 ctxts = reads arg
             in  case ctxts of
-                   [(n, "")] -> aux args opts{optMaxCtxts = n}
-                   _         -> usage >> return opts{optAction = ANone}
+                   [(n, "")] -> aux args opts{optMaxCtxts=n}
+                   _         -> usage >> return opts{optAction=ANone}
         aux ("-workers":arg : args) opts =
             let nmw :: [(Int, String)]
                 nmw = reads arg
             in  case nmw of
-                   [(n, "")] -> aux args opts{optNWorkers = n}
-                   _         -> usage >> return opts{optAction = ANone}
-        aux ("-help"  : _) opts = usage >> return opts{optAction = ANone}
+                   [(n, "")] -> aux args opts{optNWorkers=n}
+                   _         -> usage >> return opts{optAction=ANone}
+        aux ("-help"  : _) opts = usage >> return opts{optAction=ANone}
         aux (arg : args) opts = 
             if "-" `isPrefixOf` arg then
                 error ("Unknown flag " ++ arg ++ ", use -help to see all available options.")
@@ -199,7 +199,6 @@ processArgs cmdArgs =
                 case optInput opts of
                   Nothing -> aux args opts{optInput = Just [arg]}
                   Just files  -> aux args opts{optInput = Just (arg:files)} 
-                -- usage >> return opts{optAction = ANone}
     in  aux cmdArgs defaultOptions
 
 -- | Entry point, reads from a file (or stdin if no file given) and calls 
