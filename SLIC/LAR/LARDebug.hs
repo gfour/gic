@@ -5,7 +5,7 @@ module SLIC.LAR.LARDebug where
 import SLIC.AuxFun (foldDot)
 import SLIC.Constants (nl)
 import SLIC.LAR.LARAux (wrapIfGC)
-import SLIC.State (DebugFlag, GC(..))
+import SLIC.State (DebugFlag)
 import SLIC.Types
 
 debugPrologue :: String -> QName -> ShowS
