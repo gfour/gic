@@ -20,7 +20,7 @@ To build the compiler, you need:
 
 * GHC 7.6
 * ghc-paths
-* haskell-src-exts (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
+* haskell-src-exts 1.14.0 (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
 * For the C back-end:
     * GCC (with OpenMP support if the parallel runtime is enabled)
     * The Boehm-Demers-Weiser garbage collector from:

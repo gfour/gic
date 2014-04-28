@@ -309,8 +309,11 @@ runThroughGHC _ _ = error "GHC preprocessing not compiled in."
 parseFL :: Options -> FPath -> String -> IO ModFPre
 parseFL opts f text =
   let pMode = ParseMode { parseFilename = f
-      -- does not work: , baseLanguage = Haskell2010
-                        , Parser.extensions = [GADTs, BangPatterns]
+                        , baseLanguage = Haskell98
+                        , Parser.extensions =
+                            [ EnableExtension GADTs
+                            , EnableExtension BangPatterns
+                            ]
                         , ignoreLanguagePragmas = False
                         , ignoreLinePragmas = False
                         , fixities = Nothing

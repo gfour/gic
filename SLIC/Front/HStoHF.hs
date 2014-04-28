@@ -481,7 +481,7 @@ transl_e opts fm (S.RecUpdate e fields) st =
   in  transl_rec_upd opts fm eFL fields st1
 transl_e opts fm (S.RecConstr qn fields) st =
   transl_rec_upd opts fm (XF $ V $ dummyCName $ getQName qn) fields st
-transl_e opts fm (S.Tuple el) st =
+transl_e opts fm (S.Tuple _ el) st =
   let (st1, el1) = mapTI st (transl_e opts fm) el
       elN = length el
   in  if elN > maxTupleSize then
@@ -675,7 +675,7 @@ mkPat fm@(m, _) pat =
       FPatC bf_Cons [mkPat fm e0, mkPat fm e1]
     S.PInfixApp e0 hsn e1 ->
       FPatC (getQName hsn) [mkPat fm e0, mkPat fm e1]
-    S.PTuple el ->
+    S.PTuple _ el ->
       let elN = length el
       in  if elN > maxTupleSize then
             error $ "mkPat: tuples with more than "++(show maxTupleSize)++
