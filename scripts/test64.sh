@@ -19,73 +19,112 @@ function testCache {
     valgrind --tool=cachegrind --main-stacksize=262144000 ./$2 >> $CFILE 2>&1
 }
 
+function measureCache {
+echo Measuring cache of $1...
+./scripts/perf-greedy.sh ./$1_full
+./scripts/perf-greedy.sh ./$1_compact
+}
+
+# Takes three arguments: a string of flags, a string suffix for the generated
+# program, and a factor that multiplies the memory supplied (compact==1).
+function runBenchmarks {
+echo Benchmarks [flags: \"$1\", suffix: $2, mem_factor: $3]
+echo Using:
+echo gic $GICFLAGS
+echo C compiler: $CC
+let mem=28000000*$3
+export GICFLAGS="-gic-tc -mem $mem $1 $FASTOP"
+echo -n "Ack: "
+testRun Examples/NewBench/ack.hs
+cp main.c gic_ack$2.c
+cp a.out gic_ack$2
+echo -n "Collatz: "
+testRun Examples/Data/collatz.hs
+cp main.c gic_collatz$2.c
+cp a.out gic_collatz$2
+echo -n "Fib: "
+testRun Examples/NewBench/fib.hs
+cp main.c gic_fib$2.c
+cp a.out gic_fib$2
+echo -n "Primes: "
+testRun Examples/NewBench/primes.hs
+cp main.c gic_primes$2.c
+cp a.out gic_primes$2
+echo -n "Church: "
+testRun Examples/NewBench/church.hs
+cp main.c gic_church$2.c
+cp a.out gic_church$2
+echo -n "Queens-num: "
+testRun Examples/NewBench/queens-num.hs
+cp main.c gic_queens_num$2.c
+cp a.out gic_queens_num$2
+let mem=440000000*$3
+export GICFLAGS="-gic-tc -mem $mem $1 $FASTOP"
+echo -n "Digits: "
+testRun Examples/Data/digits_of_e1.hs
+cp main.c gic_digits_of_e1$2.c
+cp a.out gic_digits_of_e1$2
+echo -n "Reverse: "
+testRun Examples/Data/reverse.hs
+cp main.c gic_reverse$2.c
+cp a.out gic_reverse$2
+let mem=1800000000*$3
+export GICFLAGS="-gic-tc -mem $mem $1 $FASTOP"
+echo -n "Quick-sort: "
+testRun Examples/NewBench/quick-sort.hs
+cp main.c gic_quick_sort$2.c
+cp a.out gic_quick_sort$2
+let mem=1100000000*$3
+export GICFLAGS="-mem $mem $1 $FASTOP"
+echo -n "Tree-sort: "
+testRun Examples/NewBench/tree-sort.hs
+cp main.c gic_tree_sort$2.c
+cp a.out gic_tree_sort$2
+echo -n "Queens: "
+testRun Examples/NewBench/queens.hs
+cp main.c gic_queens$2.c
+cp a.out gic_queens$2
+let mem=7628000000*$3
+export GICFLAGS="-gic-tc -mem $mem $1 $FASTOP"
+echo -n "Ntak: "
+testRun Examples/NewBench/ntak.hs
+cp main.c gic_ntak$2.c
+cp a.out gic_ntak$2
+}
+
 echo Compiling+running with GIC...
 if [ "$CC" == "" ]
 then
   export CC=gcc
 fi
 
-# FASTOP="-fop"
-export CFLAGS2="-Wno-#warnings"
-# export CFLAGS2="-DSSTACK"
-export GICFLAGS="-gic-tc -mem 28000000 -compact $FASTOP"
-echo Using:
-echo gic $GICFLAGS
-echo C compiler: $CC
-
 ulimit -s 262144
-echo -n "Ack: "
-testRun Examples/NewBench/ack.hs
-cp main.c gic_ack.c
-cp a.out gic_ack
-echo -n "Collatz: "
-testRun Examples/Data/collatz.hs
-cp main.c gic_collatz.c
-cp a.out gic_collatz
-echo -n "Fib: "
-testRun Examples/NewBench/fib.hs
-cp main.c gic_fib.c
-cp a.out gic_fib
-echo -n "Primes: "
-testRun Examples/NewBench/primes.hs
-cp main.c gic_primes.c
-cp a.out gic_primes
-echo -n "Church: "
-testRun Examples/NewBench/church.hs
-cp main.c gic_church.c
-cp a.out gic_church
-echo -n "Queens-num: "
-testRun Examples/NewBench/queens-num.hs
-cp main.c gic_queens_num.c
-cp a.out gic_queens_num
-export GICFLAGS="-gic-tc -mem 440000000 -compact $FASTOP"
-echo -n "Digits: "
-testRun Examples/Data/digits_of_e1.hs
-cp main.c gic_digits_of_e1.c
-cp a.out gic_digits_of_e1
-echo -n "Reverse: "
-testRun Examples/Data/reverse.hs
-cp main.c gic_reverse.c
-cp a.out gic_reverse
-export GICFLAGS="-gic-tc -mem 1800000000 -compact $FASTOP"
-echo -n "Quick-sort: "
-testRun Examples/NewBench/quick-sort.hs
-cp main.c gic_quick_sort.c
-cp a.out gic_quick_sort
-export GICFLAGS="-mem 1100000000 -compact $FASTOP"
-echo -n "Tree-sort: "
-testRun Examples/NewBench/tree-sort.hs
-cp main.c gic_tree_sort.c
-cp a.out gic_tree_sort
-echo -n "Queens: "
-testRun Examples/NewBench/queens.hs
-cp main.c gic_queens.c
-cp a.out gic_queens
-export GICFLAGS="-gic-tc -mem 7628000000 -compact $FASTOP"
-echo -n "Ntak: "
-testRun Examples/NewBench/ntak.hs
-cp main.c gic_ntak.c
-cp a.out gic_ntak
+
+# FASTOP="-fop"
+export CFLAGS2="-Wno-#warnings -Wno-unused-value"
+# export CFLAGS2="-DSSTACK"
+
+echo Using CFLAGS2: $CFLAGS2
+runBenchmarks "" "_full" 4
+runBenchmarks "-compact" "_compact" 1
+
+echo Measuring cache using perf:
+
+measureCache "gic_ack"
+measureCache "gic_collatz"
+measureCache "gic_digits_of_e1"
+measureCache "gic_fib"
+measureCache "gic_ntak"
+measureCache "gic_primes"
+measureCache "gic_church"
+measureCache "gic_queens"
+measureCache "gic_queens_num"
+measureCache "gic_quick_sort"
+measureCache "gic_tree_sort"
+measureCache "gic_reverse"
+
+exit
+
 
 if [ "$GHC" == "" ]
 then
@@ -113,7 +152,7 @@ do
     TIME="\t%E" time ./$p
 done
 
-echo Testing cache behavior:
+echo Testing cache behavior with Cachegrind:
 testCache Ack gic_ack
 testCache Collatz gic_collatz
 testCache Digits_of_e1 gic_digits_of_e1
