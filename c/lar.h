@@ -187,6 +187,8 @@ typedef struct T_ {
 #define SUSP(c, t, p)      ((Susp) {c, p})
 #endif /* USE_TAGS */
 
+#define FRM_NESTED(n) (CPTR(GETSTRICTARG(n, T0)))
+
 /* ********** Garbage collection ********** */
 
 /** For compatibility with the "compact" representation. */
