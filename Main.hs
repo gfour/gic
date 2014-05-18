@@ -140,7 +140,7 @@ processArgs cmdArgs =
         aux ("-enum"  : args) opts = aux args opts{optOptEnums=True}
         aux ("-null-df":args) opts = aux args opts{optNullDf=True}
         aux ("-strict": args) opts = aux args opts{optStrict=True}
-        aux ("-semigc": args) opts = aux args opts{optGC=SemiGC}
+        aux ("-semigc": args) opts = aux args opts{optGC=SemiGC}{optScrut = True}
         aux ("-libgc" : args) opts = aux args opts{optGC=LibGC}
         aux ("-compact":args) opts = aux args opts{optCompact=True}{optGC = SemiGC}{optScrut = True}
         aux ("-fop"   : args) opts = aux args opts{optFastOp=True}
