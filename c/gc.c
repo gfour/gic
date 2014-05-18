@@ -429,7 +429,7 @@ static void MM_printThunk(int n, TP_ lar) {
 }
 #else
 static void MM_printThunk(int n, TP_ lar) {
-  TODO("MM_printThunk missing");
+  printf("MM_printThunk missing"); exit(-1);
 }
 #endif /* LAR_COMPACT */
 
