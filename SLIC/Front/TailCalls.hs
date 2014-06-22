@@ -68,7 +68,7 @@ spotTCalls m =
                       FF vf el ci
           else e
       tcoE _ e@(FF (BV{}) _ NoCI) = e
-      tcoE _   (FF _ _ (Mut _)) = error "Found already set LAR mutation."
+      tcoE _   (FF _ _ (Mut _ _)) = error "Found already set LAR mutation."
       tcoE fs  (CaseF cloc e0 qn pats) = CaseF cloc e0 qn (map (tcoPat fs) pats)
       tcoE fs  (ConF (CN CIf) [cond, e1, e2]) =
           ConF (CN CIf) [cond, tcoE fs e1, tcoE fs e2]
@@ -111,7 +111,7 @@ tcoCI cafs stricts fs f el =
           Just oIdx -> (tIdx, oIdx):(genFrmMapping ifs)
           Nothing   -> ierr "genFrmMapping: no index found for formal"
       (perms, copies) = compileM $ genFrmMapping frmsUsed
-  in  Mut (perms, copies, closed, strs)
+  in  Mut (perms, copies, closed, strs) Nothing
 
 -- | Takes a list of visible CAFs and an expression. Returns True if
 --   the expression is closed; i.e. it is a constant expression, 

@@ -473,10 +473,14 @@ pprintMut (perms, copies, closed, stricts) =
   (" closed:["++).insCommIfMore (map shows $ S.toList closed).("] |"++).
   (" strict:["++).insCommIfMore (map shows $ S.toList stricts).("]"++)
 
--- | Tail-call information.
-data CI = NoCI | Mut Mutation
+-- | Tail-call information. LAR mutations keep the intensional index
+--   to uniquely identify the call (set by the intensional transformation).
+data CI = NoCI | Mut Mutation (Maybe IIndex)
      deriving (Eq, Read, Show)
 
 instance PPrint CI where
   pprint NoCI = ("{}"++)
-  pprint (Mut mut) = ("{mut:"++).pprintMut mut.("}"++)
+  pprint (Mut mut iidx) =
+    ("{mut:"++).pprintMut mut.
+    ("|call:"++).(case iidx of Just i -> pprintIdx i ; Nothing -> id).
+    ("}"++)

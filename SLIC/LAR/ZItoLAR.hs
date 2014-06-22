@@ -10,7 +10,7 @@ module SLIC.LAR.ZItoLAR (fromZOILtoLAR) where
 
 import SLIC.ITrans.Syntax
 import SLIC.LAR.SyntaxLAR
-import SLIC.SyntaxAux(CI(NoCI), Mod(..), Prog(Prog), PatB(PatB))
+import SLIC.SyntaxAux(CI(..), Mod(..), Prog(Prog), PatB(PatB))
 import SLIC.Types
 
 -- | Translates ZOIL to LAR syntax.
@@ -40,7 +40,10 @@ mkExp sigs cids (ConZ c exprs) = LARC c (map (mkExp sigs cids) exprs)
 mkExp _ _ (FZ NOp v ci) = LARCall v [] ci
 mkExp sigs _ (FZ (Call idx) v ci) =
   let args z = [ procLName (larIIndex idx) x | x <- (frmsOf z sigs) ]
-  in  LARCall v (args v) ci
+      ci' = case ci of
+              Mut mut Nothing -> Mut mut (Just idx)
+              _ -> ci
+  in  LARCall v (args v) ci'
 -- constructors are accompanied by their numbers and arities (for compilation)
 mkExp _ cids (ConstrZ c) =
   ConstrL (mkCC c cids)
