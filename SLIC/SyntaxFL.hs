@@ -7,7 +7,9 @@ module SLIC.SyntaxFL where
 
 import Prelude hiding (lookup)
 import Data.Char (ord, toUpper)
-import Data.Map (elems, empty, filterWithKey, fromList, keys, lookup, unionWithKey)
+import qualified Data.Map as M (elems, empty, filter, filterWithKey,
+       fromList, keys, lookup, map, unionWithKey, unions)
+import qualified Data.Set as S (empty, fromList)
 import SLIC.AuxFun (comment, ierr, showStrings, spaces, toLowerFirst)
 import SLIC.Constants
 import SLIC.State (ScrutOpt)
@@ -39,7 +41,7 @@ import SLIC.Types
 data ExprFL a =
     XF V                             -- ^ variable
   | ConF Const [ExprFL a]            -- ^ constant operator
-  | FF V [ExprFL a]                  -- ^ function application
+  | FF V [ExprFL a] CI               -- ^ function application
   | ConstrF CstrName [ExprFL a]      -- ^ constructor call
   | CaseF CaseLoc (ExprFL a) QName [PatFL a]
     -- ^ pattern matching expression, /case e as v of patterns/
@@ -148,9 +150,9 @@ instance PPrint a => PPrint (ExprFL a) where
      let l = length el
          s = prettyConst p cn el
      in  showParen (l>1 && p>0) s
-   pprintPrec _ (FF vn []) =
+   pprintPrec _ (FF vn [] _) =
      pprint vn
-   pprintPrec p (FF vn ps) =
+   pprintPrec p (FF vn ps _) =
      showParen (p>0) (pprint vn.spaces 1.pprintList 1 space ps)
    pprintPrec _ (ConstrF c el) = pprintTH c.spaces 1.pprint el
    pprintPrec p (CaseF cl@(cn, _) e bind pats) =
@@ -184,7 +186,7 @@ instance PPrint a => PPrint (DefFL a) where
 
 -- | Built-in operators.
 cBuiltinOps :: [String]
-cBuiltinOps = elems cOps
+cBuiltinOps = M.elems cOps
 
 -- | Built-in functions and constructors of GHC.
 cBuiltinFuncsGHC :: [QName]
@@ -192,7 +194,7 @@ cBuiltinFuncsGHC = [ QN bMod "I#", QN bMod "unpackCString#" ]
                    
 -- | The built-in functions that are implemented directly by the back-end.
 cBuiltinFuncsC :: [QName]
-cBuiltinFuncsC = keys builtinFuncSigs
+cBuiltinFuncsC = M.keys builtinFuncSigs
 
 -- | Built-in functions and constructors (such as unboxed integers).
 cBuiltinFuncs :: [QName]
@@ -228,9 +230,9 @@ namesToFrms vs strictness = map (\v->Frm v strictness) vs
 -- | Merges the imported functions tables of many imports to a single table.
 mergeImportFuns :: [IDecl] -> ImportedNames
 mergeImportFuns imps =  
-  let aux = Data.Map.unionWithKey 
+  let aux = M.unionWithKey 
             (\ k a1 a2 -> if a1==a2 then a1 else error $ "multiple imports same function name "++(show k)++" for functions "++(show [a1, a2])++". Possible cause: two modules import different functions with the same name.")
-  in  foldl aux empty (map ideclINames imps)
+  in  foldl aux M.empty (map ideclINames imps)
 
 -- | Filter for variables that look like constructors (they can be 
 --   the result of constructor functions in the original program).
@@ -263,7 +265,7 @@ isValidFL m xl =
             else flag
       chk (XF (BV _ _)) flag = flag
       chk (ConF _ el) flag = chkL el flag
-      chk (FF f el) flag =
+      chk (FF f el _) flag =
         let chkF v = 
               let t = findType v xl
               in  if length el == typeArity t then
@@ -296,7 +298,7 @@ isValidFL m xl =
           error $ (lName dt)++" is a built-in data type, cannot redefine"
         else
           let chkDC (DConstr c _ _) =
-                case Data.Map.lookup c builtinTEnv of
+                case M.lookup c builtinTEnv of
                   Just _  ->
                     error $ (lName c)++" is a built-in constructor, cannot redefine"
                   Nothing -> True
@@ -309,11 +311,11 @@ gatherSigs mods =
   let aux m =
         let defs = progDefs $ modProg m
         in  map defSig defs
-  in  fromList $ concatMap aux mods
+  in  M.fromList $ concatMap aux mods
       
 -- | Generates the function signatures from a list of definitions.
 getSigs :: [DefF] -> FuncSigs
-getSigs defs = fromList $ map defSig defs
+getSigs defs = M.fromList $ map defSig defs
 
 -- | Makes a table of the definitions' signatures.
 sigsF :: ProgF -> FuncSigs
@@ -326,7 +328,7 @@ restrictVEnvToProg ve (Prog dts defs) =
   let vNames (DefF f frms _) = [f]++(frmsToNames frms)          
       cNames (Data _ _ dcs) = map dcName dcs
       allNames = concatMap cNames dts ++ concatMap vNames defs  
-  in  filterWithKey (\f _ -> f `elem` allNames) ve
+  in  M.filterWithKey (\f _ -> f `elem` allNames) ve
 
 -- * Variable usage analyses
 
@@ -343,7 +345,7 @@ countVarUses si v (ConF (CN c) el) =
               maximum [countVarUses si v (el!!1), countVarUses si v (el!!2)]
        _   -> sum (map (countVarUses si v) el)
 countVarUses _ _ (ConF (LitInt _) _) = 0
-countVarUses si v (FF _ el) =
+countVarUses si v (FF _ el _) =
     -- assume it is a strict first-order function (i.e. uses all its arguments) 
     sum (map (countVarUses si v) el)
 countVarUses si@(scrOpt, frms) v (CaseF _ e _ pats) =
@@ -369,7 +371,7 @@ areBound bvars (XF (BV v loc)) = (v, loc) `elem` bvars
 areBound bvars (ConF _ el) = any (areBound bvars) el
 -- we do not check the function name in applications, as bound vars
 -- are always first-order
-areBound bvars (FF _ el) = any (areBound bvars) el
+areBound bvars (FF _ el _) = any (areBound bvars) el
 areBound bvars (ConstrF _ el) = any (areBound bvars) el
 areBound bvars (CaseF _ e' _ pats') = 
   or ((areBound bvars e') : (map (\(PatB _ e) -> areBound bvars e) pats'))
@@ -380,13 +382,42 @@ areBound bvars (LamF _ _ e) = areBound bvars e
 -- | Gathers all the strictness annotations from the function definitions of
 --   a module. Since constructors are also represented as functions, this also
 --   collects bang types.
-gatherStrictVars :: ModF -> Stricts
-gatherStrictVars m =
-  let defs = progDefs $ modProg m
+gatherStrictVars :: ProgF -> Stricts
+gatherStrictVars p =
+  let defs = progDefs p
       aux (DefF f fs _) =
         let enumFs = zip fs [0..]
-        in  (f, map snd $ filter (\(Frm _ s, _)->s) enumFs)
-  in  fromList $ map aux defs
+        in  (f, S.fromList $ map snd $ filter (\(Frm _ s, _)->s) enumFs)
+  in  M.fromList $ map aux defs
+
+-- | Version of 'gatherStrictVars' for FL modules.
+gatherStricts :: ModF -> Stricts
+gatherStricts m = gatherStrictVars (modProg m)
+
+-- | Gathers a list of the names of all CAFs accessible from code in this
+--   module. The CAFs can be local definitions, or imported names.
+reachableCAFs :: ModF -> [QName]
+reachableCAFs m =
+    let defs = progDefs (modProg m)
+        localCAFs =
+            map defVarName $ filter (\(DefF _ fs _)->length fs==0) defs
+        extCAFs = 
+            M.keys $
+            M.filter (\ii->case impCAF ii of Nothing -> False ; Just _ -> True) $
+            M.unions $ map ideclINames $ modImports m
+    in  localCAFs ++ extCAFs
+
+-- | Gathers the strictness information of all reachable functions
+--   in a module.
+reachableStricts :: ModF -> Stricts
+reachableStricts m =
+    let extStricts = M.map (\iinfo->fromJustSet $ impStricts iinfo) $
+                     M.unions $ map ideclINames $ modImports m
+    in  M.unions [gatherStrictVars (modProg m), extStricts]
+
+fromJustSet :: Maybe StrictInds -> StrictInds
+fromJustSet Nothing = S.empty
+fromJustSet (Just m) = m
 
 -- * Strings
 
@@ -396,8 +427,8 @@ charToInt c = ConF (LitInt (ord c)) []
 
 -- | Converts a 'String' to an FL list.
 mkStrList :: String -> ExprFL a
-mkStrList [] = FF (V bf_Nil) []
-mkStrList (ch:chs) = FF (V bf_Cons) [charToInt ch, mkStrList chs]
+mkStrList [] = FF (V bf_Nil) [] NoCI
+mkStrList (ch:chs) = FF (V bf_Cons) [charToInt ch, mkStrList chs] NoCI
 
 -- | Checks if a program contains lambda/let-expressions.
 hasLs :: ProgF -> Bool
@@ -405,7 +436,7 @@ hasLs p =
   let defs = progDefs p
       hasLD (DefF _ _ e) = hasLE e
       hasLE (XF _) = False
-      hasLE (FF _ el) = any hasLE el
+      hasLE (FF _ el _) = any hasLE el
       hasLE (ConF _ el) = any hasLE el
       hasLE (ConstrF _ el) = any hasLE el
       hasLE (CaseF _ e _ pats) =
@@ -424,7 +455,7 @@ countPMDepths defs =
       countV (V _) = 0
       countV (BV _ (loc, _)) = dOfLoc loc
       countE (XF v) = countV v
-      countE (FF v el) = maximum ((countV v):(map countE el))
+      countE (FF v el _) = maximum ((countV v):(map countE el))
       countE (ConF _ el) = maximum (0:(map countE el))
       countE (ConstrF _ el) = maximum (0:(map countE el))
       countE (CaseF (loc, _) e _ pats) =
@@ -433,4 +464,4 @@ countPMDepths defs =
       -- These constructs are not supported, we assume lambda lifted code.
       countE (LetF {}) = ierr "countE: found let"
       countE (LamF {}) = ierr "countE: found lambda"
-  in  fromList $ map countD defs
+  in  M.fromList $ map countD defs

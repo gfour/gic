@@ -92,9 +92,9 @@ enumLetLamD (st, DefF f fs e) =      -- enumLetLamD (i, DefF f fs e) =
 --   the lambda abstractions.
 enumLetLamE :: ((Int, Int), ExprF) -> ((Int, Int), ExprF)
 enumLetLamE (st, v@(XF _)) = (st, v)
-enumLetLamE (st, FF f el) =
+enumLetLamE (st, FF f el ci) =
   let (st2, el2) = procWithState enumLetLamE st el
-  in  (st2, FF f el2)
+  in  (st2, FF f el2 ci)
 enumLetLamE (st, ConF c el) =
   let (st2, el2) = procWithState enumLetLamE st el
   in  (st2, ConF c el2)
@@ -182,20 +182,20 @@ uniqueNamesE _ _ _ (XF (BV _ _)) =
   ierr "the renamer does not support bound variables"
 uniqueNamesE m f ren (ConF c el) =
    ConF c (map (uniqueNamesE m f ren) el)
-uniqueNamesE m f ren (FF func el) =
+uniqueNamesE m f ren (FF func el ci) =
   let el' = map (uniqueNamesE m f ren) el
   in  case func of
         V func' -> 
           -- first check for a name from the local renamings, then for one
           -- from the module-scope renamings
           case M.lookup func' (localRen ren) of  
-            Just f' -> FF (V f') el'
+            Just f' -> FF (V f') el' ci
             Nothing ->
               case M.lookup func' (moduleRen ren) of  
-                Just f' -> FF (V f') el'
-                Nothing -> FF func el'
+                Just f' -> FF (V f') el' ci
+                Nothing -> FF func el' ci
         -- do not process bound variable applications
-        BV _ _ -> FF func el'
+        BV _ _ -> FF func el' ci
 uniqueNamesE m f ren (CaseF d e b pats) =
   let ppat (PatB (SPat c0 bs0, pI) e0) =
         PatB (SPat (renameConstr m ren c0) bs0, pI) (uniqueNamesE m f ren e0)
@@ -299,7 +299,7 @@ prepDef (DefF f fs e) =
 prepE :: RenameInvPat a => ExprFL a -> ExprFL a
 prepE (XF v) = XF (prepV v)
 prepE (ConF c el) = ConF c (map prepE el)
-prepE (FF f el) = FF (prepV f) (map prepE el)
+prepE (FF f el ci) = FF (prepV f) (map prepE el) ci
 prepE (ConstrF c el) = ConstrF (prepQN c) (map prepE el)
 prepE (CaseF (cn, func) e scrut pats) =
   let prepPat (PatB (pat, pI) eP) = PatB (renameInvPat pat, pI) (prepE eP)

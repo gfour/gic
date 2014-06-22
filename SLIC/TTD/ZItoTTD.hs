@@ -61,7 +61,7 @@ transE vIDs n (ConZ cOp@(CN _) el) =
       n'' = n' + 1
   in  (((n'', ConT cOp topEntriesIDs), entries), n'')
 transE _ _ (ConZ c _) = ierr $ "TODO: fromZOILtoTTD: unknown built-in constant"++(pprint c "")
-transE vIDs n (FZ qOp f) = 
+transE vIDs n (FZ qOp f _) = 
   let n' = n+1
   in  (((n', CallT qOp (idOf vIDs f)), []), n')
 transE vIDs n (XZ var) =

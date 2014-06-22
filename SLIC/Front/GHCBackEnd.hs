@@ -179,7 +179,7 @@ flatten dfs (Var f) args =
       appNameS = nm dfs f                 -- simple name
       appNameF = showPPr dfs f            -- full name
       appNameQN = mapGHCtoGICName $ stringToQName appNameF
-      ff f' args' = FF (V f') args'
+      ff f' args' = FF (V f') args' NoCI
   in  if appNameS `elem` cBuiltinOps then
         if appNameS `elem` (elems cOps) then
           case (length args) of
@@ -257,7 +257,7 @@ processPatMatch scrOpt datatypes defs =
       procPMD (DefF f fs e) = DefF f fs (procPME (scrOpt, frmsToNames fs) e)
       procPME _ e@(XF _) = e
       procPME si (ConF c el) = ConF c (map (procPME si) el)
-      procPME si (FF f el) = FF f (map (procPME si) el)
+      procPME si (FF f el ci) = FF f (map (procPME si) el) ci
       procPME si (ConstrF (QN Nothing c) el@[_, _]) | isTupleConstr c =
           let tupleC = bf_Tuple (length el)
           in  if constrExists datatypes tupleC then
@@ -293,9 +293,9 @@ processPatMatch scrOpt datatypes defs =
                   ierr "renVar: found bound variable"
                 renVar orig scrut (ConF c el) =
                   ConF c (map (renVar orig scrut) el)
-                renVar orig scrut (FF (V v) el) =
-                  FF (V (aux orig scrut v)) (map (renVar orig scrut) el)
-                renVar _ _ (FF (BV _ _) _) =
+                renVar orig scrut (FF (V v) el ci) =
+                  FF (V (aux orig scrut v)) (map (renVar orig scrut) el) ci
+                renVar _ _ (FF (BV _ _) _ _) =
                   ierr "renVar: found bound variable application"
                 renVar orig scrut (ConstrF c el) =
                   ConstrF c (map (renVar orig scrut) el)

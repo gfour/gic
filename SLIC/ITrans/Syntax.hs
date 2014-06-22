@@ -20,7 +20,7 @@ import SLIC.Types
 data ExprH =
     XH V                     -- ^ variable
   | ConH Const [ExprH]       -- ^ built-in constant application
-  | FH QOp QName [ExprH]     -- ^ function call (with intensional operators)
+  | FH QOp QName [ExprH] CI  -- ^ function call (with intensional operators)
   | CaseH CaseLoc ExprH [PatH] -- ^ pattern matching expression
   | ConstrH CstrName         -- ^ constructor call
   deriving (Eq,Read)
@@ -56,8 +56,8 @@ instance PPrint ExprH where
    pprint (XH vn)          = pprint vn
    pprint (ConH cn el)     = prettyConst 0 cn el
    pprint (ConstrH c)      = pprintTH c
-   pprint (FH NOp vn ps)   = pprint vn.pprintList 1 space ps
-   pprint (FH qOp vn ps)   =
+   pprint (FH NOp vn ps _) = pprint vn.pprintList 1 space ps
+   pprint (FH qOp vn ps _) =
        pprint qOp.(" (" ++).pprint vn.(")" ++).pprintList 1 space ps
    pprint (CaseH cl@(cn, _) e pats) =
       ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).nl.
@@ -75,7 +75,7 @@ instance PPrint DefH where
 -- | A 0-order intensional expression.
 data ExprZ = XZ V                          -- ^ variable
            | ConZ Const [ExprZ]            -- ^ built-in constant application
-           | FZ QOp QName                  -- ^ intensional call operator
+           | FZ QOp QName CI               -- ^ intensional call operator
            | CaseZ CaseLoc ExprZ [PatZ]    -- ^ pattern matching
            | ConstrZ CstrName              -- ^ intensional constructor
            deriving (Eq, Read)
@@ -97,8 +97,8 @@ type ModZ = Mod ProgZ
 instance PPrint ExprZ where
    pprint (XZ vn) = pprint vn
    pprint (ConZ cn el) = prettyConst 0 cn el
-   pprint (FZ NOp e) = pprint e
-   pprint (FZ qOp e) = pprint qOp.(" (" ++).pprint e.(")" ++)
+   pprint (FZ NOp e _) = pprint e
+   pprint (FZ qOp e _) = pprint qOp.(" (" ++).pprint e.(")" ++)
    pprint (CaseZ cl@(cn, _) e pats) =
      ("case "++).pprint e.(" of{"++).pprintCaseLoc cl.("}"++).nl.
      pprint_tab_l (tabIdxOf cn) pats

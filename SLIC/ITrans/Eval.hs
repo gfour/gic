@@ -144,9 +144,9 @@ evalZ trace prog d (XZ (V vn)) ls dict pc =
        else
          return ()) >>
       return val
-evalZ trace prog d (FZ NOp v) ls dict pc =
+evalZ trace prog d (FZ NOp v _) ls dict pc =
     evalZ trace prog d (XZ (V v)) ls dict pc    
-evalZ trace prog d (FZ (Call i) v) ls dict pc =
+evalZ trace prog d (FZ (Call i) v _) ls dict pc =
   evalZ trace prog d (XZ (V v)) (i:ls) dict pc
 evalZ trace prog d (CaseZ (CLoc (Just (0, 0)), _) e pats) ls dict pc =
     evalZ trace prog (d+1) e ls dict ls >>= \e' ->

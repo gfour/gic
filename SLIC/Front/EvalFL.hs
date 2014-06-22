@@ -141,7 +141,7 @@ transFL p =
                 case (reads (drop (idx+1) bvName) :: [(Int, String)]) of
                   [(cPos, _)] -> CProj cId cPos
                   _ -> ierr "error converting to constructor projection"
-      transE vs (SFL.FF (T.V f) el) = FApp (T.lName f) (map (transE vs) el)
+      transE vs (SFL.FF (T.V f) el _) = FApp (T.lName f) (map (transE vs) el)
       transE _  (SFL.ConF (SA.LitInt i) []) = LitI i
       transE _  (SFL.ConF (SA.CN SA.CTrue) []) = LitB True
       transE _  (SFL.ConF (SA.CN SA.CFalse) []) = LitB False

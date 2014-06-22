@@ -64,14 +64,14 @@ replaceConstrD (DefF v vl e) = DefF v vl (replaceConstrE e)
 
 -- | Replaces constructor calls with calls to constructor functions.
 replaceConstrE :: ExprF -> ExprF
-replaceConstrE e@(XF _) = e
-replaceConstrE (ConF c el) = ConF c (map replaceConstrE el)
-replaceConstrE (FF f el) = FF f (map replaceConstrE el)
+replaceConstrE e@(XF _)     = e
+replaceConstrE (ConF c el)  = ConF c (map replaceConstrE el)
+replaceConstrE (FF f el ci) = FF f (map replaceConstrE el) ci
 replaceConstrE (CaseF d e b pats) =
   let replaceConstrP (PatB pat0 e0) = PatB pat0 (replaceConstrE e0)
   in  CaseF d (replaceConstrE e) b (map replaceConstrP pats)
 -- thunks become applications
-replaceConstrE (ConstrF c el) = FF (V c) (map replaceConstrE el)
+replaceConstrE (ConstrF c el) = FF (V c) (map replaceConstrE el) NoCI
 replaceConstrE (LetF dep defs e) =
   LetF dep (map replaceConstrD defs) (replaceConstrE e)
 replaceConstrE (LamF dep v e) =
@@ -117,7 +117,7 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
                                    (CaseF (cNested scrOpt 0 updName)
                                     (XF (V ux0)) underscoreVar
                                     [PatB cPat
-                                     (FF (V c) (map (\v->XF(V v)) updFields))]
+                                    (FF (V c) (map (\v->XF(V v)) updFields) NoCI)]
                                    )
                     in  [selector, updater]
           in  (DefF pn [Frm px s] (selBody pn px)) : recFields
@@ -125,9 +125,10 @@ newDataDefsDC scrOpt (DConstr c dTypes _) =
           if containSelectors dTypes then
             let errorField i = FF (V bf_error)
                                [mkStrList $ (lName c)++
-                                ": acess to uninitialized field "++(show i)]
+                                ": acess to uninitialized field "++(show i)] NoCI
                 dc = dummyCName c
-            in  [DefF dc [] (FF (V c) (map errorField [0..(length dTypes-1)]))]
+            in  [DefF dc [] 
+                      (FF (V c) (map errorField [0..(length dTypes-1)]) NoCI)]
           else []
     in  [wrapper] ++ (concatMap mkProj $ zip dTypes [0..]) ++
         dummyConstr
@@ -250,9 +251,9 @@ procBVE scrOpt m fsig@(func, frms) al d (CaseF cloc@(cn, ef) e b pats) =
                            ierr "preprocessor: malformed case expression"
 procBVE so m func al d (ConF c el) = ConF c (map (procBVE so m func al d) el)
 procBVE so m func al d (ConstrF c el) = ConstrF c (map (procBVE so m func al d) el)
-procBVE so m func al d (FF f el) =
+procBVE so m func al d (FF f el ci) =
   case f of
-    V fName -> FF (procBVEV al fName) (map (procBVE so m func al d) el)
+    V fName -> FF (procBVEV al fName) (map (procBVE so m func al d) el) ci
     BV _ _  -> ierr "Bound variable found by procBVE, should not appear here"
 procBVE _ _ _ _ _ bv@(XF (BV _ _)) = bv
 procBVE _ _ _ al _ (XF (V v)) = XF (procBVEV al v)
@@ -289,11 +290,11 @@ getBVAliasesPat loc c vs =
 -- 
 convertFromGHC :: ProgF -> ProgF
 convertFromGHC (Prog ds defs) =
-  let elimPrim var@(XF (V _)) = var
-      elimPrim (XF (BV _ _)) = error "Cannot feed bound variables to GHC"
-      elimPrim (ConF c el) = ConF c (map elimPrim el)
-      elimPrim (FF f@(V _) el) = FF f (map elimPrim el)
-      elimPrim (FF (BV _ _) _) = ierr "elimPrim: bound variable application"
+  let elimPrim var@(XF (V _))     = var
+      elimPrim (XF (BV _ _))      = error "Cannot feed bound variables to GHC"
+      elimPrim (ConF c el)        = ConF c (map elimPrim el)
+      elimPrim (FF f@(V _) el ci) = FF f (map elimPrim el) ci
+      elimPrim (FF (BV _ _) _ _)  = ierr "elimPrim: bound variable application"
       elimPrim (ConstrF (QN (Just "GHC.Types") "I#") [e]) = e
       elimPrim (ConstrF c el) = ConstrF c (map elimPrim el)
       
@@ -349,8 +350,8 @@ liftParamCase m (d, i) (ConF c el) =
   liftParamExprL m (d+1, i) el (\el' -> ConF c el')
 liftParamCase m (d, i) (ConstrF c el) =
   liftParamExprL m (d+1, i) el (\el' -> ConstrF c el')
-liftParamCase m (d, i) (FF f el) =
-  liftParamExprL m (d+1, i) el (\el' -> FF f el')
+liftParamCase m (d, i) (FF f el ci) =
+  liftParamExprL m (d+1, i) el (\el' -> FF f el' ci)
 liftParamCase m ci (CaseF dep e bnd pats) =
   let aux (PatB pat eP) = PatB pat (liftParamCase m ci eP)
   in  CaseF dep (liftParamCase m ci e) bnd (map aux pats)
@@ -473,10 +474,10 @@ qualDef (_, fm) (DefF f@(QN (Just _) _) _ _) =
   errM fm $ "Found declaration of already qualified name: "++(qName f)
 
 qualE :: QInfo -> ExprF -> ExprF
-qualE info (XF (V v)) = XF (V (qualQName info v))
-qualE info (ConF c el) = ConF c (map (qualE info) el)
-qualE info (FF (V f) el) = FF (V (qualQName info f)) (map (qualE info) el)
-qualE info (ConstrF c el) = ConstrF (qualQName info c) (map (qualE info) el)
+qualE info (XF (V v))       = XF (V (qualQName info v))
+qualE info (ConF c el)      = ConF c (map (qualE info) el)
+qualE info (FF (V f) el ci) = FF (V (qualQName info f)) (map (qualE info) el) ci
+qualE info (ConstrF c el)   = ConstrF (qualQName info c) (map (qualE info) el)
 qualE info (CaseF cl e sc pats) =
   let qualPat (PatB (SPat c bvs, pI) eP) =
         PatB (SPat (qualQName info c) (map (qualQName info) bvs), pI)
@@ -487,7 +488,7 @@ qualE info (LetF d defs e) =
 qualE info@(_, (m, _)) (LamF d (QN Nothing v) e) =
   LamF d (QN (Just m) v) (qualE info e)
 -- sanity checks  
-qualE (_, fm) (FF (BV _ _) _) =
+qualE (_, fm) (FF (BV _ _) _ _) =
   errM fm "found bound variable application while parsing"
 qualE (_, fm) (XF (BV _ _)) = errM fm "found bound variable while parsing"
 qualE (_, fm) (LamF _ (QN (Just _) _) _) =
@@ -562,7 +563,7 @@ checkNames modF =
               True
             else
               errM fm $ "Unknown variable "++(qName vName)++", known names: "++(pprintList 0 (", "++) names "")
-      checkE names (FF f el) =
+      checkE names (FF f el _) =
         let fName = nameOfV f
         in  if (fName `elem` names) || ((lName fName) `elem` tcMethods) then
               all (checkE names) el

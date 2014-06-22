@@ -70,14 +70,14 @@ getActs :: FuncSigs -> ExprH -> [(QName, (IIndex, ExprH))]
 getActs _ (XH _) = []   
 getActs _ (ConstrH _) = []
 getActs allSigs (ConH _ el) = concatMap (getActs allSigs) el
-getActs allSigs (FH (Call i) f el) = 
+getActs allSigs (FH (Call i) f el _) = 
   let fNames =
         case Data.Map.lookup f allSigs of
           Just fn -> fn
           Nothing -> ierr $ "getActs: definition lookup failed for "++(qName f)++" in signatures:\n"++(pprFSigs allSigs "")
       acts = map (\e->(i, e)) el
   in  (zip fNames acts) ++ (concatMap (getActs allSigs) el)         
-getActs _ fc@(FH NOp _ _) =
+getActs _ fc@(FH NOp _ _ _) =
   ierr $ "getActs: this function call should have a call() before it: "++(pprint fc "")
 getActs allSigs (CaseH _ e pats) = 
   (getActs allSigs e) ++ (concatMap (\(PatB _ e0) -> getActs allSigs e0) pats)
@@ -87,8 +87,8 @@ removeFHArgs :: DefH -> DefH
 removeFHArgs def =
   let remFHArgsE (XH v) = XH v
       remFHArgsE (ConH c el) = ConH c (map remFHArgsE el)
-      remFHArgsE (FH call@(Call _) f _) = FH call f []
-      remFHArgsE fc@(FH NOp _ _) =
+      remFHArgsE (FH call@(Call _) f _ ci) = FH call f [] ci
+      remFHArgsE fc@(FH NOp _ _ _) =
         ierr $ "remFHArgsE: this function call should have a call() before it: "++(pprint fc "")
       remFHArgsE (CaseH d e pats) =
         CaseH d (remFHArgsE e)
@@ -115,7 +115,7 @@ insertCallsE inds (ConH c el) =
   let (el', inds') = insertCalls_List inds insertCallsE el
   in  (ConH c el', inds')
 insertCallsE inds (ConstrH c) = (ConstrH c, inds)  
-insertCallsE inds (FH NOp f el) =
+insertCallsE inds (FH NOp f el ci) =
   let iindex =
         case Data.Map.lookup f inds of
           Just iidx -> iidx
@@ -124,7 +124,7 @@ insertCallsE inds (FH NOp f el) =
       callId  = Call iindex
       inds1   = Data.Map.update (\_ -> Just (addOne iindex)) f inds
       (el', inds') = insertCalls_List inds1 insertCallsE el
-  in  (FH callId f el', inds')
+  in  (FH callId f el' ci, inds')
 insertCallsE _ fc@(FH {}) =
   ierr $ "Cannot insert call(), there is already one in: "++(pprint fc "")
 insertCallsE inds (CaseH d e pats) =

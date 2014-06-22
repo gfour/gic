@@ -185,18 +185,18 @@ transl_imp :: MNameF -> S.ImportDecl -> IDecl
 transl_imp fm (S.ImportDecl _ (S.ModuleName mn) False False Nothing Nothing (Just (False, specs))) =
   let transl_ispec (S.IVar (S.Ident v)) =
         let qn = QN (Just mn) v
-        in  [(qn, IInfo Nothing Nothing NFunc Nothing Nothing)]
+        in  [(qn, IInfo Nothing Nothing NFunc Nothing Nothing Nothing)]
       transl_ispec (S.IAbs (S.Ident c)) =
         let qn = QN (Just mn) c
-        in  [(qn, IInfo Nothing Nothing NFunc Nothing Nothing)]
+        in  [(qn, IInfo Nothing Nothing NFunc Nothing Nothing Nothing)]
       -- translate a partially imported constructor
       transl_ispec (S.IThingWith dt names) =
         let transl_itw (S.ConName cn) =
               let qn = QN (Just mn) (getName cn)
-              in  (qn, IInfo Nothing Nothing NConstr Nothing Nothing)
+              in  (qn, IInfo Nothing Nothing NConstr Nothing Nothing Nothing)
             transl_itw (S.VarName vn) = errM fm $ "Exported class methods are not supported (found method "++(show vn)++")"
             dtName = QN (Just mn) (getName dt)
-        in  (dtName, IInfo Nothing Nothing NDType Nothing Nothing) :
+        in  (dtName, IInfo Nothing Nothing NDType Nothing Nothing Nothing) :
             (map transl_itw names)
       transl_ispec imp = error $ "This import statement is not supported: "++(show imp)
   in  IDecl mn (Data.Map.fromList $ concatMap transl_ispec specs) Nothing
@@ -213,7 +213,7 @@ tcImport (TcDecl _ _ methods) =
             ar  = length args
             -- TODO: assume that the defunctionalized handler does pattern
             -- matching of depth=1
-            iName0 = (qn, IInfo (Just t) (Just ar) NFunc Nothing (Just 1))
+            iName0 = (qn, IInfo (Just t) (Just ar) NFunc Nothing (Just 1) Nothing)
             iSig0  = (qn, qns)
         in  (iName0, iSig0)
       (iNames0, iSigs0) = unzip $ map auxII methods
@@ -398,9 +398,10 @@ transl_e opts fm app@(S.App _ _) st =
                  S.Lambda _ pats eLambda = innerLam app
                  bvs = simplePats fm pats
                  (st3, eBind) = transl_e opts fm eLambda st2
-             in  (st3, mkLambdaLet opts lamName bvs eBind (FF (V lamName) argsF))
+             in  (st3,
+                  mkLambdaLet opts lamName bvs eBind (FF (V lamName) argsF NoCI))
            else
-             (st1, FF (V fName) argsF)
+             (st1, FF (V fName) argsF NoCI)
 transl_e _ _ (S.Con (S.Special S.UnitCon)) st = (st, ConstrF bf_Unit [])
 transl_e _ _ (S.Con cstr) st =
   let cstrF = getQName cstr
@@ -430,7 +431,7 @@ transl_e opts fm (S.InfixApp e1 app e2) st =
             in  if opN `elem` cBuiltinOps then
                   ConF (CN (cOpForStr opN)) [e1FL, e2FL]   -- built-in operator
                 else
-                  FF (V op) [e1FL, e2FL]       -- infix function application
+                  FF (V op) [e1FL, e2FL] NoCI     -- infix function application
           S.QConOp (S.Special S.Cons) -> ConstrF bf_Cons [e1FL, e2FL]  -- (:)
           S.QConOp hsn ->           
             error $ "Infix constructor application is not supported: "++(qName $ getQName hsn)
@@ -521,7 +522,7 @@ transl_rec_upd opts fm innerExpr fields st =
         let updFunc = (updCName $ getQName sel)
             (st1, fsFL  ) = aux fs st0
             (st2, eSelFL) = transl_e opts fm eSel st1
-        in  (st2, FF (V updFunc) [fsFL, eSelFL])
+        in  (st2, FF (V updFunc) [fsFL, eSelFL] NoCI)
       aux (fld:_) _ = errM fm $ "Unsupported records feature: "++(show fld)
   in  aux fields st
 
@@ -588,7 +589,7 @@ transl_let_patbind opts fm (S.PatBind _ pat _ rhs _) st =
               mkBindDefs (SPat c' ps', eName') =
                 let mkProjDef (v, i) =
                       DefF v [] (FF (V (QN Nothing (projCName (lName c') i))) 
-                                 [XF (V eName')])
+                                 [XF (V eName')] NoCI)
                 in  map mkProjDef $
                     filter (\(v', _)->v'/=underscoreVar) $ zip ps' [0..]
           in  (st3, eDef : (concatMap mkBindDefs bnds))

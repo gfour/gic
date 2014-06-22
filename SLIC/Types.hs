@@ -5,9 +5,10 @@ module SLIC.Types where
 
 import Prelude hiding (lookup, null)
 import Data.List (intersperse)
-import qualified Data.Map as Map (Map, filterWithKey, fromList, lookup, 
-                                  map, null, toList)
+import qualified Data.Map as M (Map, filterWithKey, fromList, lookup, 
+                                map, null, toList)
 import qualified Data.Sequence as Sequence (elemIndexR, fromList)
+import qualified Data.Set as S (Set, toList)
 import SLIC.AuxFun (comment, foldDot, ierr, showStrings, toLowerFirst)
 import SLIC.Constants (bMod, comments, dfMod, mControlParallel, delim, lparen,
                        rparen, nl)
@@ -107,7 +108,7 @@ type CstrName = QName
 type Arity = Int
 
 -- | A table from variables to arities.
-type Arities = Map.Map QName Arity
+type Arities = M.Map QName Arity
 
 -- | Data type names.
 type DTName = QName
@@ -166,25 +167,29 @@ tabIdxOf _ = 0
 noCaseLoc :: CaseLoc
 noCaseLoc = (CLoc Nothing, noEFunc)
 
+-- | Slot index in a LAR.
+type SlotIdx = Int
+
 -- | The indexes of strict formals for a function signature.
-type StrictInds = [Int]
+type StrictInds = S.Set SlotIdx
 
 -- | The list of strict formals of every function.
-type Stricts = Map.Map QName StrictInds
+type Stricts = M.Map QName StrictInds
 
 -- | Prints the extra 'strict formals' field of a function definition.
-pprintStrictFrms :: Stricts -> ShowS
-pprintStrictFrms stricts =
-  let aux (f, is) = pprint f.(" {"++).showStrings ", " (map show is).("}"++).nl
-  in  foldDot aux $ Map.toList stricts
+pprintStricts :: Stricts -> ShowS
+pprintStricts stricts =
+  let aux (f, is) = pprint f.(" {"++).
+                    showStrings ", " (map show $ S.toList is).("}"++).nl
+  in  foldDot aux $ M.toList stricts
 
 -- | A map containing the call-by-name formals of each function.
-type CBNVars = Map.Map QName [QName]
+type CBNVars = M.Map QName [QName]
 
 pprintCBNVars :: CBNVars -> ShowS
 pprintCBNVars cbns =
   let aux (f, frms) = pprint f.(" : "++).pprintList 0 (", "++) frms.nl
-  in  foldDot aux $ Map.toList cbns
+  in  foldDot aux $ M.toList cbns
 
 -- | The variable usage information contains the variables that can be evaluated
 --   using call-by-name and those that can be evaluated using call-by-value.
@@ -197,19 +202,19 @@ type PMDepth = Int
 
 -- | The mapping of variable definitions to their maximum pattern
 --   matching depth.
-type PMDepths = Map.Map QName PMDepth
+type PMDepths = M.Map QName PMDepth
 
 -- | Pretty printer for pattern matching depth tables.
 pprintPD :: PMDepths -> ShowS
 pprintPD pds =
   let pprPDep (qn, i) = pprint qn.(" ## "++).shows i.nl
-  in  foldDot pprPDep (Map.toList pds)
+  in  foldDot pprPDep (M.toList pds)
 
 -- | Returns the pattern matching depth of a function. Fails, if no depth
 --   is found in the PMDepths table.
 findPMDepth :: QName -> PMDepths -> PMDepth
 findPMDepth f pmds =
-  case Map.lookup f pmds of
+  case M.lookup f pmds of
     Just pd -> pd
     Nothing -> ierr $ (qName f)++" depth not found in:\n"++(pprintPD pmds "")
 
@@ -217,7 +222,7 @@ findPMDepth f pmds =
 --   is found in the PMDepths table.
 findPMDepthSafe :: QName -> PMDepths -> PMDepth
 findPMDepthSafe f pmds =
-  case Map.lookup f pmds of
+  case M.lookup f pmds of
     Just pd -> pd
     Nothing -> 0
 
@@ -230,13 +235,13 @@ type ProgInfo = (FuncSigs, VUsage, PMDepths)
 type CID = Int
 
 -- | The table of the IDs assigned to constructors during compilation.
-type CIDs = Map.Map CstrName (Arity, CID)
+type CIDs = M.Map CstrName (Arity, CID)
 
 -- | Pretty printer for compiled constructor tables.
 pprintCIDs :: CIDs -> ShowS
 pprintCIDs cids =
   let aux (c, (ar, cid)) = (pprint c).("/"++).shows ar.(" = "++).shows cid.nl
-  in  foldDot aux (Map.toList cids)
+  in  foldDot aux (M.toList cids)
 
 -- | Filenames.
 type FileName = String
@@ -248,12 +253,12 @@ type FPath = String
 type FSig = (QName, [QName])
   
 -- | Function signatures: function (formals...)
-type FuncSigs = Map.Map QName [QName]
+type FuncSigs = M.Map QName [QName]
 
 -- | Returns the formals of a name. Fails if no signature is found.
 frmsOf :: QName -> FuncSigs -> [QName]
 frmsOf qn fsigs =
-  case Map.lookup qn fsigs of
+  case M.lookup qn fsigs of
     Just frms -> frms
     Nothing -> ierr $ "No signature found for name "++(qName qn)++" in:\n"++(pprFSigs fsigs "")
 
@@ -264,18 +269,18 @@ pprFSigs fsigs =
       aux ((f, vs):fs) =
         let strL ls = showStrings ", " (map qName ls)
         in  pprint f.("("++).strL vs.(")"++).nl.aux fs
-  in  aux $ Map.toList fsigs
+  in  aux $ M.toList fsigs
         
 -- | Pretty printer for function signature tables (for import declarations).
 pprintImportSigs :: FuncSigs -> ShowS
 pprintImportSigs fsigs =
   let pprintISig (f, frms) = ("import "++).pprint f.lparen.showStrings ", " (map qName frms).rparen.nl
-  in  if Map.null fsigs then id else foldDot pprintISig (Map.toList fsigs)
+  in  if M.null fsigs then id else foldDot pprintISig (M.toList fsigs)
 
 -- | Fins the parameters of a function name in a signatures table.
 paramsOf :: QName -> FuncSigs -> [QName]
 paramsOf qn fsigs =
-  case Map.lookup qn fsigs of
+  case M.lookup qn fsigs of
     Just ps -> ps
     Nothing -> ierr $ "No parameters found in signatures table for "++(qName qn)
 
@@ -408,14 +413,14 @@ bTupleSizes = [2..maxTupleSize]
 type EInfo  = (Type, Maybe Arity)
 
 -- | A typing environment parameterized by key (e.g. variables, names).
-type Env a = Map.Map a EInfo
+type Env a = M.Map a EInfo
 
 -- | Pretty printer for environments.
 pprintE :: (PPrint a) => Env a -> ShowS
 pprintE ve =
   let pprintE0 []      = nl
       pprintE0 (vb:rs) = pprintTenvI vb.nl.pprintE0 rs
-  in  pprintE0 $ Map.toList ve
+  in  pprintE0 $ M.toList ve
 
 -- | A typing environment (Yaghi-style transformation).
 type TEnv = Env QName
@@ -439,7 +444,7 @@ typeArity t = length (types t) - 1
 -- | Finds the type/arity information of a name in an environment.
 findInfo :: (Ord a, PPrint a) => a -> Env a -> EInfo
 findInfo qn env =
-  case Map.lookup qn env of
+  case M.lookup qn env of
     Just info -> info
     Nothing   ->
       ierr ("name not found: " ++ (pprint qn "") ++ " in " ++ (pprintE env ""))
@@ -464,7 +469,7 @@ order (Tg _) = 0
 order (Tv _) = 0
 order (Ta _ _) = 0
 order (Tf _ b) = 1 + (order b)
-       
+
 -- | Tests if a variable will return lazy data on evaluation.
 returnsThunk :: TEnv -> QName -> Bool
 returnsThunk ve vn =
@@ -472,7 +477,7 @@ returnsThunk ve vn =
   case mName vn of
     Just m | m==dfMod -> True
     _ -> 
-      case Map.lookup vn ve of
+      case M.lookup vn ve of
         Just (_, Nothing) ->
           ierr $ "returnsThunk: called for "++(pprint vn "")++", which has no arity"
         Just (t, Just ar) ->
@@ -516,7 +521,7 @@ constrT (t:tl) r = Tf t (constrT tl r)
 -- | Returns the arity of a constructor and its compiled ID.
 findArID :: CstrName -> CIDs -> (Arity, CID)
 findArID c@(QN cm cn) cids =
-  case Map.lookup c cids of
+  case M.lookup c cids of
     Just (ar, cid) -> (ar, cid)
     Nothing ->
       -- Special case: built-in integers are their own ID and have no parameters.
@@ -615,7 +620,7 @@ bf_Tuple  :: Int -> QName            ; bf_Tuple i= QN bMod ("TupleC$"++(show i))
 
 -- | The IDs of the built-in constructors.
 builtinCIDs :: CIDs
-builtinCIDs = Map.fromList $
+builtinCIDs = M.fromList $
               [ (bf_Cons, (2, 0)), (bf_Nil, (0, 1))
               , (bf_Unit, (0, 0)) ]
               ++ (map (\i->(bf_Tuple i, (i, 0))) bTupleSizes)
@@ -634,7 +639,7 @@ tv_a_ :: Int -> Type            ;   tv_a_ i = Tv (v_a++(show i))
 -- | Types of built-in functions.
 builtinTEnv :: TEnv
 builtinTEnv = 
-  Map.fromList $
+  M.fromList $
   [ (bf_toInteger, (Tf tInt tInteger, Just 1))
   , (bf_toInteger_arg0, (tInt, Nothing))
   , (bf_putStrLn, (Tf (Ta tList tv_a) tUnit, Just 1))
@@ -690,12 +695,12 @@ mkTupleTg n = Tg (T (dtTuple n))
 builtinConstrs :: Arities
 builtinConstrs =
   let constrs = [bf_Cons, bf_Nil, bf_Unit]
-  in  Map.filterWithKey (\c _-> c `elem` constrs) builtinArities
+  in  M.filterWithKey (\c _-> c `elem` constrs) builtinArities
 
 -- | Function signatures of built-in functions (needed for the intensional 
 --   transformation).
 builtinFuncSigs :: FuncSigs
-builtinFuncSigs = Map.fromList $
+builtinFuncSigs = M.fromList $
                   [ (bf_toInteger, [bf_toInteger_arg0])     -- big integers
                   , (bf_printIntIO, [bf_printIntIO_arg0])
                   , (bf_readIntIO, [])
@@ -714,7 +719,7 @@ builtinFuncSigs = Map.fromList $
 -- | Checks if a name corresponds to a built-in function.
 isBuiltinFunc :: QName -> Bool
 isBuiltinFunc qn =
-  case Map.lookup qn builtinFuncSigs of Just _ -> True ; Nothing -> False
+  case M.lookup qn builtinFuncSigs of Just _ -> True ; Nothing -> False
        
 -- | Generate the signature of the built-in tuple constructor for a given arity.
 bf_TupleSig :: Arity -> FSig
@@ -726,11 +731,11 @@ bf_TupleSig n =
 
 -- | Arity information for all built-in functions.
 builtinArities :: Arities                  
-builtinArities = Map.map length builtinFuncSigs
+builtinArities = M.map length builtinFuncSigs
                   
 -- | The pattern depths of the built-in functions.
 builtinPmDepths :: PMDepths
-builtinPmDepths = Map.fromList $
+builtinPmDepths = M.fromList $
                   [ (bf_toInteger, 0), (bf_printIntIO, 0)
                   , (bf_readIntIO, 0)
                   , (bf_putStr, 0), (bf_putStrLn, 0), (bf_show, 0)

@@ -32,6 +32,7 @@ import SLIC.Front.Defunc (ModD(ModD), defuncMod, dfFlags, dfiAppSigs,
 import SLIC.Front.EvalFL (evalFL)
 import SLIC.Front.Preprocessor
 import SLIC.Front.Renamer
+import SLIC.Front.TailCalls (spotTCalls)
 import SLIC.Front.Typeclass (builtinTcInfo, inlineTcMethods)
 import SLIC.Front.TypeInfer
 import SLIC.Distr.EvalErl
@@ -105,7 +106,7 @@ processFL opts dfis inputModule =
      let dfModF = defuncMod opts e1 p1
      -- _ <- printLn dfMods
      -- do the -enum opimization
-     let dfModFFinal = (if canOptEnums opts then optEnums else id) dfModF
+     let dfModFFinal = doOnlyIf (canOptEnums opts) optEnums dfModF
 
      -- get the defunctionalized FL modules and defunctionalization interfaces
      let ModD p0Def p0DefDfi = dfModFFinal    
@@ -126,15 +127,18 @@ processFL opts dfis inputModule =
      -- inline type classes for statically known instances
      let tcInfo = mergeTcInfos [builtinTcInfo, modTCs p0BVars]
      let p0Tc = inlineTcMethods tcInfo env p0BVars
-      
+
+     -- spot tail-calls
+     let p0TCO = doOnlyIf (optTCO opts) spotTCalls p0Tc
+
      -- final preprocessed and defunctionalized source to be used
-     let p0Final = p0Tc
+     let p0Final = p0TCO
      -- _ <- printLn p0Final
       
      -- do variable usage analysis
      let cbnVars = findCBNVars opts p0Final
      -- _ <- putStrLn (pprintCBNVars cbnVars "")
-     let stricts = gatherStrictVars p0Final
+     let stricts = gatherStricts p0Final
      -- let mergedVarUsage = (cbnVars, stricts)
           
      if not ok then
@@ -287,3 +291,7 @@ callErlBackend m p opts =
   case optAction opts of
     AEvalErl -> putStrLn (makeErlRepr m p)
     a -> ierr $ "The Erlang back-end cannot handle action "++show a
+
+-- | Helper to only apply a function if a flag is set.
+doOnlyIf :: Bool -> (a->a) -> (a->a)
+doOnlyIf cond f = if cond then f else id

@@ -73,6 +73,7 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "* LAR back-end:"
            putStrLn "  -cl     : transform and compile the 0-order program to C (using lazy activation records)"
            putStrLn "             -heap    : allocate all lazy activation records on the heap"
+           putStrLn "             -tco     : do tail-call optimization"
            putStrLn "             -debug   : keep extra debugging information"
            putStrLn "             -v       : produce a graph trace file after program execution"
            putStrLn "             -semigc  : enable semispace garbage collection (EXPERIMENTAL)"
@@ -145,6 +146,7 @@ processArgs cmdArgs =
         aux ("-compact":args) opts = aux args opts{optCompact=True}{optGC = SemiGC}{optScrut = True}
         aux ("-fop"   : args) opts = aux args opts{optFastOp=True}
         aux ("-tag"   : args) opts = aux args opts{optTag=True}
+        aux ("-tco"   : args) opts = aux args opts{optTCO=True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
         aux ("-gic-tc": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf True}
         aux ("-gic-tc-nsig": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf False}

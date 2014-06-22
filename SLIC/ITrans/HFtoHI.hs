@@ -13,9 +13,9 @@ import SLIC.Types
 fromHFtoHIe :: ExprF -> ExprH
 fromHFtoHIe (XF vn) = XH vn
 fromHFtoHIe (ConF cn exprs) = ConH cn (map fromHFtoHIe exprs)
-fromHFtoHIe (FF (V vn) exprs) = FH NOp vn (map fromHFtoHIe exprs)
+fromHFtoHIe (FF (V vn) exprs ci) = FH NOp vn (map fromHFtoHIe exprs) ci
 fromHFtoHIe (ConstrF c _) = ConstrH c
-fromHFtoHIe app@(FF (BV _ _) _) =  
+fromHFtoHIe app@(FF (BV _ _) _ _) =  
   ierr $ "fromHFtoHIe: the intensional transformation cannot process higher-order bound variables, as in "++(pprint app "")
 fromHFtoHIe (CaseF cloc e _ pats) =
   let fromHFtoHIpat (PatB (SPat c bvs, _) eP) =

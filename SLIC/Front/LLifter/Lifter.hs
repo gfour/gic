@@ -35,9 +35,9 @@ fvExprF vg vn exprF =
   in  case exprF of
         XF v        -> augmentWith $ Set.singleton $ nameOfV v
         ConF _ exprFL -> List.foldl (\vg' -> fvExprF vg' vn) vg exprFL
-        FF v exprFL -> List.foldl (\vg' -> fvExprF vg' vn) 
-                                  (augmentWith $ Set.singleton $ nameOfV v)
-                                  exprFL
+        FF v exprFL _ -> List.foldl (\vg' -> fvExprF vg' vn) 
+                                    (augmentWith $ Set.singleton $ nameOfV v)
+                                    exprFL
         ConstrF _ exprFL -> List.foldl (\vg' -> fvExprF vg' vn) vg exprFL
         CaseF _ exprF' vname patFL -> Map.adjust (Set.delete vname) vn $
                                         List.foldl (\vg' -> fvPatF vg' vn) 
@@ -89,9 +89,9 @@ aRenameExprF ren exprF =
     XF v -> XF . V $ Map.findWithDefault (nameOfV v) (nameOfV v) ren
     ConF cName exprFL -> 
         ConF cName $ List.map (aRenameExprF ren) exprFL
-    FF v exprFL -> 
-        FF (V $ Map.findWithDefault (nameOfV v) (nameOfV v) ren) $
-           List.map (aRenameExprF ren) exprFL
+    FF v exprFL ci -> 
+        FF (V $ Map.findWithDefault (nameOfV v) (nameOfV v) ren)
+           (List.map (aRenameExprF ren) exprFL) ci
     ConstrF cstrName exprFL -> 
         ConstrF cstrName $ List.map (aRenameExprF ren) exprFL
     CaseF depth exprF' vname patFL -> 
@@ -133,14 +133,14 @@ preApplyExprF vg exprF =
     XF v -> 
       let extVarsS = Map.findWithDefault Set.empty (nameOfV v) vg
       in  if Set.null extVarsS then exprF 
-          else FF v $ List.map (XF . V) $ Set.elems extVarsS
+          else FF v (List.map (XF . V) $ Set.elems extVarsS) NoCI
     ConF cName exprFL -> 
         ConF cName $ List.map (preApplyExprF vg) exprFL
-    FF v exprFL -> 
+    FF v exprFL ci -> 
       let exprFL'  = List.map (preApplyExprF vg) exprFL
           extVarsS = Map.findWithDefault Set.empty (nameOfV v) vg
-      in  if Set.null extVarsS then FF v exprFL'
-          else FF v $ (List.map (XF . V) $ Set.elems extVarsS) ++ exprFL'
+      in  if Set.null extVarsS then FF v exprFL' ci
+          else FF v ((List.map (XF . V) $ Set.elems extVarsS) ++ exprFL') ci
     ConstrF cstrName exprFL -> 
         ConstrF cstrName $ List.map (preApplyExprF vg) exprFL
     CaseF depth exprF' vname patFL -> 
@@ -199,7 +199,7 @@ abstractDefsExprF vg exprF =
       ConF cName $ List.map (abstractDefsExprF vg) exprFL
     ConstrF cstrName exprFL -> 
       ConstrF cstrName $ List.map (abstractDefsExprF vg) exprFL
-    FF v exprFL -> FF v $ List.map (abstractDefsExprF vg) exprFL
+    FF v exprFL ci -> FF v (List.map (abstractDefsExprF vg) exprFL) ci
     CaseF depth exprF' vname patFL ->
       let abstractDefsPatF (PatB sPat exprF'') =
               PatB sPat $ abstractDefsExprF vg exprF''
@@ -230,9 +230,9 @@ liftDefsExprF exprF =
     ConstrF cstrName exprFL  -> 
       let (defFLL, exprFL') = List.unzip $ List.map liftDefsExprF exprFL
       in (List.concat defFLL, ConstrF cstrName exprFL')
-    FF v exprFL ->
+    FF v exprFL ci ->
       let (defFLL, exprFL') = List.unzip $ List.map liftDefsExprF exprFL
-      in (List.concat defFLL, FF v exprFL')
+      in (List.concat defFLL, FF v exprFL' ci)
     CaseF depth exprF' vname patFL -> 
       let liftDefsPatF (PatB sPat exprF'') = 
             let (defFL', exprF''') = liftDefsExprF exprF''

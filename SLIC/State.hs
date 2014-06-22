@@ -110,6 +110,7 @@ data Options = Options
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   , optEStackSz:: Int              -- ^ explicit stack size
   , optScrut   :: ScrutOpt         -- ^ optimize scrutinee nesting
+  , optTCO     :: Bool             -- ^ tail-call optimization
   }
 
 -- | Optimize scrutinees of formals to skip the nested field and read the
@@ -151,6 +152,7 @@ defaultOptions = Options
   , optNWorkers= defaultWorkers
   , optEStackSz= defaultEStackSize
   , optScrut   = False
+  , optTCO     = False
   }
 
 instance Show Options where

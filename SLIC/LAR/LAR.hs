@@ -18,7 +18,7 @@ module SLIC.LAR.LAR (compileModL, createSemiGCARInfra,
 
 import Data.List (nub)
 import Data.Map (elems, filter, lookup, keys, toList)
-import Data.Set (toList)
+import Data.Set (empty, member, toList)
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore, pathOf)
 import SLIC.Constants
 import SLIC.DFI (DFC(dfcN), DFI(dfiDfInfo), DfInfo(diDfcs, diEApps),
@@ -227,7 +227,7 @@ defInterface gc dfInfo importFuns extCIDs =
       -- generate the constructor variables accessing macros
       macrosConstr (c, (_, ar)) =
         let bvs     = cArgsC c ar
-            stricts = []   -- TODO: stricts information for imported constructors
+            stricts = empty -- TODO: stricts information for imported constructors
             cbns    = []   -- bound variables are never call-by-name
         in  foldDot (protoF gc stricts cbns c) (enumNames bvs)
       extConstrs = map dfcN $ Data.Set.toList $ diDfcs dfInfo
@@ -372,7 +372,7 @@ forceStricts gc strictInds fArity =
   let aux x =
         mkVALS gc x fArity "T0".
         (" = ((LarArg)CODE("++).shows x.(", T0))(T0); // strict "++).nl
-  in  foldDot aux strictInds
+  in  foldDot aux $ Data.Set.toList strictInds
 
 -- | Generates the C code for an expression that is assumed to be the body
 --   of a definition.
@@ -417,7 +417,7 @@ mkCExp _ config (LARC (LitInt i) exps) =
   case exps of
     []    -> intSusp (optCompact $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
-mkCExp env config (LARCall n acts) = 
+mkCExp env config (LARCall n acts ci) = 
   if n `elem` (nmsids2nms (getCAFnmsids config)) then
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)
@@ -505,6 +505,7 @@ mkCExp _ config bv@(BVL v (cloc, fname)) =
         CFrm i ->
           -- Read the nested context directly from a formal (no thunk flag check).
           mkCall gc v (("FRM_NESTED("++).shows i.(")"++))
+
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
   case Data.Map.lookup f ars of
@@ -576,7 +577,7 @@ protoB (ActualL {}) _ _ _ _ = id
 -- | Generates the access macros for the formal variables of a function.
 protoF :: GC -> StrictInds -> [QName] -> QName -> (Int, QName) -> ShowS
 protoF gc strs cbns fName (n, x)
-  | n `elem` strs =
+  | n `member` strs =
     ("#define " ++).pprint x.("(T0) "++).mkGETSTRICTARG gc fName n.nl
   | x `elem` cbns =
     ("#define " ++).pprint x.("(T0) GETCBNARG(" ++).(shows n).(", T0)"++).nl

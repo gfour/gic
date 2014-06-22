@@ -373,7 +373,7 @@ inferE cs an e =
         --      inferEL cs an el >>= \tl -> 
         --      unify (makeFunc tl b) a >>
         --      return b
-        inferE_ (FF func el) =
+        inferE_ (FF func el _) =
           let v = nameOfV func               
           in  getEnvST >>= \gamma ->
               case Map.lookup v (Map.unions [builtinSTEnv, an, gamma]) of

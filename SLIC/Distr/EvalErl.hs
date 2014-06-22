@@ -82,8 +82,8 @@ makeErlE (XZ (V v)) = makeErlVar v
 makeErlE (XZ (BV _ _)) =
   error "Bound variables are not supported yet in the Erlang interpreter"
 -- "{bid, '"++bv++"', "++(show d)++"}"
-makeErlE (FZ NOp v) = makeErlVar v
-makeErlE (FZ (Call m) v) = "{call, "++(makeErlIdx m)++", "++(makeErlVar v)++"}"
+makeErlE (FZ NOp v _) = makeErlVar v
+makeErlE (FZ (Call m) v _) = "{call, "++(makeErlIdx m)++", "++(makeErlVar v)++"}"
 -- all builtins with two arguments are strict
 makeErlE (ConZ (CN bOp) [e1, e2]) =
     "{'"++(pprint bOp "")++"', "++(makeErlE e1)++", "++(makeErlE e2)++"}"

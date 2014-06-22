@@ -232,8 +232,8 @@ evalE eOpts p (ConZ (CN CIf) [e0, e1, e2]) ctxt st =
         evalE eOpts p e1 ctxt st0
       else
         evalE eOpts p e2 ctxt st0
-evalE eOpts p (FZ NOp v) ctxt st = evalV eOpts p v ctxt st
-evalE eOpts p (FZ (Call ii) v) ctxt st =
+evalE eOpts p (FZ NOp v _) ctxt st = evalV eOpts p v ctxt st
+evalE eOpts p (FZ (Call ii) v _) ctxt st =
   let (ctxt', st') = allocCtxt eOpts ii ctxt st
   in  evalV eOpts p v ctxt' st'
 evalE eOpts p (XZ (V v)) ctxt st =  

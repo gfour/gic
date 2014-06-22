@@ -39,11 +39,11 @@ findUsedVarsD (ActualsZ _ _ el) = concatMap findUsedVarsE el
 
 -- | Finds the variables used in a ZOIL expression.
 findUsedVarsE :: ExprZ -> [QName]
-findUsedVarsE (XZ (V v)) = [v]
+findUsedVarsE (XZ (V v))    = [v]
 findUsedVarsE (XZ (BV v _)) = [v]
-findUsedVarsE (ConZ _ el) = concatMap findUsedVarsE el
-findUsedVarsE (FZ _ v) = [v]
-findUsedVarsE (ConstrZ _) = []
+findUsedVarsE (ConZ _ el)   = concatMap findUsedVarsE el
+findUsedVarsE (FZ _ v _)    = [v]
+findUsedVarsE (ConstrZ _)   = []
 findUsedVarsE (CaseZ _ e pats) =
     let procPat (PatB _ e0) = findUsedVarsE e0
     in  (findUsedVarsE e) ++ (concatMap procPat pats)
@@ -173,7 +173,7 @@ findCBNbvs _ (ConF (LitInt _) es) =
   case es of
     [] -> empty
     _  -> ierr "findCBNbvs: found literal application to expressions"
-findCBNbvs si (FF _ el) = unionsWith max (List.map (findCBNbvs si) el)
+findCBNbvs si (FF _ el _) = unionsWith max (List.map (findCBNbvs si) el)
 findCBNbvs _ (LetF {}) = ierr "findCBNbvs: encountered let-binding"
 findCBNbvs _ (LamF {}) = ierr "findCBNbvs: encountered lambda"
 

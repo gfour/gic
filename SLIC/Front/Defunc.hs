@@ -33,11 +33,12 @@ import Data.List as L (map)
 import qualified Data.Map as M (empty, filterWithKey, fromList, keys, lookup,
                                 map, mapWithKey, toList, union, unions)
 import Data.Maybe (mapMaybe)
-import Data.Set as S (Set, difference, filter, fromList, map, size, toList, union)
+import Data.Set as S (Set, difference, empty, filter, fromList, map, size,
+                      toList, union)
 import SLIC.AuxFun (ierr)
 import SLIC.Constants
 import SLIC.DFI (DfConstrs, DfInfo(..), DFI(..), DfInfo(DfInfo), DFC(DFC, dfcA),
-                 ExtAppFuns, LARInfo(LARInfo, liCIDs, liPMDs), addApp,
+                 ExtAppFuns, LARInfo(..), addApp,
                  emptyDfInfo, mergeDfInfo, noApps)
 import SLIC.Front.Preprocessor (cNested, constrToFuncs)
 import SLIC.ITrans.Optimizations (optEnumsKernel)
@@ -121,8 +122,8 @@ defuncMod opts ve' m'@(Mod fm@(mN, _) exportsR importsR (Prog dts defs) an tcs) 
       cids = calcCIDs dfData
       -- Generate the module graph info.
       mg = (mN, filterRealMods importsR)
-      -- Generate the DFI for the current module (CAFs/PMDepths are empty here).
-      larInfo = LARInfo [] cids M.empty Nothing
+      -- Generate DFI for current module (CAFs/PMDepths/stricts are empty here).
+      larInfo = LARInfo [] cids M.empty Nothing M.empty
       tcInfo = TcInfo tcs' (tcISigs tcs)
       dfi = DFI mg ve'' (getSigs defs) dfI larInfo tcInfo
       -- Make the closure GADT.
@@ -136,12 +137,12 @@ dfImports :: TEnv -> Data -> FuncSigs -> IDecl
 dfImports dfEnv dfClosDT dfSigs = 
   let mkIInfoApp (f, fs) =
         let fType = (Just $ findType f dfEnv)
-        in  (f, IInfo fType (Just $ length fs) NFunc Nothing (Just 1))
+        in  (f, IInfo fType (Just $ length fs) NFunc Nothing (Just 1) Nothing)
       mkIInfoCC :: Data -> [(QName, IInfo)]
       mkIInfoCC (Data _ _ dcs) = 
         let aux (DConstr cc dts _) =
               (cc, IInfo (Just $ findType cc dfEnv) (Just $ length dts)
-                   NConstr Nothing Nothing)
+                   NConstr Nothing Nothing Nothing)
         in  L.map aux dcs      
       iDfNames = M.fromList ((mkIInfoCC dfClosDT)++(L.map mkIInfoApp $ M.toList dfSigs))
       -- the CIDs table is empty; closure constructors are compiled during linking, 
@@ -162,8 +163,8 @@ visibleFuns ve modF =
       localFuns   = M.fromList $ L.map (\(DefF f fs _)->(f, (findType f ve, Just (length fs)))) defs
       -- ignore imported data type names
       iEnvToDfEnv (_, iinfo) | (impC iinfo == NDType) = Nothing
-      iEnvToDfEnv (v, IInfo (Just t ) ar _ _ _) = Just (v, (t, ar))
-      iEnvToDfEnv (_, IInfo (Nothing) _  _ _ _) =
+      iEnvToDfEnv (v, IInfo (Just t ) ar _ _ _ _) = Just (v, (t, ar))
+      iEnvToDfEnv (_, IInfo (Nothing) _  _ _ _ _) =
         ierr "defunctionalization found untyped import"
       vfsImported = M.fromList $ mapMaybe iEnvToDfEnv 
                     (concatMap M.toList $ L.map ideclINames imports)
@@ -244,7 +245,7 @@ genAllAppSigs ve defs =
       genAppSigsE lvs (LetF _ ldefs e) =
         M.unions $ (genAppSigsE lvs e) : (L.map (genAppSigsD lvs) ldefs)
       genAppSigsE lvs (LamF _ _ e) = genAppSigsE lvs e
-      genAppSigsE lvs (FF f el) =        
+      genAppSigsE lvs (FF f el _)  =        
         let fName = nameOfV f
         in  if fName `elem` lvs then
               case M.lookup fName ve of
@@ -292,7 +293,7 @@ defuncE _ _ vfs _ e@(XF (V vName)) =
     Just (vT, Just vArity)
       | vArity>0 ->        -- top-level function as a higher-order name
         let dfcs = allClosuresFor vName vT [0..(vArity-1)]
-        in  (FF (V (genNC vName 0)) [], (DfInfo dfcs noApps))
+        in  (FF (V (genNC vName 0)) [] NoCI, (DfInfo dfcs noApps))
       | otherwise ->
         (e, emptyDfInfo)   -- top-level variable
     Just (_, Nothing) -> ierr $ "Top-level without arity: "++(qName vName)
@@ -305,39 +306,40 @@ defuncE ndf ve vfs lvs (ConF b el) =
 -- already been filtered out from the code to be defunctionalized
 defuncE _ _ _ _ (ConstrF _ _) =
   ierr "defuncE: non-top-level constructor encountered"
-defuncE ndf ve vfs lvs (FF f@(V fName) el) =
+defuncE ndf ve vfs lvs (FF f@(V fName) el ci) =
   let (el', dfInfoL)  = defuncEL ndf ve vfs lvs el
   in  let argsLen = length el
       in  case M.lookup fName vfs of
             Just (fT, Just fArity)  ->       ----- top-level function -------
               if fArity == argsLen then      ----- saturated application ----
-                (FF f el', dfInfoL)
+                (FF f el' ci, dfInfoL)
               else if fArity > argsLen then  ----- partial application ------
                      pappToConstr ndf fName fT fArity argsLen el' dfInfoL
                    else
                      let innerEL = take fArity el' -- over-saturated call ----
                          innerCall = if fArity == 0 then XF f
-                                     else FF f innerEL
+                                     else FF f innerEL ci
                          aux e [] = e
-                         aux e (p:ps) = aux (FF (V (genNApp 1)) [e, p]) ps
+                         aux e (p:ps) = aux (FF (V (genNApp 1)) [e, p] ci) ps
                      in  (aux innerCall (drop fArity el), addApp 1 dfInfoL)
             Just (_, Nothing) ->
               ierr $ "No arity information found for "++(pprint f "")
             Nothing ->                       ----- variable -----------------
               case M.lookup fName lvs of
                 Just _  ->
-                  (FF (V (genNApp argsLen)) ((XF f):el'), addApp argsLen dfInfoL)
+                  (FF (V (genNApp argsLen)) ((XF f):el') ci,
+                   addApp argsLen dfInfoL)
                 Nothing  -> 
                   case M.lookup fName ve of
                     Just (fT@(Tf _ _), Just fArity) ->
                       if fName `elem` cBuiltinFuncsC then
-                        (FF f el', dfInfoL) -- built-in, leave untransformed
-                      else                  ----- h.o. function -------------
+                        (FF f el' ci, dfInfoL) -- built-in, leave untransformed
+                      else                     ----- h.o. function -------------
                         pappToConstr ndf fName fT fArity argsLen el' dfInfoL
-                    Just _        ->        -- global constructor function --
-                      (FF f el', dfInfoL)
+                    Just _        ->           -- global constructor function --
+                      (FF f el' ci, dfInfoL)
                     Nothing -> ierr $ "defunceE: no type for "++(qName fName)
-defuncE _ _ _ _ (FF (BV _ _) _) =                        
+defuncE _ _ _ _ (FF (BV _ _) _ _) =                        
   ierr "defuncE: bound variable application encountered"
 defuncE ndf ve vfs lvs (CaseF d e v pats) =
   let defuncPat (PatB sPat@(SPat c bvs, _) eP) =
@@ -362,7 +364,7 @@ pappToConstr doNullDf fName _ _ n _ _ | doNullDf && n>0 =
 pappToConstr _ fName fT fArity argsLen el' dfInfo =
   let dfcs' = allClosuresFor fName fT [argsLen..(fArity-1)]
       dfcsEl' = S.union (diDfcs dfInfo) dfcs'
-  in  (FF (V (genNC fName argsLen)) el', dfInfo{diDfcs=dfcsEl'})
+  in  (FF (V (genNC fName argsLen)) el' NoCI, dfInfo{diDfcs=dfcsEl'})
 
 -- | Make a environment from a list of variables and their types.
 makeVEnv :: [QName] -> [EInfo] -> TEnv
@@ -462,7 +464,8 @@ genModDFI dfi code@(Prog _ modDefs) cafInfo pmDepths =
       env' = restrictVEnvToProg env code
       mainDep = M.lookup (mainDefQName m) pmDepths
       cids = liCIDs larInfo
-      larInfo' = LARInfo cafInfo cids pmDepths mainDep
+      stricts = gatherStrictVars code
+      larInfo' = LARInfo cafInfo cids pmDepths mainDep stricts
   in  DFI mg env' (getSigs modDefs) dfInfo larInfo' tcInfo
 
 -- * Defunctionalization linker
@@ -507,7 +510,8 @@ genDfMod flags (DFI _ env fsigs (DfInfo dfcs extApps) larInfo _) =
       dummyIInfo f =
         let Just (fT, fArity) = M.lookup f env
             fPMDepth = M.lookup f (liPMDs larInfo)
-        in  IInfo (Just fT) fArity NFunc (ierr "no caf") fPMDepth
+            fStricts = M.lookup f (liStrs larInfo)
+        in  IInfo (Just fT) fArity NFunc (ierr "no caf") fPMDepth fStricts
       -- the imported functions table for module m
       iNames m = M.fromList $ L.map (\n->(n, dummyIInfo n)) (allINames m)
       -- the signatures of imported functions
@@ -556,7 +560,7 @@ genAppCBNs scrOpt defs =
 genAppStricts :: Strictness -> [DefF] -> Stricts
 genAppStricts str defs =
   let onlyIfStrict (DefF f fs _) =
-        if str then (f, [0..(length fs)-1]) else (f, [])
+        if str then (f, S.fromList [0..(length fs)-1]) else (f, S.empty)
   in  M.fromList $ L.map onlyIfStrict defs
   
 -- | Generates the pattern matching depth information for defunctionalization 
@@ -631,7 +635,7 @@ mkPatFull scrOpt app frms (DFC c ar _ (f, _)) =
   let bns = cArgsC c ar
       bvs = L.map (\v->XF $ BV v (cNested scrOpt 0 app)) bns
       pI  = PatInfo (ar/=0)
-  in  PatB (SPat c bns, pI) (FF (V f) (bvs ++ (L.map (\v->XF $ V v) frms)))
+  in  PatB (SPat c bns, pI) (FF (V f) (bvs ++ (L.map (\v->XF $ V v) frms)) NoCI)
 
 -- | Take a list of apply()-formals and a closure constructor and generate
 --   a pattern branch for a closure partial application function.

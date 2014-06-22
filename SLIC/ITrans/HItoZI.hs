@@ -12,18 +12,18 @@ import SLIC.Types
 -- | HIL -> ZOIL, program translation.
 fromHItoZIp :: ProgH -> ProgZ
 fromHItoZIp (Prog ds defs) =
-  let fromHItoZId (DefH vn _ expr)   = DefZ vn (fromHItoZIe expr)
+  let fromHItoZId (DefH vn _ expr) = DefZ vn (fromHItoZIe expr)
       fromHItoZId (ActualsH vn m exprs) =
         ActualsZ vn m (map fromHItoZIe exprs)
       fromHItoZIe (XH v) = XZ v
-      fromHItoZIe (ConH cn exprs) = ConZ cn (map fromHItoZIe exprs)
-      fromHItoZIe (FH NOp vn [])  = XZ (V vn)
-      fromHItoZIe (ConstrH c)     = ConstrZ c
-      fromHItoZIe (FH qOp vn exprs)
+      fromHItoZIe (ConH cn exprs)  = ConZ cn (map fromHItoZIe exprs)
+      fromHItoZIe (FH NOp vn [] _) = XZ (V vn)
+      fromHItoZIe (ConstrH c)      = ConstrZ c
+      fromHItoZIe (FH qOp vn exprs ci)
         | vn == constV =
           let [XH (V qn)] = exprs
-          in  FZ qOp qn
-        | otherwise    = FZ qOp vn
+          in  FZ qOp qn ci
+        | otherwise    = FZ qOp vn ci
       fromHItoZIe (CaseH d e pats) =
         let pats' = map fromHItoZIpat pats
         in  CaseZ d (fromHItoZIe e) pats'

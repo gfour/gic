@@ -8,8 +8,9 @@ import Data.List (intersperse)
 import qualified Data.Map as Map (Map, filter, filterWithKey, fromList,
                                   keys, lookup, member, null, toList, unions)
 import Data.Maybe (isJust)
-import SLIC.AuxFun (ierr, foldDot, showStrings, spaces)
-import SLIC.Constants (mControlParallelN, tcMod, lparen, rparen, nl, semi)
+import qualified Data.Set as S (Set, empty, toList)
+import SLIC.AuxFun (ierr, foldDot, insCommIfMore, showStrings, spaces)
+import SLIC.Constants (comma, mControlParallelN, tcMod, lparen, rparen, nl, semi)
 import SLIC.Types
 
 -- * User-defined data types
@@ -151,25 +152,25 @@ pprintTH c = pprint c
 
 -- * Import declarations
 
--- | The type of an imported name. During parsing, it's Nothing; it gets its
---   value after reading the DFI of the imported module.
-type IType = Maybe Type
-
--- | Converts the type of an import to a string.
-pprintIType :: IType -> ShowS
-pprintIType (Nothing) = ("<missing type>"++)
-pprintIType (Just t)  = shows t
+-- | Prints a Maybe value that should not be missing.
+pprintMaybe :: (PPrint a) => Maybe a -> ShowS
+pprintMaybe (Nothing) = ("<missing>"++)
+pprintMaybe (Just t)  = pprint t
 
 -- | An imported name can be a function, a constructor, or a data type name.
 data NInfo = NFunc | NConstr | NDType deriving (Eq, Show)
 
 -- | Information for an imported name: type, arity, CAF position, nesting.
+--   For functions that do not belong to a type class, the type/arity/CAF/depth
+--   components are initialized to Nothing during parsing; they get their
+--   real value later, when reading the DFI of the imported module.
 data IInfo =
-  IInfo { impT :: IType              -- ^ type
+  IInfo { impT :: Maybe Type         -- ^ type
         , impA :: Maybe Arity        -- ^ arity
         , impC :: NInfo              -- ^ what kind of name it is
         , impCAF :: Maybe CAFId      -- ^ global CAF index if it is a CAF
         , impD :: Depth              -- ^ pattern matching depth
+        , impStricts :: Maybe StrictInds -- ^ strict parameter positions
         }
   deriving (Eq, Show)
 
@@ -180,8 +181,8 @@ type ImportedNames = Map.Map QName IInfo
 pprintINames :: ImportedNames -> ShowS
 pprintINames impNames =
   let pprintIN (v, IInfo {}) =
-        pprint v -- .("::"++).pprintIType it
-      --   pprint v.("::"++).pprintIType it.showsCAF caf.showsNesting nesting
+        pprint v -- .("::"++).pprintMaybe it
+      --   pprint v.("::"++).pprintMaybe it.showsCAF caf.showsNesting nesting
       -- showsCAF Nothing      = id
       -- showsCAF (Just idx)   = ("[CAF #"++).shows idx.("]"++)
       -- showsNesting Nothing  = id
@@ -235,7 +236,7 @@ genBuiltinIDecl mn =
                     Just (_, cId) -> Just cId
                     Nothing       -> Nothing
             pmDepth = Map.lookup n builtinPmDepths
-        in  (n, IInfo (Just nT) (Just nAr) ni cid pmDepth)
+        in  (n, IInfo (Just nT) (Just nAr) ni cid pmDepth (Just S.empty))
   in  IDecl mn (Map.fromList names) (Just (modSigs, modCIDs))
 
 -- | Built-in (pseudo-)modules.
@@ -423,3 +424,59 @@ instance PPrint TcInfo where
 -- | Merge type class information.
 mergeTcInfos :: [TcInfo] -> TcInfo
 mergeTcInfos tci = TcInfo (concatMap tcIDecls tci) (concatMap tcISigs tci)
+
+-- * Tail calls
+
+-- A LAR mutation is a map from target slot indices, to original slot indices.
+-- E.g. {1 <- 2, 2 <- 1, 3 <- 1}
+type MutationL = [(SlotIdx, SlotIdx)]
+
+-- | A permutation of LAR slots.
+data Permutation = Perm (Map.Map SlotIdx SlotIdx)
+     deriving (Eq, Read, Show)
+
+instance PPrint Permutation where
+  pprint (Perm m) =
+    if Map.null m then error "Empty permutation"
+    else
+      let pprAux (tIdx, oIdx) = shows tIdx.("<-"++).shows oIdx
+          ps = foldDot id $ intersperse (", "++) $ map pprAux $ Map.toList m
+      in  ("perm{"++).ps.("}"++)
+
+-- | A copy from a slot to another slot. Format: src, dest.
+data Copy = Copy SlotIdx SlotIdx
+            deriving (Eq, Read, Show)
+                     
+instance PPrint Copy where
+  pprint (Copy src dest) = shows dest.(":="++).shows src
+
+instance Ord Copy where
+  compare (Copy a1 b1) (Copy a2 b2) =
+    if b1==b2 then compare a1 a2 else compare b1 b2
+
+-- | The positions of arguments whose value doesn't need access
+--   to the current LAR. See 'closedExpr' in 'SLIC.Front.TailCalls'.
+type ClosedInds = S.Set SlotIdx
+
+-- | High-level description for LAR mutations. A LAR mutation is:
+--   (a) a list of slot permutations (to reuse inter-dependent formals),
+--   (b) a number of slot copies (to reuse independent formals),
+--   (c) a number of new slots to assign to closed arguments, and
+--   (d) a number of strict slots to evaluate on the spot.
+type Mutation = ([Permutation], [Copy], ClosedInds, StrictInds)
+
+-- | Pretty printer for LAR mutations.
+pprintMut :: Mutation -> ShowS
+pprintMut (perms, copies, closed, stricts) =
+  (" perms:["++).pprintList 0 comma perms.("] |"++).
+  (" copies:["++).pprintList 0 comma copies.("] |"++).
+  (" closed:["++).insCommIfMore (map shows $ S.toList closed).("] |"++).
+  (" strict:["++).insCommIfMore (map shows $ S.toList stricts).("]"++)
+
+-- | Tail-call information.
+data CI = NoCI | Mut Mutation
+     deriving (Eq, Read, Show)
+
+instance PPrint CI where
+  pprint NoCI = ("{}"++)
+  pprint (Mut mut) = ("{mut:"++).pprintMut mut.("}"++)

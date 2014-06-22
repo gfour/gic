@@ -13,10 +13,10 @@ module SLIC.DFI (DfConstrs, DFI(..), DfInfo(..), DFC(..), ExtAppFuns,
                  updPMDepths) where
 
 import Data.Char (isUpper)
-import Data.List as List (map)
-import Data.Map (Map, fromList, lookup, member, toList, unions)
+-- import Data.List as List (map)
+import qualified Data.Map as M (Map, fromList, lookup, member, toList, unions)
 import Data.Maybe (mapMaybe)
-import Data.Set (Set, empty, insert, toList, unions)
+import qualified Data.Set as S (Set, empty, insert, toList, unions)
 
 import SLIC.AuxFun (errM, foldDot, ierr, nameOf, showStrings)
 import SLIC.Constants (dfiSuffix, dirSeparator, nl)
@@ -41,15 +41,15 @@ instance PPrint DFC where
     pprint c.(":"++).shows a.("::"++).pprint t.(" of "++).pprint v.nl
 
 -- | A set of closure constructors.
-type DfConstrs = Set DFC
+type DfConstrs = S.Set DFC
 
 -- | A list of external closure dispatching functions needed by the module.
 --   Only the required arities are stored.
-type ExtAppFuns = Set Arity
+type ExtAppFuns = S.Set Arity
 
 pprintExtAppFuns :: ExtAppFuns -> ShowS
 pprintExtAppFuns extAppFuns =
-  let funs = Data.Set.toList extAppFuns
+  let funs = S.toList extAppFuns
   in  (case funs of [] -> ("none"++) ; _  -> shows funs).nl
 
 -- * State used by defunctionalization
@@ -61,16 +61,16 @@ data DfInfo = DfInfo { diDfcs :: DfConstrs, diEApps :: ExtAppFuns }
 instance PPrint DfInfo where
   pprint (DfInfo dfcs extApps) =
     ("** Closure constructors:"++).nl.
-    foldDot pprint (Data.Set.toList dfcs).
+    foldDot pprint (S.toList dfcs).
     ("** Uses closure dispatchers of arities: "++).pprintExtAppFuns extApps
 
 -- | Empty set of closure constructors.
 noDfcs :: DfConstrs
-noDfcs = Data.Set.empty
+noDfcs = S.empty
 
 -- | Empty set of used closure dispatchers.
 noApps :: ExtAppFuns
-noApps = Data.Set.empty
+noApps = S.empty
 
 -- | Empty defunctionalization information, to be used as initial state.
 emptyDfInfo :: DfInfo
@@ -81,12 +81,12 @@ mergeDfInfo :: [DfInfo] -> DfInfo
 mergeDfInfo info =
   let dfcs    = map diDfcs info
       extApps = map diEApps info
-  in  DfInfo (Data.Set.unions dfcs) (Data.Set.unions extApps)
+  in  DfInfo (S.unions dfcs) (S.unions extApps)
 
 -- | Add the closure dispatcher of some arity to the set of used dispatchers
 --   in a defunctionalizaton information structure.
 addApp :: Arity -> DfInfo -> DfInfo
-addApp i dfInfo = dfInfo{diEApps=(Data.Set.insert i (diEApps dfInfo))}
+addApp i dfInfo = dfInfo{diEApps=(S.insert i (diEApps dfInfo))}
 
 -- * Defunctionalization interfaces
 
@@ -95,15 +95,17 @@ data LARInfo =
   LARInfo { liCAFD :: CAFDct     -- ^ indexes of CAF tables
           , liCIDs :: CIDs       -- ^ compiled constructors
           , liPMDs :: PMDepths   -- ^ depths of exported functions
-          , liDepth :: Depth -- ^ depth of main function (if defined in the module)
+          , liDepth :: Depth     -- ^ depth of main function (if defined in the module)
+          , liStrs :: Stricts    -- ^ strict parameters for exported functions
           }
   deriving (Read, Show)
 
 instance PPrint LARInfo where
-  pprint (LARInfo cafs cids pmDepths rdep) =
+  pprint (LARInfo cafs cids pmDepths rdep stricts) =
     ("** CAFs:"++).nl.pprintCAFs cafs.
     ("** Compiled constructors:"++).nl.pprintCIDs cids.
     ("** Pattern matching depths:"++).nl.pprintPD pmDepths.
+    ("** Strict parameters:"++).nl.pprintStricts stricts.
     (case rdep of
         Nothing -> id
         Just d  ->
@@ -158,7 +160,7 @@ pprintDfcs ve dfcs =
   let showCC (DFC c  0 _ _) = pprint c
       showCC (DFC c ar _ f) = pprint c.(" "++).pprintList space (take ar $ typs f)
       typs :: QName -> [Type]
-      typs f = List.map (\(t, _)->defuncT t) (getTypesOf f ve)
+      typs f = map (\(t, _)->defuncT t) (getTypesOf f ve)
       aux :: Arity -> ShowS
       aux n = 
         let dfcs' = Set.filter (\(DFC _ _ t' _)->n==order t') dfcs
@@ -202,7 +204,7 @@ updExtTypesDFI _ _ _ _ [] = return []
 -- For import declarations that have Empty information, load it.
 updExtTypesDFI v mThis fPath dfis ((IDecl mn imns Nothing):imps) =
   do rest <- updExtTypesDFI v mThis fPath dfis imps
-     (case Data.Map.lookup mn builtinModules of
+     (case M.lookup mn builtinModules of
          -- If built-in module, use the built-in information.
          Just builtinIDecl -> return (builtinIDecl : rest)
          -- Otherwise, load the DFI file.
@@ -215,9 +217,9 @@ updExtTypesDFI v mThis fPath dfis ((IDecl mn imns Nothing):imps) =
               (opt v $ putStrLn $ "Reading: "++f)
               (DFI _ fTypes fSigs _ larInfo _) <- parseDFI f
               let mn' = concatMap (updIInfo mThis larInfo fSigs mn fTypes)
-                        (Data.Map.toList imns)
+                        (M.toList imns)
               let cids = liCIDs larInfo
-              let import' = IDecl mn (Data.Map.fromList mn') (Just (fSigs, cids))
+              let import' = IDecl mn (M.fromList mn') (Just (fSigs, cids))
               return (import' : rest))
 -- Don't touch import declarations that have filled-in information.
 updExtTypesDFI v mThis fPath dfis (i:is) = 
@@ -231,16 +233,18 @@ dfiFor fPath m = fPath++[dirSeparator]++(dfiFile m)
 --   If it is an imported constructor, also import its projection functions.
 updIInfo :: MNameF -> LARInfo -> FuncSigs -> MName -> TEnv -> (QName, IInfo) -> [(QName, IInfo)]
 -- data type names are left unchanged
-updIInfo _ _ _ _ _ iinfo@(_, IInfo _ _ NDType _ _) = [iinfo]
-updIInfo mThis lInfo sigs m ve (qn, IInfo Nothing Nothing ni Nothing Nothing) = 
-  case Data.Map.lookup qn ve of 
+updIInfo _ _ _ _ _ iinfo@(_, IInfo _ _ NDType _ _ _) = [iinfo]
+updIInfo mThis lInfo sigs m ve
+         (qn, IInfo Nothing Nothing ni Nothing Nothing Nothing) = 
+  case M.lookup qn ve of 
     Just (t, Just ar) ->
-      case Data.Map.lookup qn sigs of
+      case M.lookup qn sigs of
         Just frms ->
           if length frms == ar then
-            let cafs = liCAFD lInfo
-                nestings = liPMDs lInfo    
-                vInfo = (qn, IInfo (Just t) (Just ar) ni (Prelude.lookup qn cafs) (Data.Map.lookup qn nestings))
+            let cafs     = liCAFD lInfo
+                nestings = liPMDs lInfo
+                stricts  = liStrs lInfo
+                vInfo = (qn, IInfo (Just t) (Just ar) ni (lookup qn cafs) (M.lookup qn nestings) (M.lookup qn stricts))
                 constrFuncs = map (projC_i qn t) [0..(ar-1)]
             in  if (ni == NConstr && ar > 0) then 
                   vInfo : constrFuncs
@@ -252,22 +256,24 @@ updIInfo mThis lInfo sigs m ve (qn, IInfo Nothing Nothing ni Nothing Nothing) =
     Just (_, Nothing) -> errM mThis $ "No arity for "++(qName qn)
     Nothing ->
       errM mThis $ "The interface of "++m++" does not define "++(qName qn)
-updIInfo mThis _ _ _ _ (qn, IInfo (Just _) _ _ _ _) =
+updIInfo mThis _ _ _ _ (qn, IInfo (Just _) _ _ _ _ _) =
   errM mThis $ "external type is already updated in module "++(show mThis)++" for "++(qName qn)
-updIInfo mThis _ _ _ _ (qn, IInfo Nothing (Just _) _ _ _) =
+updIInfo mThis _ _ _ _ (qn, IInfo Nothing (Just _) _ _ _ _) =
   errM mThis $ "external arity is already updated in module "++(show mThis)++" for "++(qName qn)
-updIInfo mThis _ _ _ _ (qn, IInfo Nothing Nothing _ (Just _) _) =
+updIInfo mThis _ _ _ _ (qn, IInfo Nothing Nothing _ (Just _) _ _) =
   errM mThis $ "external caf idx is already updated in module "++(show mThis)++" for "++(qName qn)
-updIInfo mThis _ _ _ _ (qn, IInfo Nothing Nothing _ Nothing (Just _)) =
+updIInfo mThis _ _ _ _ (qn, IInfo Nothing Nothing _ Nothing (Just _) _) =
   errM mThis $ "external nesting is already updated in module "++(show mThis)++" for "++(qName qn)
+updIInfo mThis _ _ _ _ (qn, IInfo Nothing Nothing _ Nothing _ (Just _)) =
+  errM mThis $ "external strictness information is already updated in module "++(show mThis)++" for "++(qName qn)
 
--- | Given a constructor name/type, generates the part of the 'import' declaration 
---   that names its i-th projection function.
+-- | Given a constructor name/type, generates the part of the 'import' 
+--   declaration that names its i-th projection function.
 projC_i :: CstrName -> Type -> Int -> (QName, IInfo)
 projC_i constr cT i =
   let qn = procLName (\n -> projCName n i) constr
       t = Tf (takeRes cT) ((takeParams cT) !! i)
-  in  (qn, IInfo (Just t) (Just 1) NFunc Nothing (Just 1))
+  in  (qn, IInfo (Just t) (Just 1) NFunc Nothing (Just 1) (Just S.empty))
 
 -- * DFI helper functions
 
@@ -286,44 +292,45 @@ mergeDFIs dfis =
 
 -- | Returns the union of all typing environments from a list of DFIs.
 mergeEnvs :: [DFI] -> TEnv
-mergeEnvs dfis = Data.Map.unions $ List.map dfiTEnv dfis
+mergeEnvs dfis = M.unions $ map dfiTEnv dfis
 
 -- | Returns the union of all function signatures from a list of DFIs.
 mergeSigs :: [DFI] -> FuncSigs
-mergeSigs dfis = Data.Map.unions $ List.map dfiSigs dfis
+mergeSigs dfis = M.unions $ map dfiSigs dfis
 
 -- | Returns the union of all closure constructors from a list of DFIs.
 mergeDfcs :: [DFI] -> DfConstrs
-mergeDfcs dfis = Data.Set.unions $ List.map (diDfcs.dfiDfInfo) dfis
+mergeDfcs dfis = S.unions $ map (diDfcs.dfiDfInfo) dfis
 
 -- | Gathers all external apply() arities appearing in a list of DFIs.
 mergeExtAppArs :: [DFI] -> ExtAppFuns
-mergeExtAppArs dfis = Data.Set.unions $ List.map (diEApps.dfiDfInfo) dfis
+mergeExtAppArs dfis = S.unions $ map (diEApps.dfiDfInfo) dfis
 
 -- | Merges all LAR info appearing in a list of DFIs.
 mergeLARInfo :: [DFI] -> LARInfo
 mergeLARInfo dfis =
-  let cafsL = List.map (liCAFD.dfiLARInfo) dfis
-      cidsL = List.map (liCIDs.dfiLARInfo) dfis
-      pmdsL = List.map (liPMDs.dfiLARInfo) dfis
+  let cafs = concatMap (liCAFD.dfiLARInfo) dfis
+      cids = M.unions $ map (liCIDs.dfiLARInfo) dfis
+      pmds = M.unions $ map (liPMDs.dfiLARInfo) dfis
+      strs = M.unions $ map (liStrs.dfiLARInfo) dfis
       rDep  =
         case mapMaybe (liDepth.dfiLARInfo) dfis of
           []  -> Nothing
           [r] -> Just r
           (_:_) -> error $ "More than one DFIs define a depth for "++mainDefName
-  in  LARInfo (concat cafsL) (Data.Map.unions cidsL) (Data.Map.unions pmdsL) rDep
+  in  LARInfo cafs cids pmds rDep strs
 
 mergeTcInfo :: [DFI] -> TcInfo
-mergeTcInfo dfis = mergeTcInfos $ List.map dfiTcInfo dfis
+mergeTcInfo dfis = mergeTcInfos $ map dfiTcInfo dfis
   
 -- | Returns the arities of all closure constructor functions and closure
 --   dispatchers generated by defunctionalization.
-calcExtDFInfo :: ProgF -> (Map CstrName Arity, Map QName Arity)
+calcExtDFInfo :: ProgF -> (M.Map CstrName Arity, M.Map QName Arity)
 calcExtDFInfo (Prog [Data _ _ dcs] defs) =
-  let clcs           = fromList $ List.map 
+  let clcs           = M.fromList $ map 
                        (\(DConstr c dts _) -> (c, length dts)) dcs
-      isNotCC (f, _) = not $ member f clcs 
-      apps = fromList $ filter isNotCC $ List.map (\(DefF f vs _) -> (f, length vs)) defs
+      isNotCC (f, _) = not $ M.member f clcs 
+      apps = M.fromList $ filter isNotCC $ map (\(DefF f vs _) -> (f, length vs)) defs
   in  (clcs, apps)
 calcExtDFInfo p = ierr $ "wrong generated defunctionalized code: "++(pprint p "")
 
@@ -331,9 +338,9 @@ calcExtDFInfo p = ierr $ "wrong generated defunctionalized code: "++(pprint p ""
 -- | A fake DFI for modules that use the Prelude.
 preludeDFI :: DFI
 preludeDFI =
-  let dfcs   = Data.Set.empty
-      cids   = Data.Map.empty
-      eApps  = Data.Set.empty
+  let dfcs   = S.empty
+      cids   = M.empty
+      eApps  = S.empty
       larInfo= ([], cids, builtinPmDepths, Nothing)
   in  DFI builtinTEnv builtinFuncSigs (dfcs, eApps) larInfo
 -}
@@ -343,6 +350,6 @@ updPMDepths :: DFI -> ModF -> DFI
 updPMDepths dfi modF =
   let pmds = countPMDepths $ progDefs $ modProg modF
       (mn, _) = modNameF modF
-      rDep = Data.Map.lookup (mainDefQName mn) pmds
+      rDep = M.lookup (mainDefQName mn) pmds
       newLARInfo = (dfiLARInfo dfi){liPMDs=pmds}{liDepth=rDep}
   in  dfi{dfiLARInfo=newLARInfo}

@@ -39,7 +39,7 @@ mkCC c cids =
   in CC c cId cArity 
 
 -- | A LAR expression.
-data ExprL  = LARCall QName [QName]    -- ^ call variable with a LAR of variables
+data ExprL  = LARCall QName [QName] CI -- ^ call variable with a LAR of variables
             | LARC Const [ExprL]       -- ^ built-in constant application
             | ConstrL CCstrName        -- ^ constructor call
             | BVL QName CaseLoc        -- ^ bound variable (constructor projection)
@@ -58,10 +58,10 @@ instance PPrint BlockL where
     pprint v.(" = "++).(if act then ("ACTUAL."++) else id).pprint e
 
 instance PPrint ExprL where
-  pprint (LARCall v vs) = pprint v.spaces 1.showStrings " " (map qName vs)
-  pprint (LARC cn el) = prettyConst 0 cn el
-  pprint (ConstrL c) = pprint c
-  pprint (BVL v cn) = pprintBVC v cn
+  pprint (LARCall v vs _) = pprint v.spaces 1.showStrings " " (map qName vs)
+  pprint (LARC cn el)     = prettyConst 0 cn el
+  pprint (ConstrL c)      = pprint c
+  pprint (BVL v cn)       = pprintBVC v cn
   pprint (CaseL cl@(cn, _) e pats) =
     let dep = tabIdxOf cn
         pprintPats []             = id
@@ -89,7 +89,7 @@ getBlockName (ActualL vnm _ _) = vnm
 -- | Counts the maximum depth of nested pattern matching expressions
 --   in a LAR expression.
 countPMDepthL :: ExprL -> Int
-countPMDepthL (LARCall _ _) = 0
+countPMDepthL (LARCall _ _ _) = 0
 countPMDepthL (ConstrL _) = 0
 countPMDepthL (BVL _ _) = 0
 countPMDepthL (LARC _ []) = 0

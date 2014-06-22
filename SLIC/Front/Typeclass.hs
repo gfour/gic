@@ -171,12 +171,12 @@ inlineTcMethods tcInfo env modF =
       allTcInsts :: Map (TcName, Type) MName
       allTcInsts = fromList $ tcISigs tcInfo
       inlineTcD (DefF f fs e) = DefF f fs (inlineTcE e)
-      inlineTcE (FF (BV _ _) _) = ierr "inlineTcE: bound variable application"
-      inlineTcE (FF f@(V fName) el) =
+      inlineTcE (FF (BV _ _) _ _) = ierr "inlineTcE: bound variable application"
+      inlineTcE (FF f@(V fName) el ci) =
         let el' = map inlineTcE el
             fNameL = lName fName
         in  case Data.Map.lookup fNameL allTcMethods of
-              Nothing -> FF f el'
+              Nothing -> FF f el' ci
               Just (tcn, tv, t) ->
                 let -- find which argument is the one with the parametric type
                     Just argIdx = Data.List.elemIndex (Tv tv) (types t)
@@ -184,7 +184,7 @@ inlineTcMethods tcInfo env modF =
                     -- find the type of the argument (if possible)
                     rT x = Just $ last $ types $ fst $ fromJust x
                     argT a = case a of
-                      FF (V f') args      ->
+                      FF (V f') args _     ->
                         case Data.Map.lookup f' env of
                           Just (fT', Just ar') ->
                             if ar'==length args then
@@ -219,15 +219,15 @@ inlineTcMethods tcInfo env modF =
                       CaseF _ _ _ ((PatB _ eP):_) -> argT eP -- use 1st pattern
                       LetF _ _ eL         -> argT eL
                       LamF {}             -> Nothing         -- can't handle lambda
-                      FF (BV _ _) _       -> Nothing         -- can't handle bvars
+                      FF (BV _ _) _ _     -> Nothing         -- can't handle bvars
                 in  case argT arg of
-                      Nothing -> FF f el'      -- cannot determine type
+                      Nothing -> FF f el' ci   -- cannot determine type
                       Just t' -> 
                         case Data.Map.lookup (tcn, t') allTcInsts of
-                          Nothing -> FF f el'  -- no instance found
+                          Nothing -> FF f el' ci  -- no instance found
                           Just m -> -- found instance in module m
                             let f' = QN (Just m) (mkMethodName fm tcn t' fNameL)
-                            in  FF (V f') el'
+                            in  FF (V f') el' ci
       inlineTcE v@(XF _) = v
       inlineTcE (ConF c el) = ConF c (map inlineTcE el)
       inlineTcE (ConstrF c el) = ConstrF c (map inlineTcE el)

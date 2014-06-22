@@ -19,9 +19,9 @@ import SLIC.Types
 patComp :: ProgFH -> [TcInstFH] -> (ProgF, [TcInstF])
 patComp (Prog dtsFL defsFH) tcInsts =
   let pcE :: ExprFH -> ExprF
-      pcE (XF var)  = XF var
-      pcE (ConF c el) = ConF c (map pcE el)
-      pcE (FF v el)   = FF v (map pcE el)
+      pcE (XF var)       = XF var
+      pcE (ConF c el)    = ConF c (map pcE el)
+      pcE (FF v el ci)   = FF v (map pcE el) ci
       pcE (ConstrF c el) = ConstrF c (map pcE el)
       pcE (CaseF d e s pats) =
         if allSimple pats then

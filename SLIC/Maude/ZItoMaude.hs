@@ -58,8 +58,8 @@ makeMaudeE (CaseZ {}) = error "Maude backend doesn't support pattern matching"
 makeMaudeE (ConstrZ _) = error "Maude backend doesn't support thunks"
 makeMaudeE (XZ (V v)) = makeMaudeVar v
 makeMaudeE (XZ (BV _ _)) = error "Maude backend doesn't support bound variables"
-makeMaudeE (FZ NOp v) = makeMaudeVar v
-makeMaudeE (FZ (Call (_, i)) v) = "call("++(show i)++", "++(makeMaudeVar v)++")"
+makeMaudeE (FZ NOp v _) = makeMaudeVar v
+makeMaudeE (FZ (Call (_, i)) v _) = "call("++(show i)++", "++(makeMaudeVar v)++")"
 -- all builtins with two arguments are strict
 makeMaudeE (ConZ (CN bOp) [e1, e2]) =
     let m1 = makeMaudeE e1
