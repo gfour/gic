@@ -126,15 +126,15 @@ pprintIdx :: IIndex -> ShowS
 pprintIdx (m, i) = ("("++).(m++).(":"++).shows i.(")"++)
 
 -- | The nesting depth of a bound variable in pattern matching.
-type DepthID = Int
-type Depth = Maybe DepthID
+type PMDepth = Int
+type Depth = Maybe PMDepth
 
 -- | A counter showing the unique position of a case/let/lambda expression
 --   inside a function.
 type Counter = Int
 
 -- | The location of a case/let expression.
-type Loc = Maybe (Counter, DepthID)
+type Loc = Maybe (Counter, PMDepth)
 
 -- | Pretty printer for expression locations.
 pprintLoc :: Loc -> ShowS
@@ -196,9 +196,6 @@ pprintCBNVars cbns =
 type VUsage = (CBNVars, Stricts)
 
 -- * Pattern matching depths
-
--- | Pattern matching depth.
-type PMDepth = Int
 
 -- | The mapping of variable definitions to their maximum pattern
 --   matching depth.

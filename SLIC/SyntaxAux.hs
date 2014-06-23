@@ -137,11 +137,11 @@ concatCode :: [Mod (Prog a)] -> (Prog a)
 concatCode mods = concatProgs (map modProg mods)
 
 -- | Pretty printer that takes a \"location\" arg to insert whitespace.
-pprint_tab :: (PPrint a) => DepthID -> a -> ShowS
+pprint_tab :: (PPrint a) => PMDepth -> a -> ShowS
 pprint_tab d pat = spaces (2*d).pprint pat
 
 -- | Pretty printer of semicolon-terminated tabbed lists. Used for patterns.
-pprint_tab_l :: (PPrint a) => DepthID -> [a] -> ShowS
+pprint_tab_l :: (PPrint a) => PMDepth -> [a] -> ShowS
 pprint_tab_l _ []         = ("{- nothing -}"++).nl
 pprint_tab_l d [pat]      = pprint_tab d pat.nl
 pprint_tab_l d (pat : ps) = pprint_tab d pat.semi.nl.pprint_tab_l d ps
