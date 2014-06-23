@@ -441,7 +441,7 @@ mkCExp _ config (LARC (LitInt i) exps) =
   case exps of
     []    -> intSusp (optCompact $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
-mkCExp env config (LARCall n _ (Mut _ iidx)) | optTCO (getOptions config) =
+mkCExp _ config (LARCall n _ (Mut _ iidx)) | optTCO (getOptions config) =
   case iidx of
     Just i  -> pprint n.("("++).nameMutAR n i.(")"++)
     Nothing -> ierr "mkCExp: missing intensional index"
