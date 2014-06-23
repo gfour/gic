@@ -2,18 +2,10 @@
 --
 --   Tail-calls can use the same LAR as the calling function, by
 --   using a /LAR mutator/ that uses the current LAR for the
---   function call.
--- 
---   Another analysis then finds all pairs (f, g), where g is a
---   tail-call in f and uses them to find tail-call chains.
---   E.g. [(f, g), (g, h)] is a chain of possible calls, where f
---   calls g in tail position and g calls h in tail position.
---   This means that f, g, and h can use the same space for their
---   LARs, if maxSpace=max(LAR_f_size, LAR_g_size, LAR_h_size).
---   For this tail-call chain, the call to f will allocate space
---   of size maxSpace; then g and h will re-use it through a
---   LAR mutator. A mutator runs on a tail-call and initializes
---   the LAR of the next function.
+--   function call. Tail calls are conservative: they only happen
+--   when the current LAR has at least as much space as the LAR
+--   needed for the call. This check makes this analysis dependent
+--   on the actual LAR representation used by the back-end.
 -- 
 --   On a tail call, two things happen:
 --   (1) The strict parameters of the new LAR are evaluated
@@ -37,6 +29,7 @@ import Data.Set as S (fromList, member)
 import Data.Graph (SCC(..), stronglyConnCompR)
 import Data.List (nub, sort)
 import SLIC.AuxFun (ierr, trace2)
+import SLIC.State
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
 import SLIC.Types
@@ -51,37 +44,43 @@ import SLIC.Types
 --   (c) strict parameters of the called function whose
 --       evaluation returns a closed value.
 -- 
-spotTCalls :: ModF -> ModF
-spotTCalls m =
+spotTCalls :: Options -> ModF -> ModF
+spotTCalls opts m =
   let p = modProg m
       cafs = reachableCAFs m
       stricts = reachableStricts m
       env = modTAnnot m
+      arities = reachableArities m
+      pmdepths = reachablePmDepths m
       tcoDefs = map tcoD (progDefs p)
-      tcoD (DefF f fs e) = DefF f fs (tcoE (frmsToNames fs) e)
-      tcoE fs e@(FF vf@(V f) el NoCI) = 
-          let indexedArgs = zip [0..] el
-          in  if all (tcoCompatible fs f) indexedArgs then
-                  let ci = tcoCI cafs stricts fs f indexedArgs
-                  in  trace2 ("Found tail call: '"++(pprint e "")++"', ci="++
-                              (pprint ci "")) $ 
-                      FF vf el ci
+      tcoD (DefF f fs e) = DefF f fs (tcoE (f, frmsToNames fs) e)
+      tcoE (f0, fs) e@(FF vf@(V f) el NoCI) = 
+        let indexedArgs = zip [0..] el
+        in  if all (tcoCompatible fs f) indexedArgs then
+              if larsCompatible f0 f then
+                let ci = tcoCI cafs stricts fs f indexedArgs
+                in  -- trace2 ("Found tail call: '"++(pprint e "")++"', ci="++
+                    --         (pprint ci "")) $ 
+                    FF vf el ci
+              else
+                -- trace2 ("Discarding tail call: '"++(pprint e "")++
+                --         "', enclosing LAR is too small")$
+                e
           else e
       tcoE _ e@(FF (BV{}) _ NoCI) = e
       tcoE _   (FF _ _ (Mut _ _)) = error "Found already set LAR mutation."
-      tcoE fs  (CaseF cloc e0 qn pats) = CaseF cloc e0 qn (map (tcoPat fs) pats)
-      tcoE fs  (ConF (CN CIf) [cond, e1, e2]) =
-          ConF (CN CIf) [cond, tcoE fs e1, tcoE fs e2]
+      tcoE ff  (CaseF cloc e0 qn pats) = CaseF cloc e0 qn (map (tcoPat ff) pats)
+      tcoE ff  (ConF (CN CIf) [cond, e1, e2]) =
+          ConF (CN CIf) [cond, tcoE ff e1, tcoE ff e2]
       tcoE _ e@(XF {}) = e
       tcoE _ e@(ConF{}) = e
       tcoE _ e@(ConstrF{}) = e
       tcoE _   (LetF{}) = ierr "The tail-call inspector cannot handle let."
       tcoE _   (LamF{}) = ierr "The tail-call inspector cannot handle lambdas."
-      tcoPat fs (PatB pat e) = PatB pat (tcoE fs e)
-      tcoCompatible _  f (slotIdx, _) | isStrictGround f slotIdx = True
-      tcoCompatible fs _ (_, XF (V v)) =
-          (v `elem` fs) || (v `elem` cafs)
-      tcoCompatible _  _ (_, e) = closedExpr cafs e
+      tcoPat ff (PatB pat e) = PatB pat (tcoE ff e)
+      tcoCompatible _  f (slotIdx,  _) | isStrictGround f slotIdx = True
+      tcoCompatible fs _ (_, XF (V v)) = (v `elem` fs) || (v `elem` cafs)
+      tcoCompatible _  _ (_, e       ) = closedExpr cafs e
       isStrictGround f slotIdx =
         case M.lookup f stricts of
           Nothing   -> False
@@ -94,6 +93,16 @@ spotTCalls m =
                         Tg gt -> isNullaryGT gt
                         _     -> False
             in  (S.member slotIdx strs) && isGround
+      -- If f is called inside f0, check that the LAR of f is smaller.
+      larsCompatible f0 f =
+        let (Just a0, n0) = (M.lookup f0 arities, findPMDepth f0 pmdepths)
+            (Just a , n ) = (M.lookup f  arities, findPMDepth f  pmdepths)
+        in  case (optGC opts, optCompact opts) of 
+              (SemiGC, True) -> a0+n0 >= a+n
+              (LibGC , _   ) ->
+                let suspSize = if optTag opts then 3 else 2
+                in  (a0*suspSize)+n0 >= (a*suspSize)+n
+              _              -> False
   in  m{modProg=(p{progDefs=tcoDefs})}
 
 -- | Generate the call information for a tail call.

@@ -129,13 +129,13 @@ processFL opts dfis inputModule =
      let p0Tc = inlineTcMethods tcInfo env p0BVars
 
      -- spot tail-calls
-     let p0TCO = doOnlyIf (optTCO opts) spotTCalls p0Tc
+     let p0TCO = doOnlyIf (optTCO opts) (spotTCalls opts) p0Tc
 
      -- final preprocessed and defunctionalized source to be used
      let p0Final = p0TCO
      -- _ <- printLn p0Final
       
-     -- do variable usage analysis
+     -- do variable sharing analysis
      let cbnVars = findCBNVars opts p0Final
      -- _ <- putStrLn (pprintCBNVars cbnVars "")
      let stricts = gatherStricts p0Final
