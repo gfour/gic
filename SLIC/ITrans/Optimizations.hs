@@ -10,7 +10,7 @@
 --     (its assigned id) and changing the environment so that the enums no
 --     longer belong to their data type, but to Int.
 -- 
---   * Usage analysis spots formals that do not need to be stored in thunks
+--   * A sharing analysis spots formals that do not need to be stored in thunks
 --   but can be evaluated as call-by-name.
 -- 
 
@@ -114,7 +114,7 @@ ifEnumThenInt ds typ =
       transT t@(Tv _)  = t
   in  transT typ
 
--- * Usage analysis
+-- * Sharing analysis
 
 -- | Analyzes a FL program to find which formals of each function do not need 
 --   to be stored in thunks. Returns all the bound variables used <2 times in
@@ -127,14 +127,18 @@ findCBNVars opts modF =
       scrOpt = optScrut opts
       cbnConstrParams = findCBNComps scrOpt defs
       findCBNVarsD :: DefF -> (QName, [QName])
-      findCBNVarsD (DefF f frms (ConstrF _ _)) =
+      findCBNVarsD (DefF f frms (ConstrF _ _))
+        | optSharing opts =
         (f, frmsToNames (filter (\(Frm v _)-> v `elem` cbnConstrParams) frms))
+        | otherwise = (f, [])
       -- returns all the formals used <2 times in the function body
-      findCBNVarsD (DefF f frms e) =    
+      findCBNVarsD (DefF f frms e)
+        | optSharing opts = 
         let si = (scrOpt, frmsToNames frms)
             frmUses = List.map (\(Frm v _) -> (v, countVarUses si (V v) e)) frms
             cbnFrms = filter (\(_, i) -> i<2) frmUses
         in  (f, List.map fst cbnFrms)
+        | otherwise = (f, [])
   in  fromList (List.map findCBNVarsD defs)
 
 -- | Find the call-by-name components of the constructors. These are the
