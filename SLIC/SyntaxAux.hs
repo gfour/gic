@@ -481,6 +481,6 @@ data CI = NoCI | Mut Mutation (Maybe IIndex)
 instance PPrint CI where
   pprint NoCI = ("{}"++)
   pprint (Mut mut iidx) =
-    ("{mut:"++).pprintMut mut.
-    ("|call:"++).(case iidx of Just i -> pprintIdx i ; Nothing -> id).
+    ("{mut:"++).pprintMut mut.(" |"++).
+    (" call:"++).(case iidx of Just i -> pprintIdx i ; Nothing -> id).
     ("}"++)
