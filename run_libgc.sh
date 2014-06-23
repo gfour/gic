@@ -51,7 +51,7 @@ if [ "$GICFLAGS" = ""  ]; then
     GICFLAGS="-ghc-tc"
 fi
 
-./gic ${GICFLAGS} -cl $1 > /dev/null
+./gic ${GICFLAGS} -cl $* > /dev/null
 CMD="${CC} ${SSTACK} ${GC_INCLUDE} ${CFLAGS} ${USE_GMP} ${USE_OMP} main.c ${GC_LIB}"
 # echo $CMD
 $CMD
