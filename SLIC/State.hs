@@ -111,6 +111,7 @@ data Options = Options
   , optEStackSz:: Int              -- ^ explicit stack size
   , optScrut   :: ScrutOpt         -- ^ optimize scrutinee nesting
   , optTCO     :: Bool             -- ^ tail-call optimization
+  , optSharing :: Bool             -- ^ sharing analysis
   }
 
 -- | Optimize scrutinees of formals to skip the nested field and read the
@@ -153,6 +154,7 @@ defaultOptions = Options
   , optEStackSz= defaultEStackSize
   , optScrut   = False
   , optTCO     = False
+  , optSharing = True
   }
 
 instance Show Options where

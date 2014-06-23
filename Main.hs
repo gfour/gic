@@ -72,8 +72,6 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
 #endif           
            putStrLn "* LAR back-end:"
            putStrLn "  -cl     : transform and compile the 0-order program to C (using lazy activation records)"
-           putStrLn "             -heap    : allocate all lazy activation records on the heap"
-           putStrLn "             -tco     : do tail-call optimization"
            putStrLn "             -debug   : keep extra debugging information"
            putStrLn "             -v       : produce a graph trace file after program execution"
            putStrLn "             -semigc  : enable semispace garbage collection (EXPERIMENTAL)"
@@ -86,6 +84,10 @@ usage = do putStrLn "Usage: gic <options> <file.hs>"
            putStrLn "                         formals and constructor args"           
            putStrLn "             -tag     : embed tags in constructors"
            putStrLn("             -pdfi    : print information about a "++dfiSuffix++" file")
+           putStrLn "      Optimizations:"
+           putStrLn "             -heap       : allocate all lazy activation records on the heap (no escape analysis)"
+           putStrLn "             -no-sharing : skip sharing analysis"
+           putStrLn "             -tco        : do tail-call optimization"
            putStrLn "* Eduction back-end:"
            putStrLn "  -e      : transform and evaluate the 0-order program (lazy eduction)"
            putStrLn("             -maxwh N : maximum warehouse entries before GC (default="++(showNum defaultMaxWHSize)++")")
@@ -146,6 +148,7 @@ processArgs cmdArgs =
         aux ("-compact":args) opts = aux args opts{optCompact=True}{optGC = SemiGC}{optScrut = True}
         aux ("-fop"   : args) opts = aux args opts{optFastOp=True}
         aux ("-tag"   : args) opts = aux args opts{optTag=True}
+        aux ("-no-sharing":args) opts = aux args opts{optSharing=False}
         aux ("-tco"   : args) opts = aux args opts{optTCO=True}
         aux ("-ghc-tc": args) opts = aux args opts{optGHC=GHCTc}{optTC=GHCTypeInf}
         aux ("-gic-tc": args) opts = aux args opts{optGHC=NoGHC}{optTC=GICTypeInf True}
@@ -201,7 +204,14 @@ processArgs cmdArgs =
                 case optInput opts of
                   Nothing -> aux args opts{optInput = Just [arg]}
                   Just files  -> aux args opts{optInput = Just (arg:files)} 
-    in  aux cmdArgs defaultOptions
+        sanitizeOpts opts =
+          if optTCO opts && optSharing opts then
+            putStrLn ("Disabling sharing analysis, not compatible with TCO.") >>
+            sanitizeOpts (opts{optSharing=False})
+          else
+            return opts
+    in  do opts <- aux cmdArgs defaultOptions
+           sanitizeOpts opts
 
 -- | Entry point, reads from a file (or stdin if no file given) and calls 
 --   the main part of the compiler.
