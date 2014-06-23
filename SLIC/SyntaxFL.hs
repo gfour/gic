@@ -9,6 +9,7 @@ import Prelude hiding (lookup)
 import Data.Char (ord, toUpper)
 import qualified Data.Map as M (elems, empty, filter, filterWithKey,
        fromList, keys, lookup, map, unionWithKey, unions)
+import Data.Maybe (fromJust)
 import qualified Data.Set as S (empty, fromList)
 import SLIC.AuxFun (comment, ierr, showStrings, spaces, toLowerFirst)
 import SLIC.Constants
@@ -407,13 +408,29 @@ reachableCAFs m =
             M.unions $ map ideclINames $ modImports m
     in  localCAFs ++ extCAFs
 
--- | Gathers the strictness information of all reachable functions
---   in a module.
+-- | Gathers strictness information for all reachable functions in a module.
 reachableStricts :: ModF -> Stricts
 reachableStricts m =
     let extStricts = M.map (\iinfo->fromJustSet $ impStricts iinfo) $
                      M.unions $ map ideclINames $ modImports m
     in  M.unions [gatherStrictVars (modProg m), extStricts]
+
+-- | Gathers arity information for all reachable functions in a module.
+reachableArities :: ModF -> Arities
+reachableArities m =
+  let localArities = M.fromList $ map ((\(f, fs)->(f, length fs)).defSig) $
+                     progDefs $ modProg m
+      extArities   = M.map (\iinfo->fromJust $ impA iinfo) $
+                     M.unions $ map ideclINames $ modImports m
+  in  M.unions [localArities, extArities, builtinArities]
+
+-- | Gathers pattern matching information for all reachable functions in a module.
+reachablePmDepths :: ModF -> PMDepths
+reachablePmDepths m =
+  let localPmDepths = countPMDepths $ progDefs $ modProg m
+      extPmDepths   = M.map (\ii->fromJust $ impD ii) $
+                      M.unions $ map ideclINames $ modImports m
+  in  M.unions [localPmDepths, extPmDepths, builtinPmDepths]
 
 fromJustSet :: Maybe StrictInds -> StrictInds
 fromJustSet Nothing = S.empty
