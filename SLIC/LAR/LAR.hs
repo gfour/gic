@@ -17,7 +17,7 @@ module SLIC.LAR.LAR (compileModL, createSemiGCARInfra,
                      prologue) where
 
 import Data.List (nub)
-import Data.Map (elems, filter, lookup, keys, toList)
+import Data.Map (elems, filter, lookup, keys, toList, union)
 import Data.Set (empty, member, toList)
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore, pathOf)
 import SLIC.Constants
@@ -29,10 +29,9 @@ import SLIC.LAR.LARAux
 import SLIC.LAR.LARBuiltins
 import SLIC.LAR.LARDebug
 import SLIC.LAR.LARGraph
-import SLIC.LAR.SMacrosAux (declF, nameGCAF, namegenv, protoFunc, mkAllocAR,
-                            mkDefineVar, mkGETSTRICTARG, mkLARMacro,
-                            mkLARMacroOpt, mkMainCall, mkNESTED, mkPUSHAR,
-                            mkRETVAL, mkVALS, smFun)
+import SLIC.LAR.SMacrosAux (MutInfo, declF, nameGCAF, namegenv, protoFunc,
+       mkAllocAR, mkDefineVar, mkGETSTRICTARG, mkLARMacro, mkLARMacroOpt,
+       mkMainCall, mkMutAR, mkNESTED, mkPUSHAR, mkRETVAL, mkVALS, nameMutAR,smFun)
 import SLIC.LAR.SyntaxLAR
 import SLIC.State
 import SLIC.SyntaxAux
@@ -67,6 +66,9 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
         macrosC opts modName arities pmDepths arityCAF.
         prologue opts modName arityCAF.
         predeclarations defs' config.
+        (if optTCO opts then
+            genMutARs (gc, optCompact opts) arities pmDepths defs'
+         else id).
         pdeclGCAF config arityCAF.nl.
         declarations dTypes defs'.
         argDefs defs env strictVars cbns gc.nl.
@@ -237,11 +239,10 @@ defInterface gc dfInfo importFuns extCIDs =
       foldDot macrosConstr (Data.Map.toList extCIDs)
 
 -- | Generates specialized macros for LARs used by the functions defined
---   in the current module
---   * this is not to be used with -semiGC
+--   in the current module.
 predeclarations :: [BlockL] -> ConfigLAR -> ShowS
 predeclarations lblockList config =
-    let opts        = getOptions config
+    let opts = getOptions config
         predeclF (DefL fname _ bind) =
             let arityA  = length bind
                 arityV  = arityA
@@ -278,6 +279,29 @@ pdeclExtApps :: Options -> ExtAppFuns -> ShowS
 pdeclExtApps opts extApps =
   let mkSmFun ar = smFun opts (genNApp ar) (1+ar) (1+ar) 1
   in  foldDot mkSmFun $ Data.Set.toList extApps
+
+-- | Generates macros for the LAR mutators of the program tail calls.
+genMutARs :: (GC, Bool) -> Arities -> PMDepths -> [BlockL] -> ShowS
+genMutARs larStyle localArities localPmdepths defs =
+  let arities  = union localArities builtinArities
+      pmdepths = union localPmdepths builtinPmDepths
+      findCIsB (DefL _ e _) = findCIsE e
+      findCIsB (ActualL _ _ e) = findCIsE e
+      findCIsE (LARCall _ _ NoCI) = []
+      findCIsE (LARCall _ _ (Mut _ Nothing)) =
+        ierr "mutation index not set"
+      findCIsE (LARCall f qns (Mut mut (Just iidx))) =
+        case (Data.Map.lookup f arities, Data.Map.lookup f pmdepths) of
+          (Just a, Just n) -> [(f, (mut, iidx), qns, (a, n))]
+          _ -> ierr $ "findCIsE: Missing information for "++(qName f)
+      findCIsE (LARC _ el) = concatMap findCIsE el
+      findCIsE (ConstrL{}) = []
+      findCIsE (BVL{}) = []
+      findCIsE (CaseL _ _ pats) = concatMap findCIsP pats
+      findCIsP (PatB _ e) = findCIsE e
+      allMutInfo :: [MutInfo]
+      allMutInfo = concatMap findCIsB defs
+  in  foldDot (mkMutAR larStyle) allMutInfo
 
 -- | Generates specialized macros for a module's global CAF.
 pdeclGCAF :: ConfigLAR -> Int -> ShowS
@@ -417,7 +441,11 @@ mkCExp _ config (LARC (LitInt i) exps) =
   case exps of
     []    -> intSusp (optCompact $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
-mkCExp env config (LARCall n acts ci) = 
+mkCExp env config (LARCall n _ (Mut _ iidx)) | optTCO (getOptions config) =
+  case iidx of
+    Just i  -> pprint n.("("++).nameMutAR n i.(")"++)
+    Nothing -> ierr "mkCExp: missing intensional index"
+mkCExp env config (LARCall n acts _) =
   if n `elem` (nmsids2nms (getCAFnmsids config)) then
     let Just n' = (getCAFid n (getCAFnmsids config))
     in  ("("++).nameGCAF (getModName config).(("("++(show n')++"))")++)

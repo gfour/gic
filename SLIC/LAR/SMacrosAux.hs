@@ -56,15 +56,19 @@
 --   whole program text).
 -- 
 
-module SLIC.LAR.SMacrosAux (declF, mkAllocAR, mkDefineVar, mkGETARG,
-                            mkGETSTRICTARG, mkLARMacro, mkPUSHAR, mkRETVAL,
-                            mkLARMacroOpt, mkMainCall, mkNESTED, mkVALS,
-                            nameGCAF, namegenv, protoFunc, smFun) where
+module SLIC.LAR.SMacrosAux (MutInfo, declF, mkAllocAR, mkDefineVar, mkGETARG,
+       mkGETSTRICTARG, mkLARMacro, mkPUSHAR, mkRETVAL, mkLARMacroOpt, mkMainCall,
+       mkMutAR, mkNESTED, mkVALS, nameGCAF, namegenv, nameMutAR, protoFunc, smFun)
+       where
 
-import SLIC.AuxFun (insCommIfMore)
+import qualified Data.Map as M (filterWithKey, null)
+import qualified Data.Set as S (null, toList)
+import SLIC.AuxFun (foldDot, ierr, insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
 import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
-import SLIC.Types (Arity, MName, PMDepth, QName, qName, mainDefQName, pprint)
+import SLIC.SyntaxAux (Copy(..), Mutation, Permutation(..))
+import SLIC.Types (Arity, IIndex, MName, PMDepth, QName, qName,
+                   mainDefQName, pprint)
 import SLIC.LAR.LARAux (wrapIfOMP)
 
 -- * LAR construction
@@ -310,3 +314,46 @@ mkRETVAL dbg =
       ("#define RETVAL(x) ((Susp)({ Susp r = (x); sstack_ptr--; "++).
       debug_RETVAL.
       (" r; }))"++).nl
+
+-- | Information for a LAR mutator: function name, mutation description,
+--   intensional index, list of parameters, function arity/nesting depth.
+type MutInfo = (QName, (Mutation, IIndex), [QName], (Arity, PMDepth))
+
+-- | Generates the mutation macro for reusing the current LAR as the
+--   LAR of a new tail call.
+mkMutAR :: (GC, Bool) -> MutInfo -> ShowS
+mkMutAR (gc, compact) (f, ((perms, copies, closed, stricts), iidx), qns, (a, n)) =
+  let noIdPerm (Perm perm) = not $ M.null $ M.filterWithKey (/=) perm
+      -- Omit identity permutations/copies.
+      perms' = filter noIdPerm perms
+      copies' = filter (\(Copy src dest)->src/=dest) copies
+      setArg i = 
+         if (gc==LibGC) || ((gc==SemiGC) && compact) then
+           ("ARGS("++).shows i.(", T0) = ARGC("++).pprint (qns!!i).("); "++)
+         else
+           ierr "TODO: setArg for semigc"
+      setNested i =
+        case gc of
+          LibGC  -> ("NESTED("++).shows i.(", "++).
+                    shows a.(", "++).shows a.(", T0) = 0; "++)
+          SemiGC | compact ->
+              ("NESTED("++).shows i.(", "++).shows a.(", T0) = 0; "++)
+          SemiGC -> ("NESTED("++).shows i.(", T0) = 0; "++)
+  in  ("#define "++).nameMutAR f iidx.("    ({"++).
+      -- Evaluate strict arguments.
+      (if S.null stricts then id else ierr "TODO: strict args in mkMutAR").
+      -- Do permutations of reused thunks on dependent slots.
+      (if perms'==[] then id else ierr "TODO: permutations in mkMutAR").
+      -- Do copies of resued thunks on independent slots.
+      (if copies'==[] then id else ierr "TODO: copies in mkMutAR").
+      -- Add closed arguments in the LAR.
+      foldDot setArg (S.toList closed).
+      -- Initialize nested fields to 0.
+      (if n==0 then id else foldDot setNested [0..(n-1)]).
+      -- only if n<current-n, use the current T0
+      -- Return the mutated LAR; if all the above did nothing, it is the identity.
+      ("T0;})"++).nl
+
+-- | Generates the name of a LAR mutator.
+nameMutAR :: QName -> IIndex -> ShowS
+nameMutAR f (m, i) = ("__MUT_AR_"++).pprint f.("_"++).(m++).("_"++).shows i
