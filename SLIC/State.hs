@@ -2,9 +2,9 @@
 -- 
 
 {-# LANGUAGE CPP #-}
-module SLIC.State (Action(..), CompactOpt, CompileMode(..), DebugFlag, DoNullDf,
-                   GC(..), GHCAPI(..), Options(..), ScrutOpt, TypeChecker(..),
-                   Verb, defaultOptions, opt) where
+module SLIC.State (Action(..), CompileMode(..), DebugFlag, DoNullDf, GC(..),
+                   GHCAPI(..), LARStyle(..), Options(..), ScrutOpt,
+                   TypeChecker(..), Verb, defaultOptions, gcFor, opt) where
 
 import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
                        defaultMemSize, defaultMaxCtxts, defaultWorkers, nl)
@@ -39,18 +39,30 @@ data CompileMode =
    | CompileModule -- ^ compile a single Module.hs to Module.o (and accompanying interface)
    deriving (Eq, Show)
               
--- | The garbage collector to use.
-data GC =
-    SemiGC       -- ^ custom semispace garbage collector
-  | LibGC        -- ^ Boehm's garbage collector (libgc)
-  deriving (Eq)
-                 
 -- | What part of GHC the compiler may use.
 data GHCAPI =
     NoGHC      -- ^ the GHC API is not used (no need to link against it)
   | GHCTc      -- ^ only use the type checker of the GHC API
   | GHCCore    -- ^ use GHC until (Prepared) Core is emitted
   deriving (Eq)
+
+-- | The representation that is used by the LAR back-end.
+data LARStyle =
+    LAR        -- ^ original, uses semispace GC, supports OpenMP
+  | LAROPT     -- ^ optimized, uses Boehm's garbage collector
+  | LAR64      -- ^ compact 64-bit representation (AMD64-only)
+  deriving (Eq)
+
+-- | The garbage collector to use.
+data GC =
+    SemiGC       -- ^ custom semispace garbage collector
+  | LibGC        -- ^ Boehm's garbage collector (libgc)
+
+-- | Returns the garbage collector used by each LAR representation.
+gcFor :: LARStyle -> GC
+gcFor LAR    = SemiGC
+gcFor LAROPT = LibGC
+gcFor LAR64  = SemiGC
 
 -- | The different type checking/inference engines that can be used.
 --   
@@ -91,7 +103,7 @@ data Options = Options
   , optVerbose :: Verb             -- ^ verbose flag
   , optDebug   :: DebugFlag        -- ^ debugging flag
   , optHeap    :: Bool             -- ^ allocate all lazy activation records on the heap
-  , optGC      :: GC               -- ^ enable garbage collection
+  , optLARStyle:: LARStyle         -- ^ which LAR representation to use
   , optTC      :: TypeChecker      -- ^ which type checker to use
   , optGHC     :: GHCAPI           -- ^ enable preprocessing using GHC
   , optStrict  :: Strictness       -- ^ enable automatic optrictness everywhere
@@ -105,7 +117,6 @@ data Options = Options
   , optLink    :: Bool             -- ^ linking mode
   , optCMode   :: CompileMode      -- ^ the current compilation mode (whole program, partial compilation)
   , optWhRedis :: Bool             -- ^ use the Redis-based warehouse for the Erlang back-end
-  , optCompact :: CompactOpt       -- ^ use the compact x86-64 representation
   , optFastOp  :: Bool             -- ^ use the fast integer operations
   , optNWorkers:: Int              -- ^ number of workers used by the TTD back-end
   , optEStackSz:: Int              -- ^ explicit stack size
@@ -117,9 +128,6 @@ data Options = Options
 -- | Optimize scrutinees of formals to skip the nested field and read the
 --   nested context directly from the formal thunk.
 type ScrutOpt = Bool
-
--- | Flag to use the compact thunk representation.
-type CompactOpt = Bool
 
 -- | The default options of the compiler. It is used as a default for
 --   applying user command-line switches, or by the GHC back-end.
@@ -133,7 +141,7 @@ defaultOptions = Options
   , optWhNum   = defaultWhs
   , optWhSize  = defaultMaxWHSize
   , optMaxMem  = defaultMemSize
-  , optGC      = LibGC
+  , optLARStyle= LAROPT
 #ifdef USE_GHC
   , optTC      = GHCTypeInf
 #else
@@ -148,7 +156,6 @@ defaultOptions = Options
   , optLink    = False
   , optCMode   = Whole
   , optWhRedis = False
-  , optCompact = False
   , optFastOp  = False
   , optNWorkers= defaultWorkers
   , optEStackSz= defaultEStackSize
@@ -162,8 +169,9 @@ instance Show Options where
     ("State:"++).nl.
     ("Input: "++).(case optInput opts of Nothing -> id; Just inp -> shows inp).nl.
     ("Compilation mode: "++).shows (optCMode opts).nl.
-    ("Garbage collector: "++).
-    (case optGC opts of
-        SemiGC -> ("semispace"++)
-        LibGC  -> ("libgc"++)).nl
-    
+    ("LAR style: "++).
+    (case optLARStyle opts of
+        LAR    -> ("LAR (semispace gc)"++)
+        LAROPT -> ("LAROPT (optimized, libgc)"++)
+        LAR64  -> ("LAR64 (compact, semispace gc)"++)
+    )

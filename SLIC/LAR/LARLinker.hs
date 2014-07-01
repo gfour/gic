@@ -88,21 +88,20 @@ makeCLinker opts dfis modNames =
       pmDepths  = Map.insert mainDef mainDepth builtinPmDepths 
       cafs      = []
       arityCAF  = length cafs
-      gc        = optGC opts
-      compact   = optCompact opts
-  in  headersC opts.
+      larStyle  = optLARStyle opts
+  in  headersC larStyle.
       macrosC opts modName arities pmDepths arityCAF.
       prologue opts modName arityCAF.
-      (case gc of
+      (case gcFor larStyle of
           SemiGC ->
-            createSemiGCARInfra modName gc compact arities pmDepths arityCAF
+            createSemiGCARInfra modName larStyle arities pmDepths arityCAF
           LibGC  ->
             mkLARMacroOpt opts (qName mainDef) 0 0 mainDepth.nl).
       ("extern "++).protoFunc mainDef.
       foldDot extInitMod modNames.             -- linked module initializers
       declarationsBuiltins opts.
       mainFunc env opts mainDepth modNames.
-      prettyPrintersC compact.nl.
+      prettyPrintersC larStyle.nl.
       epilogue opts.nl
 
 -- | Whole program compilation: generates the defunctionalization module,

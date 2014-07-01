@@ -28,27 +28,25 @@ t0 = "T0"
 --   This contains automatically generated 'Show' functions and auxiliaries.
 builtins :: Options -> ShowS
 builtins opts =
-  let gc = optGC opts
-      compact = optCompact opts
-  in  b_readIntIO.nl.
-      b_printIntIO gc.nl.
-      b_putStr gc compact.nl.
-      b_putStrLn.nl.
-      b_toInteger opts.nl.
-      b_strToList gc compact.nl.
-      b_show gc.nl.
-      b_mulI opts.nl.
+  let larStyle = optLARStyle opts
+  in  b_readIntIO          .nl.
+      b_printIntIO larStyle.nl.
+      b_putStr     larStyle.nl.
+      b_putStrLn           .nl.
+      b_toInteger  larStyle.nl.
+      b_strToList  larStyle.nl.
+      b_show       larStyle.nl.
+      b_mulI       larStyle.nl.
       builtinConstrsC opts.
-      b_runMainIO.nl.
-      b_error.nl.
-      b_par gc.nl.
-      b_pseq gc.nl
+      b_runMainIO          .nl.
+      b_error              .nl.
+      b_par        larStyle.nl.
+      b_pseq       larStyle.nl
 
 -- | The memory allocation function for arbitrary precision numbers.
-gmpMalloc :: Options -> String -> ShowS
-gmpMalloc opts sz =
-  if optGC opts == LibGC then ("GC_MALLOC("++).(sz++).(")"++) 
-  else ("malloc("++).(sz++).(")"++)
+gmpMalloc :: LARStyle -> String -> ShowS
+gmpMalloc LAROPT sz = ("GC_MALLOC("++).(sz++).(")"++)
+gmpMalloc _      sz = ("malloc("++).(sz++).(")"++)
 
 {-
 -- | The free() function for arbitrary precision numbers.
@@ -59,13 +57,13 @@ gmpFree opts ptr =
 -}
 
 -- | Pretty-printing (and forcing) functions.
-prettyPrintersC :: CompactOpt -> ShowS
-prettyPrintersC compact =
-  prettyPrintInt compact.nl.
+prettyPrintersC :: LARStyle -> ShowS
+prettyPrintersC larStyle =
+  prettyPrintInt larStyle.nl.
   prettyPrintBool.nl.
   prettyPrintInteger.nl.
   prettyPrintDefunc.nl.
-  prettyPrintList compact.nl.
+  prettyPrintList larStyle.nl.
   prettyPrintUnit.nl.
   prettyPrintMagic.nl
 
@@ -151,10 +149,10 @@ prettyPrintDTName c n dtName =
 -- * Hard-coded built-in functions
 
 -- | Built-in pretty printer for Int.
-prettyPrintInt :: CompactOpt -> ShowS
-prettyPrintInt compact = 
+prettyPrintInt :: LARStyle -> ShowS
+prettyPrintInt larStyle = 
   pprinterSig dtInt.(" {"++).nl.
-  (if compact then
+  (if larStyle==LAR64 then
      tab.("printf(\"%ld\", PVAL_R(i));"++)
    else
      tab.("printf(\"%d\", CONSTR(i));"++)).nl.
@@ -216,26 +214,26 @@ b_readIntIO =
   ("}"++).nl
 
 -- | Writes an integer to the standard input and returns it.
-b_printIntIO :: GC -> ShowS
-b_printIntIO gc =
+b_printIntIO :: LARStyle -> ShowS
+b_printIntIO larStyle =
   funcHeader bf_printIntIO.
-  tab.("Susp i = "++).mkGETARG gc bf_printIntIO 0 t0.(";"++).nl.
+  tab.("Susp i = "++).mkGETARG larStyle bf_printIntIO 0 t0.(";"++).nl.
   tab.("printf(\"%d\\n\", CONSTR(i));"++).nl.
   tab.("return i;"++).nl.
   ("}"++).nl
 
 -- | Writes a string to the standard input.
-b_putStr :: GC -> CompactOpt -> ShowS
-b_putStr gc compact =
+b_putStr :: LARStyle -> ShowS
+b_putStr larStyle =
   let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
   in  funcHeader bf_putStr.
-      tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
+      tab.("Susp i = "++).mkGETARG larStyle bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
       tab.tab.("TP_ str_tp = CPTR(i);"++).nl.
       tab.tab.("printf(\"%c\", "++).
-      (if compact then ("(unsigned char)PVAL_R"++) else ("CONSTR"++)).
-      ("("++).mkGETARG gc bf_Cons 0 "AR_REF(str_tp)".("));"++).nl.
-      tab.tab.("i = "++).mkGETARG gc bf_Cons 1 "AR_REF(str_tp)".(";"++).nl.
+      (if larStyle==LAR64 then ("(unsigned char)PVAL_R"++) else ("CONSTR"++)).
+      ("("++).mkGETARG larStyle bf_Cons 0 "AR_REF(str_tp)".("));"++).nl.
+      tab.tab.("i = "++).mkGETARG larStyle bf_Cons 1 "AR_REF(str_tp)".(";"++).nl.
       tab.("}"++).nl.
       tab.("return "++).pprint bf_Unit.("(0);"++).nl.
       ("}"++).nl
@@ -265,16 +263,17 @@ dummyPre :: ShowS
 dummyPre = ("0"++)
 
 -- | Converts an Int to an Integer.
-b_toInteger :: Options -> ShowS
-b_toInteger opts =
+b_toInteger :: LARStyle -> ShowS
+b_toInteger larStyle =
   funcHeader bf_toInteger.
-  (if optCompact opts then
+  (if larStyle == LAR64 then
      ("printf(\"TODO: toInteger for -compact\");"++).nl
    else
      wrapIfGMP
-     (tab.("Susp i = "++).mkGETARG (optGC opts) bf_toInteger 0 t0.(";"++).nl.
+     (tab.("Susp i = "++).mkGETARG larStyle bf_toInteger 0 t0.(";"++).nl.
       -- tab.("printf(\"Initializing big int %d\\n\", i.constr);"++).nl.
-      tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
+      tab.("mpz_t *ret = (mpz_t *)"++).
+          gmpMalloc larStyle "sizeof(mpz_t)".(";"++).nl.
       tab.("mpz_init_set_ui(*ret, i.constr);"++).nl.
       -- tab.("printf(\"Initialized big int %d in addr %p: \", i.constr, ret);"++).nl.
       -- tab.("gmp_printf(\"verify=%d\\n\", mpz_get_ui(*ret));"++).nl.
@@ -284,8 +283,8 @@ b_toInteger opts =
   ("}"++).nl
 
 -- | Converts a C string to a Haskell list. For internal use.
-b_strToList :: GC -> CompactOpt -> ShowS
-b_strToList gc compact =
+b_strToList :: LARStyle -> ShowS
+b_strToList larStyle =
   let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
       Just (_, cidNil)  = M.lookup bf_Nil  builtinCIDs
   in  ("Susp strToList(char *str, int chars, TP_ AR_TP(T0)) {"++).nl.
@@ -296,13 +295,13 @@ b_strToList gc compact =
       tab.("TP_ consTP;"++).nl.
       tab.("for (d=chars-1; d>=0; d--) {"++).nl.
       tab.tab.("consTP = "++).
-              mkAllocAR gc True compact bf_Cons 2 0 [("0"++), ("0"++)].("; "++).
+              mkAllocAR larStyle True bf_Cons 2 0 [("0"++), ("0"++)].("; "++).
               ("// generate evaluated LAR for Cons"++).nl.
       tab.tab.("// read character as integer"++).nl.
-      tab.tab.(mkVALS gc 0 2 "AR_REF(consTP)").
+      tab.tab.(mkVALS larStyle 0 2 "AR_REF(consTP)").
               (" = SUSP((int)str[d], "++).listTag.(", 0);"++).nl.
       tab.tab.("// add last cons cell to the back"++).nl.
-      tab.tab.(mkVALS gc 1 2 "AR_REF(consTP)").(" = lastCell;"++).nl.
+      tab.tab.(mkVALS larStyle 1 2 "AR_REF(consTP)").(" = lastCell;"++).nl.
       tab.tab.("lastCell = SUSP("++).shows cidCons.(", "++).listTag.(", consTP);"++).nl.
       tab.("}"++).nl.
       tab.("return lastCell;"++).nl.
@@ -310,10 +309,10 @@ b_strToList gc compact =
 
 -- | Converts its integer argument to a character list.
 --   For now, it is the Show Int implementation.
-b_show :: GC -> ShowS
-b_show gc =
+b_show :: LARStyle -> ShowS
+b_show larStyle =
   funcHeader bf_show.
-  tab.("Susp i = "++).mkGETARG gc bf_show 0 t0.(";"++).nl.
+  tab.("Susp i = "++).mkGETARG larStyle bf_show 0 t0.(";"++).nl.
   tab.("// find number of digits"++).nl.
   tab.("int a = abs(CONSTR(i)), digits = 0;"++).nl.
   tab.("while (a > 0) { a /= 10; digits++; }"++).nl.
@@ -324,29 +323,29 @@ b_show gc =
   tab.("return strToList(str, wdigits, T0);"++).nl.
   ("}"++).nl
 
-b_par :: GC -> ShowS
-b_par gc =
+b_par :: LARStyle -> ShowS
+b_par larStyle =
   funcHeader bf_par.
   wrapIfOMP
   (tab.("Susp a, b;"++).nl.
    ("#pragma omp single nowait"++).nl.
    ("{"++).nl.
    ("#pragma omp task untied"++).nl.
-   tab.("{ a = "++).mkGETARG gc bf_par 0 t0.("; }"++).nl.
+   tab.("{ a = "++).mkGETARG larStyle bf_par 0 t0.("; }"++).nl.
    ("#pragma omp task untied"++).nl.
-   tab.("{ b = "++).mkGETARG gc bf_par 1 t0.("; }"++).nl.
+   tab.("{ b = "++).mkGETARG larStyle bf_par 1 t0.("; }"++).nl.
    ("}"++).nl.
    ("#pragma omp taskwait"++).nl.
    ("return b;"++).nl)
-  (tab.("Susp b = "++).mkGETARG gc bf_par 1 t0.(";"++).nl.
+  (tab.("Susp b = "++).mkGETARG larStyle bf_par 1 t0.(";"++).nl.
    tab.("return b;"++).nl).
   ("}"++).nl
 
-b_pseq :: GC -> ShowS
-b_pseq gc =
+b_pseq :: LARStyle -> ShowS
+b_pseq larStyle =
   funcHeader bf_pseq.
-  wrapIfOMP (tab.("Susp a = "++).mkGETARG gc bf_pseq 0 t0.(";"++).nl) id.
-  tab.("Susp b = "++).mkGETARG gc bf_pseq 1 t0.(";"++).nl.
+  wrapIfOMP (tab.("Susp a = "++).mkGETARG larStyle bf_pseq 0 t0.(";"++).nl) id.
+  tab.("Susp b = "++).mkGETARG larStyle bf_pseq 1 t0.(";"++).nl.
   tab.("return b;"++).nl.
   ("}"++).nl
 
@@ -357,11 +356,11 @@ mulISig :: ShowS
 mulISig = ("Susp "++).pprint CMulI.("(Susp a, Susp b)"++)
 
 -- | C code for big integer multiplication.
-b_mulI :: Options -> ShowS
-b_mulI opts =
+b_mulI :: LARStyle -> ShowS
+b_mulI larStyle =
   mulISig.(" {"++).nl.
   wrapIfGMP
-  (tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc opts "sizeof(mpz_t)".(";"++).nl.
+  (tab.("mpz_t *ret = (mpz_t *)"++).gmpMalloc larStyle "sizeof(mpz_t)".(";"++).nl.
    tab.("mpz_t *v1 = (mpz_t *)CPTR(a);"++).nl.
    tab.("mpz_t *v2 = (mpz_t *)CPTR(b);"++).nl.
    -- tab.("printf(\"Integer multiplication, addresses %p and %p -> %p\\n\", v1, v2, ret);"++).nl.
@@ -402,17 +401,17 @@ builtinConstrsC opts =
 -- | Generates the declarations for the built-in constructors and their formals.
 builtinConstrsDecls :: Options -> ShowS
 builtinConstrsDecls opts =
-  let gc = optGC opts
+  let larStyle = optLARStyle opts
       extern = case optCMode opts of CompileModule -> ("extern "++) ; Whole -> id
       declTuple i =
         let tupleI = bf_Tuple i
             Just args = M.lookup tupleI builtinFuncSigs
-            mkCVar (arg, idx) = mkDefineVar gc arg tupleI idx
+            mkCVar (arg, idx) = mkDefineVar larStyle arg tupleI idx
         in  extern.declF opts (tupleI, (i, i, 0)).
             foldDot mkCVar (zip args [0..(length args)-1])
   in  extern.declF opts (bf_Cons, (2, 2, 0)).
-      mkDefineVar gc bf_cons_0 bf_Cons 0.
-      mkDefineVar gc bf_cons_1 bf_Cons 1.
+      mkDefineVar larStyle bf_cons_0 bf_Cons 0.
+      mkDefineVar larStyle bf_cons_1 bf_Cons 1.
       extern.declF opts (bf_Nil, (0, 0, 0)).
       extern.declF opts (bf_Unit, (0, 0, 0)).
       foldDot declTuple bTupleSizes
@@ -424,8 +423,8 @@ bfsLARInfo =
       pmd v = findPMDepth v builtinPmDepths
   in  map (\f -> (f, (ar f, ar f, pmd f))) cBuiltinFuncsC
 
-prettyPrintList :: Bool -> ShowS
-prettyPrintList compact =
+prettyPrintList :: LARStyle -> ShowS
+prettyPrintList larStyle =
   let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
       Just (_, cidNil ) = M.lookup bf_Nil  builtinCIDs
   in  pprinterSig dtList.(" {"++).nl.
@@ -438,7 +437,7 @@ prettyPrintList compact =
       tab.tab.("while (1) {"++).nl.
       tab.tab.tab.("TP_ cell_tp = CPTR(i);"++).nl.
       tab.tab.tab.("comp1 = "++).pprint bf_cons_0.("(AR_REF(cell_tp));"++).nl.
-      (if compact then
+      (if larStyle==LAR64 then
          tab.tab.tab.("if (IS_PVAL(comp1))"++).nl.
          tab.tab.tab.tab.("printf(\"%ld\", PVAL_R(comp1));"++).nl.
          tab.tab.tab.("else"++).nl.tab

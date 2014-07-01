@@ -143,9 +143,9 @@ processArgs cmdArgs =
         aux ("-enum"  : args) opts = aux args opts{optOptEnums=True}
         aux ("-null-df":args) opts = aux args opts{optNullDf=True}
         aux ("-strict": args) opts = aux args opts{optStrict=True}
-        aux ("-semigc": args) opts = aux args opts{optGC=SemiGC}{optScrut = True}
-        aux ("-libgc" : args) opts = aux args opts{optGC=LibGC}
-        aux ("-compact":args) opts = aux args opts{optCompact=True}{optGC = SemiGC}{optScrut = True}
+        aux ("-semigc": args) opts = aux args opts{optLARStyle=LAR}{optScrut = True}
+        aux ("-libgc" : args) opts = aux args opts{optLARStyle=LAROPT}
+        aux ("-compact":args) opts = aux args opts{optLARStyle=LAR64}{optScrut = True}
         aux ("-fop"   : args) opts = aux args opts{optFastOp=True}
         aux ("-tag"   : args) opts = aux args opts{optTag=True}
         aux ("-no-sharing":args) opts = aux args opts{optSharing=False}
@@ -217,9 +217,8 @@ processArgs cmdArgs =
 --   the main part of the compiler.
 main :: IO ()
 main =
-    do args  <- getArgs
-       opts0 <- processArgs args
-       let opts = validateOpts opts0
+    do args <- getArgs
+       opts <- processArgs args
        case optAction opts of
          ANone -> return ()
          APrintDFI ->
@@ -336,9 +335,3 @@ parseFL opts f text =
                  (show srcColumn0)++": "++message)
         ParseOk hsMod ->
           return $ fromHStoHF opts f hsMod    -- translate Haskell source to FL
-
--- | Checks that certain flag combinations are not allowed.
-validateOpts :: Options -> Options
-validateOpts opts | ((optGC opts == LibGC) && (optCompact opts)) =
-  error "The -compact mode cannot be combined with -libgc."
-validateOpts opts = opts

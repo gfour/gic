@@ -98,12 +98,12 @@ spotTCalls opts m =
       larsCompatible f0 f =
         let (Just a0, n0) = (M.lookup f0 arities, findPMDepth f0 pmdepths)
             (Just a , n ) = (M.lookup f  arities, findPMDepth f  pmdepths)
-        in  case (optGC opts, optCompact opts) of 
-              (SemiGC, True) -> a0+n0 >= a+n
-              (LibGC , _   ) ->
+        in  case optLARStyle opts of 
+              LAR64  -> a0+n0 >= a+n
+              LAROPT ->
                 let suspSize = if optTag opts then 3 else 2
                 in  (a0*suspSize)+n0 >= (a*suspSize)+n
-              _              -> False
+              _      -> False
   in  m{modProg=(p{progDefs=tcoDefs})}
 
 -- | Generate the call information for a tail call.

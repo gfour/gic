@@ -65,7 +65,8 @@ import qualified Data.Set as S (null, toList)
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
 import SLIC.Front.TailCalls (bladesToSeqCopies)
-import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
+import SLIC.State (GC(LibGC, SemiGC), LARStyle(..),
+                   Options(optHeap, optLARStyle), gcFor)
 import SLIC.SyntaxAux (Mutation)
 import SLIC.Types (Arity, IIndex, MName, PMDepth, QName, qName,
                    mainDefQName, pprint)
@@ -112,17 +113,17 @@ mkLARMacro opts name arityA arityV nesting =
   -- if the function LAR is going to be empty, ignore
   if (arityA==0) && (arityV==0) && (nesting==0) then
     id
-  else case optGC opts of
+  else case gcFor (optLARStyle opts) of
          LibGC  -> mkLARMacroOpt opts name arityA arityV nesting
          SemiGC -> id
 
 -- | Generates the macro for variable x of function f (stored in position n).
-mkDefineVar :: GC -> QName -> QName -> Int -> ShowS
-mkDefineVar gc x f n =
+mkDefineVar :: LARStyle -> QName -> QName -> Int -> ShowS
+mkDefineVar larStyle x f n =
   ("#define " ++).pprint x.("(T0) "++).
-  (case gc of
-      LibGC  -> asMacroPrefixFunc f
-      SemiGC -> id).  
+  (case larStyle of
+      LAROPT -> asMacroPrefixFunc f
+      _      -> id).  
   ("GETARG("++).(shows n).(", T0)"++).nl
 
 -- | The prototype of a function.
@@ -157,16 +158,16 @@ mkMainCall gc m =
 --   in the heap (if False, it goes in the stack), a flag to indicate if
 --   the LAR is using the compact representation, the function
 --   name\/arity\/depth, and the argument representations.
-mkAllocAR :: GC -> Bool -> Bool -> QName -> Arity -> PMDepth -> [ShowS] -> ShowS
-mkAllocAR gc allocHeap compact f fArity fNesting args =
+mkAllocAR :: LARStyle -> Bool -> QName -> Arity -> PMDepth -> [ShowS] -> ShowS
+mkAllocAR larStyle allocHeap f fArity fNesting args =
   let larConstr = if allocHeap then ("AR"++) else ("AR_S"++)
-      args'     = if (compact && (not allocHeap)) then
+      args'     = if ((larStyle==LAR64) && (not allocHeap)) then
                      map (\a->("ARGC("++).a.(")"++)) args
                   else args
       argsS     = insCommIfMore args'
-  in  (case gc of
-          LibGC  -> asMacroPrefixFunc f.larConstr.lparen
-          SemiGC ->
+  in  (case larStyle of
+          LAROPT -> asMacroPrefixFunc f.larConstr.lparen
+          _      ->
             -- LAR constructors take extra "arity, nesting, ..." parameters.
             larConstr.lparen.shows fArity.(", "++).shows fNesting.
             -- If function arguments follow, add comma.
@@ -177,40 +178,39 @@ mkAllocAR gc allocHeap compact f fArity fNesting args =
 
 -- | Generates a GETARG accessor for a function, at a LAR position.
 --   Also takes a string representation of the context.
-mkGETARG :: GC -> QName -> Int -> String -> ShowS
-mkGETARG gc f i ctxt =
-  (case gc of
-      LibGC  -> asMacroPrefixFunc f
-      SemiGC -> id).
+mkGETARG :: LARStyle -> QName -> Int -> String -> ShowS
+mkGETARG larStyle f i ctxt =
+  (case larStyle of
+      LAROPT -> asMacroPrefixFunc f
+      _      -> id).
   ("GETARG("++).shows i.(", "++).(ctxt++).(")"++)
 
 -- | Generates a NESTED accessor for a function, at a nesting position. Also
 --   takes the arity of the enclosing function.
-mkNESTED :: GC -> Bool -> QName -> Int -> Arity -> ShowS
-mkNESTED gc compact f i argsN =
-  (case gc of
-      LibGC  -> asMacroPrefixFunc f
-      SemiGC -> id).
-  (if compact then
-     ("NESTED("++).shows i.(", "++).shows argsN.(", T0)"++)
-   else
-     ("NESTED("++).shows i.(", T0)"++))
+mkNESTED :: LARStyle -> QName -> Int -> Arity -> ShowS
+mkNESTED larStyle f i argsN =
+  (case larStyle of
+     LAROPT -> asMacroPrefixFunc f
+     _      -> id).
+  (case larStyle of
+     LAR64 -> ("NESTED("++).shows i.(", "++).shows argsN.(", T0)"++)
+     _     -> ("NESTED("++).shows i.(", T0)"++))
 
 -- | Generates a GETSTRICTARG accessor for a function, at a LAR position.
-mkGETSTRICTARG :: GC -> QName -> Int -> ShowS
-mkGETSTRICTARG gc f i =
-  (case gc of
+mkGETSTRICTARG :: LARStyle -> QName -> Int -> ShowS
+mkGETSTRICTARG larStyle f i = 
+  (case gcFor $ larStyle of
       LibGC  -> asMacroPrefixFunc f
       SemiGC -> id).("GETSTRICTARG("++).shows i.(", T0)"++)
 
 -- | Generates a VALS accessor for a LAR position (where the LAR has a specified
 --   arity). Also takes a string representation of the context.
-mkVALS :: GC -> Int -> Int -> String -> ShowS
-mkVALS gc i argsNum ctxt =
+mkVALS :: LARStyle -> Int -> Int -> String -> ShowS
+mkVALS larStyle i argsNum ctxt =
   ("VALS("++).shows i.(", "++).
-  (case gc of
-      LibGC  -> shows argsNum.(", "++)
-      SemiGC -> id).
+  (case larStyle of
+      LAROPT -> shows argsNum.(", "++)
+      _      -> id).
   (ctxt++).(")"++)
 
 -- * CAF construction
@@ -321,37 +321,37 @@ type MutInfo = (QName, (Mutation, IIndex), [QName], (Arity, PMDepth))
 
 -- | Generates the mutation macro for reusing the current LAR as the
 --   LAR of a new tail call.
-mkMutAR :: (GC, Bool) -> MutInfo -> ShowS
-mkMutAR (gc, compact)
-        (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
+mkMutAR :: LARStyle -> MutInfo -> ShowS
+mkMutAR larStyle (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
   let setArg i = 
-         if (gc==LibGC) || ((gc==SemiGC) && compact) then
+         if (larStyle==LAROPT) || (larStyle==LAR64) then
            ("ARGS("++).shows i.(", T0) = ARGC("++).pprint (qns!!i).("); "++)
          else
            ierr "TODO: setArg for semigc"
       setNested i =
-        case gc of
-          LibGC  -> ("NESTED("++).shows i.(", "++).
-                    shows a.(", "++).shows a.(", T0) = 0; "++)
-          SemiGC | compact ->
-              ("NESTED("++).shows i.(", "++).shows a.(", T0) = 0; "++)
-          SemiGC -> ("NESTED("++).shows i.(", T0) = 0; "++)
+        case larStyle of
+          LAR    -> ("NESTED("++).shows i.(", T0) = 0; "++)
+          LAROPT -> ("NESTED("++).shows i.(", "++).
+                     shows a.(", "++).shows a.(", T0) = 0; "++)
+          LAR64  -> ("NESTED("++).shows i.(", "++).
+                    shows a.(", T0) = 0; "++)
       doCopy (src, dest) =
-        case gc of
-          LibGC ->
+        case larStyle of
+          LAR    -> ierr "TODO: SemiGC LAR style is not supported yet"
+          LAROPT ->
             error "TODO: no enclosing arity (aC) information yet"
             -- ("ARGS("++).shows dest.(", T0) = ARGS("++).shows src.(", T0); "++).
             -- ("VALS("++).shows dest.(", "++).shows a.
             -- (", T0) = VALS("++).shows src.(", "++).shows aC.(", T0); "++)
-          SemiGC | compact ->
+          LAR64  ->
             ("VALS("++).shows dest.(", T0) = VALS("++).shows src.(", T0); "++)
-          SemiGC -> ierr "TODO: SemiGC LAR style is not supported yet"
   in  ("#define "++).nameMutAR f iidx.("    ({"++).
       -- Evaluate strict arguments.
       (if S.null stricts then id else ierr "TODO: strict args in mkMutAR").
       -- Do permutations of reused thunks on dependent slots.
-      -- foldDot doPerm perms.
-      (if perms==[] then id else ierr "TODO: permutations in mkMutAR").
+      -- .
+      (if perms==[] then id else ierr "TODO: permutations in mkMutAR"
+      ).
       -- Do copies of reused thunks on independent slots.
       foldDot doCopy (bladesToSeqCopies w).
       -- Add closed arguments in the LAR.

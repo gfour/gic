@@ -51,7 +51,8 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
         cids        = getCIDs config
         importFuns  = keys imports
         opts        = getOptions config
-        gc          = optGC opts        
+        larStyle    = optLARStyle opts
+        gc          = gcFor larStyle
         modName     = getModName config
         cMode       = optCMode opts
         arityCAF    = length (getCAFnmsids config)
@@ -62,16 +63,16 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
             -- constructors and defunctionalization functions, they should be
             -- stored separately in the DFI)
             Prelude.filter (blockIsLocal modName) defs
-    in  headersC opts.
+    in  headersC larStyle.
         macrosC opts modName arities pmDepths arityCAF.
         prologue opts modName arityCAF.
         predeclarations defs' config.
         (if optTCO opts then
-            genMutARs (gc, optCompact opts) arities pmDepths defs'
+            genMutARs larStyle arities pmDepths defs'
          else id).
         pdeclGCAF config arityCAF.nl.
         declarations dTypes defs'.
-        argDefs defs env strictVars cbns gc.nl.
+        argDefs larStyle defs env strictVars cbns.nl.
         declarationsBuiltins opts.nl.
         (case cMode of
             Whole -> id
@@ -81,7 +82,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
                   LibGC  ->
                     pdeclExts opts imports.
                     pdeclExtApps opts (diEApps $ dfiDfInfo dfi)).
-              defInterface gc (dfiDfInfo dfi) importFuns extCIDs.nl).
+              defInterface larStyle (dfiDfInfo dfi) importFuns extCIDs.nl).
         initMod modName config.nl.                   -- module initializer
         (case cMode of
             Whole ->
@@ -90,7 +91,7 @@ makeC (Prog dTypes defs) env config (dfi, imports, extCIDs) =
             CompileModule -> id).
         mainProg defs' env config.
         (case cMode of
-            Whole -> prettyPrintersC (optCompact opts).epilogue opts
+            Whole -> prettyPrintersC larStyle.epilogue opts
             CompileModule -> id).
         prettyPrintersFor dTypes cids.nl
 
@@ -106,28 +107,24 @@ blockIsLocal _ (ActualL {}) = True
 blockIsLocal _ _ = ierr "blockIsLocal: found unqualified block definition"
 
 -- | The C headers of the generated code.
-headersC :: Options -> ShowS
-headersC opts =
-  let gc   = optGC opts
-  in  (case gc of
-          LibGC  ->
-            ("#include \"c/lar_opt.h\""++).nl.
-            ("#include \"gc.h\""++).nl
-          SemiGC ->
-            (if optCompact opts then
-               ("#include \"c/lar_compact.h\""++).nl
-             else
-               ("#include \"c/lar.h\""++).nl).
-            ("#include \"c/gc.h\""++).nl).nl.
+headersC :: LARStyle -> ShowS
+headersC larStyle =
+  let gc = ("#include \"c/gc.h\""++).nl
+  in  (case larStyle of
+         LAROPT  ->
+           ("#include \"c/lar_opt.h\""++).nl.
+           ("#include \"gc.h\""++).nl
+         LAR64   -> ("#include \"c/lar_compact.h\""++).nl.gc
+         LAR     -> ("#include \"c/lar.h\""++).nl.gc).nl.
       ("#include <c/gic_builtins.h>"++).nl.
       wrapIfGMP (("#include <gmp.h>"++).nl) id.nl
       
 -- | The C macros of the generated code.
 macrosC :: Options -> MName -> Arities -> PMDepths -> Int -> ShowS
 macrosC opts modName arities pmDepths arityCAF =
-  let gc   = optGC opts
-      co   = optCompact opts
-      dbg  = optDebug opts
+  let larStyle = optLARStyle opts
+      gc       = gcFor larStyle
+      dbg      = optDebug opts
   in  ("// Macros"++).nl.nl.
       (if optTag opts then
           ("#ifndef USE_TAGS"++).nl.
@@ -152,7 +149,7 @@ macrosC opts modName arities pmDepths arityCAF =
       (case gc of
           LibGC  -> createLibGCARInfra opts modName pmDepths.nl
           SemiGC ->
-            createSemiGCARInfra modName gc co arities pmDepths arityCAF.nl).nl
+            createSemiGCARInfra modName larStyle arities pmDepths arityCAF.nl).nl
 
 -- | Create the necessary macros for handling the optimized LARs. To be used
 --   by the libgc garbage collector.
@@ -175,8 +172,8 @@ mkMainAR opts m pmds =
   
 -- | Create all possible activation record shapes (to be allocated in the heap).
 --   Not to be used with the optimized LARs (that omit the size fields).
-createSemiGCARInfra :: MName -> GC -> Bool -> Arities -> PMDepths -> Int -> ShowS
-createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
+createSemiGCARInfra :: MName -> LARStyle -> Arities -> PMDepths -> Int -> ShowS
+createSemiGCARInfra m larStyle fArities pmDepths arityCAF =
   let arities     = nub $ elems fArities
       nestings    = nub $ elems pmDepths
       maxArity    = maximum (arityCAF:arities)
@@ -195,7 +192,7 @@ createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
       hAR_CLEAR 0 = ("#define AR_CLEAR_0(lar, n) do { } while(0)"++).nl
       hAR_CLEAR d =
         ("#define AR_CLEAR_"++).shows d.("(lar, n) do {            \\"++).nl.
-        (case gc of
+        (case gcFor larStyle of
             SemiGC -> tab.tab.("NESTED(n, lar) = NULL;                \\"++).nl
             LibGC  -> id).
         tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, n+1);                 \\"++).nl.
@@ -204,7 +201,7 @@ createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
       hAR_CLEARc 0 = ("#define AR_CLEAR_0(lar, ar, n) do { } while(0)"++).nl
       hAR_CLEARc d =
         ("#define AR_CLEAR_"++).shows d.("(lar, ar, n) do {            \\"++).nl.
-        (case gc of
+        (case gcFor larStyle of
             SemiGC -> tab.tab.("NESTED(n, ar, lar) = NULL;                \\"++).nl
             LibGC  -> id).
         tab.tab.("AR_CLEAR_"++).shows (d-1).("(lar, ar, n+1);           \\"++).nl.
@@ -215,7 +212,7 @@ createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
                error $ "Maximum function/LAR nesting exceeded: "++(show maxNestings)++", maximum is "++(show maxNestedLARs)
              else                    
                (foldDot hAR_COPY [0..maxArity]).nl.
-               (if compact then
+               (if larStyle==LAR64 then
                   foldDot hAR_CLEARc [0..maxNestings]
                 else
                   foldDot hAR_CLEAR [0..maxNestings]).nl
@@ -223,15 +220,15 @@ createSemiGCARInfra m gc compact fArities pmDepths arityCAF =
 -- | Generates the "extern" declarations that link to the defunctionalization
 --   interface and to functions in other modules. The CIDs table given is used
 --   to generate declarations for bound variables from other modules.
-defInterface :: GC -> DfInfo -> [QName] -> CIDs -> ShowS
-defInterface gc dfInfo importFuns extCIDs = 
+defInterface :: LARStyle -> DfInfo -> [QName] -> CIDs -> ShowS
+defInterface larStyle dfInfo importFuns extCIDs = 
   let externF v   = ("extern "++).protoFunc v
       -- generate the constructor variables accessing macros
       macrosConstr (c, (_, ar)) =
         let bvs     = cArgsC c ar
             stricts = empty -- TODO: stricts information for imported constructors
             cbns    = []   -- bound variables are never call-by-name
-        in  foldDot (protoF gc stricts cbns c) (enumNames bvs)
+        in  foldDot (protoF larStyle stricts cbns c) (enumNames bvs)
       extConstrs = map dfcN $ Data.Set.toList $ diDfcs dfInfo
   in  foldDot externF extConstrs.
       foldDot externF (map genNApp $ Data.Set.toList $ diEApps dfInfo).
@@ -269,7 +266,7 @@ pdeclExts opts imports =
                 Just fArity     = impA iinfo
             in smFun opts fname fArity fArity nesting
         pdecls = foldDot predeclEF (Data.Map.keys imports').nl
-    in  case optGC opts of
+    in  case gcFor $ optLARStyle opts of
           SemiGC -> ierr "pdeclExts: not to be used with semiGC"
           LibGC  -> pdecls
 
@@ -281,7 +278,7 @@ pdeclExtApps opts extApps =
   in  foldDot mkSmFun $ Data.Set.toList extApps
 
 -- | Generates macros for the LAR mutators of the program tail calls.
-genMutARs :: (GC, Bool) -> Arities -> PMDepths -> [BlockL] -> ShowS
+genMutARs :: LARStyle -> Arities -> PMDepths -> [BlockL] -> ShowS
 genMutARs larStyle localArities localPmdepths defs =
   let arities  = union localArities builtinArities
       pmdepths = union localPmdepths builtinPmDepths
@@ -308,7 +305,7 @@ pdeclGCAF :: ConfigLAR -> Int -> ShowS
 pdeclGCAF config arityCAF =
     let m       = getModName config
         opts    = getOptions config
-    in  case (optGC $ getOptions config) of
+    in  case (gcFor $ optLARStyle $ getOptions config) of
           SemiGC -> id
           LibGC  -> mkLARMacro opts ("GCAF_"++m) arityCAF arityCAF 0
 
@@ -348,9 +345,10 @@ epilogue opts = builtins opts.nl
 -- | Generates C code for a block.
 mkCBlock :: BlockL -> TEnv -> ConfigLAR -> ShowS
 mkCBlock (DefL f e bind) env config =
-  let fArity = length bind
-      opts = getOptions config
-      gc = optGC opts
+  let fArity   = length bind
+      opts     = getOptions config
+      larStyle = optLARStyle opts
+      gc       = gcFor larStyle
   in  ("FUNC("++).pprint f.("){"++).nl.
       (case gc of
           LibGC | fArity > 0 ->
@@ -359,7 +357,7 @@ mkCBlock (DefL f e bind) env config =
       debugFuncPrologue (optDebug opts) f.
       (case Data.Map.lookup f (getStricts config) of 
           Nothing -> id
-          Just strictFrms -> forceStricts gc strictFrms fArity).
+          Just strictFrms -> forceStricts larStyle strictFrms fArity).
       logPrev opts.
       mkCFuncBody config env f e.
       ("}"++).nl
@@ -391,10 +389,10 @@ mkCFuncBody config env f e =
 
 -- | Forces the strict parameters of a function call. It only works for ground 
 --   values, otherwise will just force until the constructor head.
-forceStricts :: GC -> StrictInds -> Arity -> ShowS
-forceStricts gc strictInds fArity =
+forceStricts :: LARStyle -> StrictInds -> Arity -> ShowS
+forceStricts larStyle strictInds fArity =
   let aux x =
-        mkVALS gc x fArity "T0".
+        mkVALS larStyle x fArity "T0".
         (" = ((LarArg)CODE("++).shows x.(", T0))(T0); // strict "++).nl
   in  foldDot aux $ Data.Set.toList strictInds
 
@@ -419,8 +417,9 @@ mkCStmBody e env config = ("return "++).mkCExp env config e.semi.nl
 --   configuration, and the LAR expression.
 mkCExp :: TEnv -> ConfigLAR -> ExprL -> ShowS
 mkCExp env config (LARC (CN c) exps) =
-  let compact = optCompact $ getOptions config
-      useFastOps = compact && (optFastOp $ getOptions config)
+  let opts       = getOptions config
+      larStyle   = optLARStyle opts
+      useFastOps = (larStyle==LAR64) && (optFastOp opts)
   in  case c of
         CIf  -> ("(PVAL_R("++).mkCExp env config (exps !! 0).(")?"++).
                        ("("++).mkCExp env config (exps !! 1).("):"++).
@@ -434,12 +433,12 @@ mkCExp env config (LARC (CN c) exps) =
                 ("PVAL_NEG("++).nExp.(")"++)
               else
                 ("PVAL_C(-(PVAL_R("++).nExp.("))"++).mIntTag config.(")"++)
-        CTrue  -> intSusp compact "True"
-        CFalse -> intSusp compact "False"
+        CTrue  -> intSusp larStyle "True"
+        CFalse -> intSusp larStyle "False"
         _      -> error $ "mkCExp: unknown built-in constant "++(pprint c "")
 mkCExp _ config (LARC (LitInt i) exps) =
   case exps of
-    []    -> intSusp (optCompact $ getOptions config) (show i)
+    []    -> intSusp (optLARStyle $ getOptions config) (show i)
     (_:_) -> ierr "Integer literal applied to expressions."
 mkCExp _ config (LARCall n _ (Mut _ iidx)) | optTCO (getOptions config) =
   case iidx of
@@ -484,7 +483,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
             CaseL {} -> id
             _        -> ("Res = "++)).
         mkCExp env config ePB
-      compact = optCompact opts
+      larStyle = optLARStyle opts
       argsN = getFuncArity efunc (getArities config)
       ierrCLoc = ierr $ "mkCExp: non-enumerated case expression: "++(pprint e "")
   in  (case cn of
@@ -494,7 +493,7 @@ mkCExp env config (CaseL (cn, efunc) e pats) =
             in  tab.("cl["++).dS.("] = "++).matchedExpr.semi.nl.
                 -- TODO: eliminate this when all patterns are nullary constructors
                 -- (or are used as such, see 'bindsVars')
-                tab.mkNESTED (optGC opts) compact efunc counter argsN.(" = CPTR(cl["++).dS.("]);"++).nl.
+                tab.mkNESTED larStyle efunc counter argsN.(" = CPTR(cl["++).dS.("]);"++).nl.
                 logDict opts counter ;
            CFrm _ -> id).
       -- if debug mode is off, optimize away constructor choice when there is
@@ -523,16 +522,16 @@ mkCExp _ _ (ConstrL _) =
 mkCExp _ _ e@(BVL _ (CLoc Nothing, _)) =
   ierr $ "mkCExp: found non-enumerated bound variable: "++(pprint e "")
 mkCExp _ config bv@(BVL v (cloc, fname)) =
-  let gc = optGC $ getOptions config
-      compact = optCompact $ getOptions config
-      argsN = getFuncArity fname (getArities config)
+  let larStyle = optLARStyle $ getOptions config
+      argsN    = getFuncArity fname (getArities config)
+      gc       = gcFor larStyle
   in  case cloc of
         CLoc Nothing -> ierr $ "non-enumerated bound variable: "++(pprint bv "")
         CLoc (Just (counter, _)) ->
-          mkCall gc v (mkNESTED gc compact fname counter argsN)
+          mkCall gc v (mkNESTED larStyle fname counter argsN)
         CFrm i ->
           -- Read the nested context directly from a formal (no thunk flag check).
-          mkCall gc v (("FRM_NESTED("++).shows i.(")"++))
+          mkCall (gcFor larStyle) v (("FRM_NESTED("++).shows i.(")"++))
 
 getFuncArity :: QName -> Arities -> Arity
 getFuncArity f ars =
@@ -551,7 +550,7 @@ mkBinOp c [e1, e2] env config =
       cBin cOp tagFunc =
         ("(PVAL_C("++).val1.(cOp++).val2.tagFunc config.("))"++)
       opts = getOptions config
-      useFastOps = (optCompact opts) && (optFastOp opts)
+      useFastOps = (optLARStyle opts==LAR64) && (optFastOp opts)
       -- This is used by the fast arithmetic ops.
       fastOp opN = (opN++).("(("++).e1'.("), ("++).e2'.("))"++)
   in  case c of
@@ -586,35 +585,32 @@ mkBinOp _ _ _ _ =
   ierr "mkBinOp: called with wrong arguments"
 
 -- | An integer value or equivalent (nullary constructor or ground value).
-intSusp :: Bool -> String -> ShowS
-intSusp compact c =
-  if compact then
-    ("PVAL_C("++).(c++).(")"++)
-  else
-    ("(SUSP("++).(c++).(", "++).intTag.(", NULL))"++)
+intSusp :: LARStyle -> String -> ShowS
+intSusp LAR64 c = ("PVAL_C("++).(c++).(")"++)
+intSusp _     c = ("(SUSP("++).(c++).(", "++).intTag.(", NULL))"++)
 
 -- | Generates C macros for accessing function arguments in a LAR block.
 --   Takes into consideration strictness/call-by-name information.
-protoB :: BlockL -> TEnv -> Stricts -> CBNVars -> GC -> ShowS
-protoB (DefL fName _ bind) _ stricts cbnVars gc =
+protoB :: LARStyle -> BlockL -> TEnv -> Stricts -> CBNVars -> ShowS
+protoB larStyle (DefL fName _ bind) _ stricts cbnVars =
   let Just cbns = Data.Map.lookup fName cbnVars
       Just strs = Data.Map.lookup fName stricts
-  in  foldDot (protoF gc strs cbns fName) (enumNames bind)
-protoB (ActualL {}) _ _ _ _ = id
+  in  foldDot (protoF larStyle strs cbns fName) (enumNames bind)
+protoB _ (ActualL {}) _ _ _ = id
 
 -- | Generates the access macros for the formal variables of a function.
-protoF :: GC -> StrictInds -> [QName] -> QName -> (Int, QName) -> ShowS
-protoF gc strs cbns fName (n, x)
+protoF :: LARStyle -> StrictInds -> [QName] -> QName -> (Int, QName) -> ShowS
+protoF larStyle strs cbns fName (n, x)
   | n `member` strs =
-    ("#define " ++).pprint x.("(T0) "++).mkGETSTRICTARG gc fName n.nl
+    ("#define " ++).pprint x.("(T0) "++).mkGETSTRICTARG larStyle fName n.nl
   | x `elem` cbns =
     ("#define " ++).pprint x.("(T0) GETCBNARG(" ++).(shows n).(", T0)"++).nl
   | otherwise =
-    case gc of
+    case gcFor larStyle of
       SemiGC ->
         ("#define " ++).pprint x.("(T0) "++).
         ("GETARG("++).(shows n).(", T0)"++).nl
-      LibGC -> mkDefineVar gc x fName n
+      LibGC -> mkDefineVar larStyle x fName n
 
 -- | The macro that accesses a CAF LAR.
 defineGCAF :: MName -> GC -> Int -> ShowS
@@ -639,7 +635,7 @@ genv m arityCAF =
 --   management subsystem, (c) the Graphviz declarations.
 prologue :: Options -> MName -> Int -> ShowS
 prologue opts modName arityCAF =
-  let gc           = optGC opts
+  let gc = gcFor $ optLARStyle opts
   in  genv modName arityCAF.nl.         -- prototype for module CAF
       (case gc of
          SemiGC ->
@@ -676,9 +672,9 @@ mainFunc env opts mainNesting modules =
   let m       = case modules of [m'] -> m' ; _ -> "Main"
       mainDef = mainDefQName m
       printResDT dt = tab.pprinterName dt.("(res); printf(\"  \");"++).nl
-      compact = optCompact opts
-      dbg     = optDebug   opts
-      gc      = optGC      opts
+      dbg     = optDebug    opts
+      larStyle= optLARStyle opts
+      gc      = gcFor larStyle
   in  ("int main(int argc, char* argv[]){\n"++).
       tab.("clock_t t1, t2;"++).nl.
       tab.("Susp res;"++).nl.
@@ -731,7 +727,7 @@ mainFunc env opts mainNesting modules =
             (tab.("printf(\"cannot compute 'result', gic must be built with libgmp support\\n\");"++).nl)
           Tg (T dt) ->
             if (dt==dtInt || dt==dtBool) then
-              if compact then
+              if larStyle==LAR64 then
                 -- compact mode, special int representation
                 tab.("printf(\"%ld, \", PVAL_R(res));"++).nl
               else
@@ -770,7 +766,7 @@ initMod m config =
       (if arityCAF > 0 then
          debugCreateCAF (optDebug opts) cafName.
          tab.cafName.(" = "++).
-         (case optGC opts of
+         (case gcFor (optLARStyle opts) of
              SemiGC ->
                ("PUSHAR(AR("++).shows arityCAF.
                (", 0"++).((foldl (\x -> \y -> x ++ ", " ++ (y "")) "" nms)++).
@@ -785,9 +781,9 @@ genInitMod :: MName -> ShowS
 genInitMod m = ("__initModule_"++).(m++)
   
 -- | Generates C macros for accessing the variables of each LAR block.
-argDefs :: [BlockL] -> TEnv -> Stricts -> CBNVars -> GC -> ShowS
-argDefs ds env stricts cbnVars gc =
-  foldDot (\def -> (protoB def env stricts cbnVars gc)) ds
+argDefs :: LARStyle -> [BlockL] -> TEnv -> Stricts -> CBNVars -> ShowS
+argDefs larStyle ds env stricts cbnVars =
+  foldDot (\def -> (protoB larStyle def env stricts cbnVars)) ds
 
 -- | Returns the LAR with the actuals of a function call.
 makeActs :: QName -> [QName] -> TEnv -> ConfigLAR -> ShowS
@@ -795,19 +791,18 @@ makeActs f args env config =
   let fNesting  = findPMDepthSafe f (getPMDepths config)
       isVar = case args of { [] | fNesting==0 -> True ; _ -> False }
       allocHeap = optHeap (getOptions config) || (returnsThunk env f)
-      gc        = optGC (getOptions config)
+      larStyle  = optLARStyle (getOptions config)
       -- nullary functions don't create a new LAR but use the current one (T0)
       -- unless they have nesting > 0
       fLAR =
         if isVar then ("AR_TP(T0)"++)
         else
           let fArity = length args
-              c      = optCompact (getOptions config)
-          in  mkAllocAR gc allocHeap c f fArity fNesting (map pprint args)
+          in  mkAllocAR larStyle allocHeap f fArity fNesting (map pprint args)
       simpleCall = pprint f.("("++).fLAR.(")"++)
-  in  case gc of
-        LibGC  -> simpleCall
-        SemiGC -> ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
+  in  case larStyle of
+        LAROPT  -> simpleCall
+        _       -> ("RETVAL("++).pprint f.("(PUSHAR("++).fLAR.(")))"++)
 
 -- | Finds the pattern-matching depth of the 'result' definition.
 depthOfMainDef :: [BlockL] -> Int
