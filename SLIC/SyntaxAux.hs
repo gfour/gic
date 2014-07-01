@@ -9,8 +9,9 @@ import qualified Data.Map as Map (Map, filter, filterWithKey, fromList,
                                   keys, lookup, member, null, toList, unions)
 import Data.Maybe (isJust)
 import qualified Data.Set as S (Set, empty, toList)
+import Data.Tree (Tree(..), drawForest, drawTree)
 import SLIC.AuxFun (ierr, foldDot, insCommIfMore, showStrings, spaces)
-import SLIC.Constants (comma, mControlParallelN, tcMod, lparen, rparen, nl, semi)
+import SLIC.Constants (mControlParallelN, tcMod, lparen, rparen, nl, semi)
 import SLIC.Types
 
 -- * User-defined data types
@@ -427,49 +428,70 @@ mergeTcInfos tci = TcInfo (concatMap tcIDecls tci) (concatMap tcISigs tci)
 
 -- * Tail calls
 
--- A LAR mutation is a map from target slot indices, to original slot indices.
--- E.g. {1 <- 2, 2 <- 1, 3 <- 1}
-type MutationL = [(SlotIdx, SlotIdx)]
+-- | A windmill is a list of cycles (axles) and a list of trees rooted in
+--   the cycles (blades); it is used by tail calls to implement the required
+--   parallel assignment, in order to reuse formals between the old and
+--   the new LAR. For more information, read:
+-- 
+--   L. Rideau, B. P. Serpette, and X. Leroy. ''Tilting at windmills with
+--   Coq: formal verification of a compilation algorithm for parallel moves''.
+--   Journal of Automated Reasoning, 40(4):307–326, May 2008.
+type Windmill = ([Axle], [Blade])
 
--- | A permutation of LAR slots.
-data Permutation = Perm (Map.Map SlotIdx SlotIdx)
+-- | Windmill pretty printer.
+pprWindmill :: Windmill -> ShowS
+pprWindmill (axles, blades) =
+  let pprBlades bls = ((drawForest (map toStrTree bls))++)
+  in  ("axles:["++).insCommIfMore (map pprAxle axles).("]"++).nl.
+      ("blades:["++).nl.pprBlades blades.("]"++)
+
+-- | A cycle in the windmill, written as a non-empty list.
+data Axle = IdA SlotIdx | ConsA SlotIdx Axle
      deriving (Eq, Read, Show)
 
-instance PPrint Permutation where
-  pprint (Perm m) =
-    if Map.null m then error "Empty permutation"
-    else
-      let pprAux (tIdx, oIdx) = shows tIdx.("<-"++).shows oIdx
-          ps = foldDot id $ intersperse (", "++) $ map pprAux $ Map.toList m
-      in  ("perm{"++).ps.("}"++)
+-- | Axle pretty printer.
+pprAxle :: Axle -> ShowS
+pprAxle axle =
+  let pprAxle_aux (IdA i) = shows i
+      pprAxle_aux (ConsA i a) = shows i.(", "++).pprAxle_aux a
+  in  ("{"++).pprAxle_aux axle.("}"++)
 
--- | A copy from a slot to another slot. Format: src, dest.
-data Copy = Copy SlotIdx SlotIdx
-            deriving (Eq, Read, Show)
-                     
-instance PPrint Copy where
-  pprint (Copy src dest) = shows dest.(":="++).shows src
+-- | Converts a list of slot indices to an axle.
+listToAxle :: [SlotIdx] -> Axle
+listToAxle [] = ierr "listToAxle: cannot construct empty cycle"
+listToAxle [i] = IdA i
+listToAxle (i : a) = ConsA i (listToAxle a)
 
-instance Ord Copy where
-  compare (Copy a1 b1) (Copy a2 b2) =
-    if b1==b2 then compare a1 a2 else compare b1 b2
+-- | Converts an axle to a list of slot indices.
+axleToList :: Axle -> [SlotIdx]
+axleToList (IdA i) = [i]
+axleToList (ConsA i a) = i : (axleToList a)
+
+-- | A blade is a tree. Its root node may also belong to an axle.
+type Blade = Tree SlotIdx
+
+-- | Convert a tree to a string tree.
+toStrTree :: Show a => Tree a -> Tree String
+toStrTree (Node i ns) = Node (show i) (map toStrTree ns)
+
+-- | Blade pretty printer.
+pprBlade :: Blade -> ShowS
+pprBlade blade = ((drawTree $ toStrTree blade)++)
 
 -- | The positions of arguments whose value doesn't need access
 --   to the current LAR. See 'closedExpr' in 'SLIC.Front.TailCalls'.
 type ClosedInds = S.Set SlotIdx
 
 -- | High-level description for LAR mutations. A LAR mutation is:
---   (a) a list of slot permutations (to reuse inter-dependent formals),
---   (b) a number of slot copies (to reuse independent formals),
---   (c) a number of new slots to assign to closed arguments, and
---   (d) a number of strict slots to evaluate on the spot.
-type Mutation = ([Permutation], [Copy], ClosedInds, StrictInds)
+--   (a) a parallel assignment to reuse (the thunks of) formals,
+--   (b) a number of new slots to assign to closed arguments, and
+--   (c) a number of strict slots to evaluate on the spot.
+type Mutation = (Windmill, ClosedInds, StrictInds)
 
 -- | Pretty printer for LAR mutations.
 pprintMut :: Mutation -> ShowS
-pprintMut (perms, copies, closed, stricts) =
-  (" perms:["++).pprintList 0 comma perms.("] |"++).
-  (" copies:["++).pprintList 0 comma copies.("] |"++).
+pprintMut (windmill, closed, stricts) =
+  (" windmill:"++).pprWindmill windmill.
   (" closed:["++).insCommIfMore (map shows $ S.toList closed).("] |"++).
   (" strict:["++).insCommIfMore (map shows $ S.toList stricts).("]"++)
 

@@ -18,17 +18,18 @@
 --   and N is the number of strict arguments in the call. This
 --   space can be either temporary C variables/registers, or
 --   space from the end of the LAR space (if it holds that
---   old_LAR_size - new_LAR_size >= N+1).
+--   old_LAR_size - new_LAR_size >= N+1). We can omit the extra
+--   parameter space, if we implement swapping with XOR.
 --   
 
-module SLIC.Front.TailCalls (spotTCalls, test) where
+module SLIC.Front.TailCalls (bladesToSeqCopies, spotTCalls, test) where
 
-import Data.List (findIndex)
-import qualified Data.Map as M (fromList, lookup)
+import Data.Graph (SCC(..), buildG, components, stronglyConnCompR)
+import Data.List (findIndex, nub)
+import qualified Data.Map as M (lookup)
 import Data.Set as S (fromList, member)
-import Data.Graph (SCC(..), stronglyConnCompR)
-import Data.List (nub, sort)
-import SLIC.AuxFun (ierr, trace2)
+import Data.Tree
+import SLIC.AuxFun (ierr, insCommIfMore)
 import SLIC.State
 import SLIC.SyntaxAux
 import SLIC.SyntaxFL
@@ -119,10 +120,10 @@ tcoCI cafs stricts fs f el =
         case findIndex (\fv->fv==v) fs of
           Just oIdx -> (tIdx, oIdx):(genFrmMapping ifs)
           Nothing   -> ierr "genFrmMapping: no index found for formal"
-      (perms, copies) = compileM $ genFrmMapping frmsUsed
-  in  Mut (perms, copies, closed, strs) Nothing
+      (axles, copies) = compileM $ genFrmMapping frmsUsed
+  in  Mut ((axles, copies), closed, strs) Nothing
 
--- | Takes a list of visible CAFs and an expression. Returns True if
+-- | Takes a list of visible CAFs and an expression. Returns 'True' if
 --   the expression is closed; i.e. it is a constant expression, 
 --   with the only variables permitted being CAFs.
 closedExpr :: [QName] -> ExprF -> Bool
@@ -138,52 +139,99 @@ closedExpr _    (CaseF{})      = False
 closedExpr _    (LetF{})       = False
 closedExpr _    (LamF{})       = False
 
+-- | A LAR mutation is a parallel assignment from original slot indices, to
+--   target slot indices, e.g. {2 -> 1, 1 -> 2, 1 -> 3}. We use the term
+--   /copy/ to refer to a /move/ in parallel assignment.
+type MutationL = [Copy]
+
+-- | A copy from a slot index to another slot index.
+type Copy = (SlotIdx, SlotIdx)
+
+-- | Pretty printer for copies.
+pprCopy :: Copy -> ShowS
+pprCopy (src, dest) = shows src.("->"++).shows dest
+
 -- | The graphs used internally contain no information, just unit.
 type SCC' = SCC ((), SlotIdx, [SlotIdx])
 
--- | Compiles a list of slot-to-slot moves to a list of permutations
---   and a list of slot copies. This is required to handle the re-use
+-- | Compiles a list of slot-to-slot moves to a windmill (list of axles
+--   and list of blades). This is required to handle the re-use
 --   of formals from the current LAR. The intuition is that some moves
 --   may depend on each other, while others not. For example, assume
---   the mutation [(1<-3),(2<-1),(3<-5),(5<-2),(7<-8),(8<-9),(9<-7),(4<-3)].
---   This can be done with two permutations [(1<-3),(2<-1),(3<-5),(5<-2)]
---   and [(7<-8),(8<-9),(9<-7)], and one copy (4<-3).
-compileM :: MutationL -> ([Permutation], [Copy])
+--   the mutation [(3->1),(1->2),(5->3),(2->5),(8->7),(9->8),(7->9),(3->4)].
+--   This can be done with two permutations [(3->1),(1->2),(5->3),(2->5)]
+--   and [(8->7),(9->8),(7->9)], and one copy (3->4).
+compileM :: MutationL -> Windmill
 compileM mL =
-  let toGraph ml = stronglyConnCompR $ map (\(a, b)->((), a, [b])) ml
-      compileSCCs :: [SCC'] -> [Permutation] -> [Copy] -> ([Permutation], [Copy])
-      compileSCCs [] perms copies = (perms, sort copies)
-      compileSCCs (scc:sccs) perms copies =
+  let listToGraph l = map (\(a, b)->((), b, [a])) l
+      windmillG  = stronglyConnCompR $ listToGraph mL
+      compileSCCs :: [SCC'] -> [Axle] -> [Copy] -> ([Axle], [Blade])
+      compileSCCs [] axles copies = (axles, copiesToBlades copies)
+      compileSCCs (scc:sccs) axles copies =
         case scc of
+          -- nodes not in cycles are kept as extra 'copies'
           AcyclicSCC ((), tId, [oId]) ->
-            let copy = Copy oId tId
-            in  compileSCCs sccs perms (copy:copies)
-          CyclicSCC vvs@(v:vs) ->
-            let vvsShift1 = vs++[v]
-                nodeID ((), nID, _) = nID
-                permL = map (\(a, b)->(nodeID a, nodeID b)) $
-                        zip vvs vvsShift1
-                perm = Perm $ M.fromList permL
-            in  compileSCCs sccs (perm:perms) copies
+            let copy = (oId, tId)
+            in  compileSCCs sccs axles (copy:copies)
+          -- single-node cycles are ignored
+          CyclicSCC [_] -> compileSCCs sccs axles copies
+          -- cycle (axle) found
+          CyclicSCC vvs ->
+            let nodeID ((), nID, _) = nID
+                axle = listToAxle $ map nodeID vvs
+            in  compileSCCs sccs (axle:axles) copies
           _ -> error "compileSCCs: found strange SCC"
-  in  compileSCCs (toGraph mL) [] []
+      copiesToBlades :: [Copy] -> [Blade]
+      copiesToBlades [] = []
+      copiesToBlades copies =
+        let bounds = (0, (\(as, bs)->maximum (as++bs)+1) (unzip copies))
+            bladesG = buildG bounds (copies)
+            notSingleNode (Node _ cs) = cs/=[]
+        in  filter notSingleNode $ components bladesG
+  in  compileSCCs windmillG [] []
+
+-- | Compiles a list of blades to an ordered list of copies. Does a post-order
+--   traversal to order the copies. If the root is part of an axle, it is
+--   replaced by the node which is assigned to it by the axle permutation.
+bladesToSeqCopies :: Windmill -> [Copy]
+bladesToSeqCopies (axles, blades) =
+  let bladeToSeqCopies parent (Node i ns) =
+         (concatMap (bladeToSeqCopies i) ns) ++ [(parent, i)]
+      bladeRootToSeqCopies (Node i ns) =
+         -- if the root is in a cycle, get its index after the permutation
+         let root = findRootCopy axles i
+         in  concatMap (bladeToSeqCopies root) ns
+      axleToCopies axle =
+        let axs@(a:as) = axleToList axle
+            axsShift1  = as++[a]
+        in  zip axs axsShift1
+      findRootCopy []     i = i
+      findRootCopy (a:as) i =
+         case lookup i (axleToCopies a) of
+           Just j  -> j
+           Nothing -> findRootCopy as i
+  in  concatMap bladeRootToSeqCopies blades
 
 -- | Test routine.
 test :: IO ()
 test = do putStrLn "Mutation tests:"
-          testMut [(1, 2), (2, 1), (3, 1)]
-          testMut [(1, 2), (5, 1), (6, 1), (2, 2), (3, 4)]
-          testMut [(1, 2), (2, 3), (3, 1)]
-          testMut [(1, 3), (2, 1), (3, 5), (5, 2), (7, 8), (8, 9), (9, 7), (4, 3)]
+          testMut [(2, 1), (1, 2), (1, 3), (1, 4)]
+          testMut [(2, 1), (1, 5), (1, 6), (2, 2), (4, 3)]
+          testMut [(1, 0), (2, 1), (0, 2)]
+          testMut [(3, 1), (1, 2), (5, 3), (2, 5), (8, 7), (9, 8), (7, 9), (3, 4)]
+          testMut [(3, 1), (1, 2), (2, 3), (2, 4), (4, 5), (4, 6), (3, 7), (7, 8)]
 
+-- | Test a single LAR mutation involving only parallel assignment.
 testMut :: MutationL -> IO ()
 testMut ml =
-  let checkMutation ms = length ms == length (nub (map fst ms))
+  let checkMutation ms = length ms == length (nub (map snd ms))
+      pprCopyL copies = insCommIfMore (map pprCopy copies)
   in  do putStrLn $ "[*] Original: "++(show ml)
          if checkMutation ml then
-           do let (perms, copies) = compileM ml
-              putStrLn $ "Result: "
-              putStrLn $ "Permutations="++(show perms)
-              putStrLn $ "Copies="++(show copies)
+           do let windmill = compileM ml
+              putStrLn $ "Result:"
+              putStrLn $ pprWindmill windmill ""
+              putStrLn $ "Compiled blades:"
+              putStrLn $ pprCopyL (bladesToSeqCopies windmill) ""
          else
              putStrLn "The mutation is malformed."

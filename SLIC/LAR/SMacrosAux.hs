@@ -61,12 +61,12 @@ module SLIC.LAR.SMacrosAux (MutInfo, declF, mkAllocAR, mkDefineVar, mkGETARG,
        mkMutAR, mkNESTED, mkVALS, nameGCAF, namegenv, nameMutAR, protoFunc, smFun)
        where
 
-import qualified Data.Map as M (filterWithKey, null)
 import qualified Data.Set as S (null, toList)
 import SLIC.AuxFun (foldDot, ierr, insCommIfMore)
 import SLIC.Constants (comma, nl, lparen, rparen, tab)
+import SLIC.Front.TailCalls (bladesToSeqCopies)
 import SLIC.State (GC(LibGC, SemiGC), Options(optGC, optHeap))
-import SLIC.SyntaxAux (Copy(..), Mutation, Permutation(..))
+import SLIC.SyntaxAux (Mutation)
 import SLIC.Types (Arity, IIndex, MName, PMDepth, QName, qName,
                    mainDefQName, pprint)
 import SLIC.LAR.LARAux (wrapIfOMP)
@@ -323,12 +323,8 @@ type MutInfo = (QName, (Mutation, IIndex), [QName], (Arity, PMDepth))
 --   LAR of a new tail call.
 mkMutAR :: (GC, Bool) -> MutInfo -> ShowS
 mkMutAR (gc, compact)
-        (f, ((perms, copies, closed, stricts), iidx), qns, (a, n)) =
-  let noIdPerm (Perm perm) = not $ M.null $ M.filterWithKey (/=) perm
-      -- Omit identity permutations/copies.
-      perms' = filter noIdPerm perms
-      copies' = filter (\(Copy src dest)->src/=dest) copies
-      setArg i = 
+        (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
+  let setArg i = 
          if (gc==LibGC) || ((gc==SemiGC) && compact) then
            ("ARGS("++).shows i.(", T0) = ARGC("++).pprint (qns!!i).("); "++)
          else
@@ -340,7 +336,7 @@ mkMutAR (gc, compact)
           SemiGC | compact ->
               ("NESTED("++).shows i.(", "++).shows a.(", T0) = 0; "++)
           SemiGC -> ("NESTED("++).shows i.(", T0) = 0; "++)
-      doCopy (Copy src dest) =
+      doCopy (src, dest) =
         case gc of
           LibGC ->
             error "TODO: no enclosing arity (aC) information yet"
@@ -354,10 +350,10 @@ mkMutAR (gc, compact)
       -- Evaluate strict arguments.
       (if S.null stricts then id else ierr "TODO: strict args in mkMutAR").
       -- Do permutations of reused thunks on dependent slots.
-      -- foldDot doPerm perms'.
-      (if perms'==[] then id else ierr "TODO: permutations in mkMutAR").
-      -- Do copies of resued thunks on independent slots.
-      foldDot doCopy copies'.
+      -- foldDot doPerm perms.
+      (if perms==[] then id else ierr "TODO: permutations in mkMutAR").
+      -- Do copies of reused thunks on independent slots.
+      foldDot doCopy (bladesToSeqCopies w).
       -- Add closed arguments in the LAR.
       foldDot setArg (S.toList closed).
       -- Initialize nested fields to 0.
