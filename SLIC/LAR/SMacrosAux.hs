@@ -322,7 +322,7 @@ type MutInfo = (QName, (Mutation, IIndex), [QName], (Arity, PMDepth))
 -- | Generates the mutation macro for reusing the current LAR as the
 --   LAR of a new tail call.
 mkMutAR :: LARStyle -> MutInfo -> ShowS
-mkMutAR larStyle (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
+mkMutAR larStyle (f, ((w@(perms, _), closed, stricts), iidx), qns, (a_g, n_g)) =
   let setArg i = 
          if (larStyle==LAROPT) || (larStyle==LAR64) then
            ("ARGS("++).shows i.(", T0) = ARGC("++).pprint (qns!!i).("); "++)
@@ -332,9 +332,9 @@ mkMutAR larStyle (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
         case larStyle of
           LAR    -> ("NESTED("++).shows i.(", T0) = 0; "++)
           LAROPT -> ("NESTED("++).shows i.(", "++).
-                     shows a.(", "++).shows a.(", T0) = 0; "++)
+                    shows a_g.(", "++).shows a_g.(", T0) = 0; "++)
           LAR64  -> ("NESTED("++).shows i.(", "++).
-                    shows a.(", T0) = 0; "++)
+                    shows a_g.(", T0) = 0; "++)
       doCopy (src, dest) =
         case larStyle of
           LAR    -> ierr "TODO: SemiGC LAR style is not supported yet"
@@ -357,8 +357,16 @@ mkMutAR larStyle (f, ((w@(perms, _), closed, stricts), iidx), qns, (a, n)) =
       -- Add closed arguments in the LAR.
       foldDot setArg (S.toList closed).
       -- Initialize nested fields to 0.
-      (if n==0 then id else foldDot setNested [0..(n-1)]).
+      (if n_g==0 then id else foldDot setNested [0..(n_g-1)]).
       -- only if n<current-n, use the current T0
+      -- Update the 'layout' field, if using the semispace collector.
+      (case larStyle of
+         LAROPT -> id
+         LAR    -> ("T0->arity = "++).shows a_g.("; "++).
+                   ("T0->nesting = "++).shows n_g.("; "++)
+         LAR64  -> ("T0->prev = ARINFO("++).
+                   shows a_g.(", "++).shows n_g.(", T0->prev); "++)
+      ).
       -- Return the mutated LAR; if all the above did nothing, it is the identity.
       ("AR_TP(T0);})"++).nl
 
