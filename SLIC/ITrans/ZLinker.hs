@@ -19,7 +19,7 @@ import SLIC.Types
 -- | Merges together a number of 0-order modules, adding the required closure
 --   constructor and dispatching functions.
 mergeAndLinkZ :: DfFlags -> DFI -> [ModZ] -> ProgZ
-mergeAndLinkZ flags@(_, str, _, _) dfi mods =
+mergeAndLinkZ flags@(_, str, _, _, _) dfi mods =
   concatProgs [concatCode mods, genDfCodeZ flags dfi, bProgZ str]
 
 -- | Generates the 0-order module needed for linking defunctionalized modules.

@@ -3,7 +3,7 @@
 
 {-# LANGUAGE CPP #-}
 module SLIC.State (Action(..), CompileMode(..), DebugFlag, DoNullDf, GC(..),
-                   GHCAPI(..), LARStyle(..), Options(..), ScrutOpt,
+                   GHCAPI(..), LARStyle(..), Options(..), ScrutOpt, Sharing,
                    TypeChecker(..), Verb, defaultOptions, gcFor, opt) where
 
 import SLIC.Constants (defaultEStackSize, defaultWhs, defaultMaxWHSize,
@@ -96,6 +96,9 @@ type DoNullDf = Bool
 -- | Enable debugging mode in the generated program.
 type DebugFlag = Bool
 
+-- | Flag to enable the sharing analysis.
+type Sharing = Bool
+
 -- | The state of the compiler, as defined by the user options.
 data Options = Options
   { optAction  :: Action           -- ^ what to do
@@ -122,7 +125,7 @@ data Options = Options
   , optEStackSz:: Int              -- ^ explicit stack size
   , optScrut   :: ScrutOpt         -- ^ optimize scrutinee nesting
   , optTCO     :: Bool             -- ^ tail-call optimization
-  , optSharing :: Bool             -- ^ sharing analysis
+  , optSharing :: Sharing          -- ^ sharing analysis
   }
 
 -- | Optimize scrutinees of formals to skip the nested field and read the
