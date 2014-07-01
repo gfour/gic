@@ -6,7 +6,8 @@ module SLIC.Front.Typeclass (TcInst(..), TcInstF, TcInstFH, addTcInsts,
                              tc_Num_Int, tc_Show_Int) where
 
 import Data.List (elemIndex)
-import Data.Map hiding (map)
+import Data.Map (Map, fromList, toList, union)
+import qualified Data.Map as M (lookup)
 import Data.Maybe (fromJust)
 import SLIC.AuxFun (errM, foldDot, ierr, spaces)
 import SLIC.Constants
@@ -59,16 +60,16 @@ addTcInsts tcInsts modF =
       tAnnots = modTAnnot modF
       -- TODO: add here the imported type class declarations
       TcInfo tcDecls _ = modTCs modF
-      tcDeclsTable :: Map TcName TcEnv
-      tcDeclsTable = fromList $ map (\(TcDecl tcn _ ms)->(tcn, msTEnv ms)) tcDecls
+      tcDeclsTbl :: Map TcName TcEnv
+      tcDeclsTbl = fromList $ map (\(TcDecl tcn _ ms)->(tcn, msTEnv ms)) tcDecls
       tcInstToDefs :: TcInstF -> [(DefF, TEnvI)]
       tcInstToDefs (TcInst tcn ti methods) =
         let qualN (QN m n) = QN m (mkMethodName fm tcn ti n)
             methodToDef (DefF f fs e) =
-              case Data.Map.lookup tcn tcDeclsTable of
+              case M.lookup tcn tcDeclsTbl of
                 Nothing -> error $ "Class declaration for "++tcn++" was not found"
                 Just minfo ->
-                  case Data.Map.lookup (lName f) minfo of
+                  case M.lookup (lName f) minfo of
                     Nothing ->
                       ierr $ "No class declaration for instance method "++(qName f)
                              ++" in:\n"++(pprintTcE minfo "")
@@ -175,7 +176,7 @@ inlineTcMethods tcInfo env modF =
       inlineTcE (FF f@(V fName) el ci) =
         let el' = map inlineTcE el
             fNameL = lName fName
-        in  case Data.Map.lookup fNameL allTcMethods of
+        in  case M.lookup fNameL allTcMethods of
               Nothing -> FF f el' ci
               Just (tcn, tv, t) ->
                 let -- find which argument is the one with the parametric type
@@ -185,16 +186,16 @@ inlineTcMethods tcInfo env modF =
                     rT x = Just $ last $ types $ fst $ fromJust x
                     argT a = case a of
                       FF (V f') args _     ->
-                        case Data.Map.lookup f' env of
+                        case M.lookup f' env of
                           Just (fT', Just ar') ->
                             if ar'==length args then
                               Just $ last $ types fT'
                             else
                               Nothing
                           _ -> ierr $ "argT: lookup failure: "++(pprint f' "")
-                      XF (V v')           -> rT $ Data.Map.lookup v' env
-                      XF (BV v' _)        -> rT $ Data.Map.lookup v' env
-                      ConstrF c' _        -> rT $ Data.Map.lookup c' env
+                      XF (V v')           -> rT $ M.lookup v' env
+                      XF (BV v' _)        -> rT $ M.lookup v' env
+                      ConstrF c' _        -> rT $ M.lookup c' env
                       ConF (CN CPlus) _   -> Just tInt
                       ConF (CN CMinus) _  -> Just tInt
                       ConF (CN CMult) _   -> Just tInt
@@ -223,7 +224,7 @@ inlineTcMethods tcInfo env modF =
                 in  case argT arg of
                       Nothing -> FF f el' ci   -- cannot determine type
                       Just t' -> 
-                        case Data.Map.lookup (tcn, t') allTcInsts of
+                        case M.lookup (tcn, t') allTcInsts of
                           Nothing -> FF f el' ci  -- no instance found
                           Just m -> -- found instance in module m
                             let f' = QN (Just m) (mkMethodName fm tcn t' fNameL)

@@ -7,7 +7,7 @@ module SLIC.LAR.LARBuiltins (bfsLARInfo, blockNotApp, builtins,
                              prettyPrintersFor, pprinterName, pprinterSig) where
 
 import Data.List (intersperse)
-import Data.Map (lookup)
+import qualified Data.Map as M (lookup)
 import SLIC.AuxFun
 import SLIC.Constants
 import SLIC.Front.Defunc (dfDT)
@@ -227,7 +227,7 @@ b_printIntIO gc =
 -- | Writes a string to the standard input.
 b_putStr :: GC -> CompactOpt -> ShowS
 b_putStr gc compact =
-  let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
+  let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
   in  funcHeader bf_putStr.
       tab.("Susp i = "++).mkGETARG gc bf_putStr 0 t0.(";"++).nl.
       tab.("while ((CONSTR(i)) == "++).shows cidCons.(") {"++).nl.
@@ -286,8 +286,8 @@ b_toInteger opts =
 -- | Converts a C string to a Haskell list. For internal use.
 b_strToList :: GC -> CompactOpt -> ShowS
 b_strToList gc compact =
-  let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
-      Just (_, cidNil)  = Data.Map.lookup bf_Nil  builtinCIDs
+  let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
+      Just (_, cidNil)  = M.lookup bf_Nil  builtinCIDs
   in  ("Susp strToList(char *str, int chars, TP_ AR_TP(T0)) {"++).nl.
       tab.("// construct list from back-to-front"++).nl.
       tab.("int d;"++).nl.
@@ -378,7 +378,7 @@ b_mulI opts =
 mkBuiltinCstr :: Options -> DTName -> CstrName -> ShowS
 mkBuiltinCstr opts dt cstr =
   let (cId, hasParams) =
-        case Data.Map.lookup cstr builtinCIDs of
+        case M.lookup cstr builtinCIDs of
           Just (arC, cidC) -> (cidC, arC > 0)
           Nothing -> ierr $ "mkBuiltinCstr: no info for "++(qName cstr)
       tag = shows (findTagOfDT dt builtinTags)
@@ -406,7 +406,7 @@ builtinConstrsDecls opts =
       extern = case optCMode opts of CompileModule -> ("extern "++) ; Whole -> id
       declTuple i =
         let tupleI = bf_Tuple i
-            Just args = Data.Map.lookup tupleI builtinFuncSigs
+            Just args = M.lookup tupleI builtinFuncSigs
             mkCVar (arg, idx) = mkDefineVar gc arg tupleI idx
         in  extern.declF opts (tupleI, (i, i, 0)).
             foldDot mkCVar (zip args [0..(length args)-1])
@@ -426,8 +426,8 @@ bfsLARInfo =
 
 prettyPrintList :: Bool -> ShowS
 prettyPrintList compact =
-  let Just (_, cidCons) = Data.Map.lookup bf_Cons builtinCIDs
-      Just (_, cidNil ) = Data.Map.lookup bf_Nil  builtinCIDs
+  let Just (_, cidCons) = M.lookup bf_Cons builtinCIDs
+      Just (_, cidNil ) = M.lookup bf_Nil  builtinCIDs
   in  pprinterSig dtList.(" {"++).nl.
       tab.("Susp comp1, comp2;"++).nl.
       tab.("if (CONSTR(i)=="++).shows cidNil.(") {"++).nl.
@@ -457,7 +457,7 @@ prettyPrintList compact =
 
 prettyPrintUnit :: ShowS
 prettyPrintUnit =
-  let Just (_, cidUnit) = Data.Map.lookup bf_Unit builtinCIDs
+  let Just (_, cidUnit) = M.lookup bf_Unit builtinCIDs
   in  pprinterSig dtUnit.(" {"++).nl.
       tab.("if (CONSTR(i)=="++).shows cidUnit.(") {"++).nl.
       tab.tab.("printf(\"()\");"++).nl.

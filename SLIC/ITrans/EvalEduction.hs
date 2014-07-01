@@ -18,9 +18,9 @@
 {-# LANGUAGE CPP #-}
 module SLIC.ITrans.EvalEduction (evalZOILLazy) where
 
-import Data.Map as M (Map, empty, elems, filter, filterWithKey,
-                      insert, keys, lookup, size)
 import qualified Data.IntMap as IM
+import Data.Map (Map, elems, filterWithKey, insert, keys, size)
+import qualified Data.Map as M (empty, filter, lookup)
 import Data.Maybe (catMaybes, mapMaybe)
 import SLIC.AuxFun (foldDot, ierr, showStrings, trace2)
 import SLIC.Constants
@@ -340,7 +340,7 @@ gc t ctxt ((cmap, cid), wh) =
       cmap' = markLive wh ctxt cmap      
       -- find all pending computations in the warehouse and mark their
       -- contexts pending as well
-      pendingCtxts = Prelude.map snd $ M.keys $ 
+      pendingCtxts = Prelude.map snd $ keys $ 
                      M.filter (\x->x==Pending) wh
       cmap'' = foldr (markLive wh) cmap' pendingCtxts
       -- find all contexts that have 'prev' pointers pointing to this context
@@ -354,9 +354,9 @@ gc t ctxt ((cmap, cid), wh) =
       --                           (idx, prev, ns, False)) $
       --            M.filter (\(_, _, _, gcm)->gcm) cmapMarked
       liveCtxts = IM.keys $ IM.filter (\(_, _, _, gcm)->gcm) cmapMarked
-      -- deadCtxts = M.keys $ 
+      -- deadCtxts = keys $ 
       --             M.filter (\(_, _, _, gcm)->not gcm) cmapMarked
-      whLive = M.filterWithKey (\(_, ctx0) _-> ctx0 `elem` liveCtxts) wh
+      whLive = filterWithKey (\(_, ctx0) _-> ctx0 `elem` liveCtxts) wh
   in  (if t then
           trace2 ("Found "++(show $ length liveCtxts)++" live contexts.") 
        else id)
@@ -393,5 +393,5 @@ findCCtxtsIn :: CtxtID -> Warehouse -> [CtxtID]
 findCCtxtsIn ctxt wh =
   let lConstrCtxt (Memo (VT (_, ctxtC))) = Just ctxtC
       lConstrCtxt _ = Nothing
-  in  mapMaybe lConstrCtxt $ M.elems $
-      M.filterWithKey (\(_, ctxt') _ -> ctxt==ctxt') wh 
+  in  mapMaybe lConstrCtxt $ elems $
+      filterWithKey (\(_, ctxt') _ -> ctxt==ctxt') wh 

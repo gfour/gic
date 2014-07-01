@@ -30,8 +30,8 @@ module SLIC.Front.Defunc (DfFlags, ModD(ModD), defuncMod, dfDT, dfFlags,
                           genModDFI, genNApp, linkF, optEnums) where
 
 import Data.List as L (map)
-import qualified Data.Map as M (empty, filterWithKey, fromList, keys, lookup,
-                                map, mapWithKey, toList, union, unions)
+import Data.Map (filterWithKey, keys, mapWithKey, unions)
+import qualified Data.Map as M (empty, fromList, lookup, map, toList, union)
 import Data.Maybe (mapMaybe)
 import Data.Set as S (Set, difference, empty, filter, fromList, map, size,
                       toList, union)
@@ -92,7 +92,7 @@ unzipI aInfos =
 defuncMod :: Options -> TEnv -> ModF -> ModD
 defuncMod opts ve' m'@(Mod fm@(mN, _) exportsR importsR (Prog dts defs) an tcs) =
   let vFuns     = visibleFuns ve' m'
-      vFunNames = M.keys vFuns
+      vFunNames = keys vFuns
       -- Read the required flags (nullary defunctionalization, strictness).
       flags@(ndf, _, _, _) = dfFlags opts
       -- 1. Transform the function definitions using defunctionalization.
@@ -109,13 +109,13 @@ defuncMod opts ve' m'@(Mod fm@(mN, _) exportsR importsR (Prog dts defs) an tcs) 
       (dfConstrsVE, appFrmsVE, clSigs, appSigs) = makeAppInfo ve' dfcs
       -- Defunctionalize types, arities stay the same.
       dfConstrsVE' = M.map (\(t, ar)->(defuncT t, ar)) dfConstrsVE
-      appSigs'     = M.unions [clSigs, appSigs, genAllAppSigs ve' defs]
+      appSigs'     = unions [clSigs, appSigs, genAllAppSigs ve' defs]
       appFrmsVE'   = {- M.union -} appFrmsVE {- (genAllAppTypes ve' defs) -} 
       -- Defunctionalize types in the environment.
       prettyPrinters = L.map (\(Data dt _ _)->QN (Just mN) (pprint dt "")) dts
       funcs = vFunNames ++ cBuiltinFuncs ++ prettyPrinters
       dfAppsVE' = mkDfAppsTEnv $ diEApps dfI
-      ve'' = M.unions [ dfConstrsVE', dfAppsVE'
+      ve'' = unions [ dfConstrsVE', dfAppsVE'
                       , defuncEnv funcs $ M.union ve' appFrmsVE' ]
       tcs' = L.map defuncTcDecl $ tcIDecls tcs
       -- Calculate the constructor ids (to put them in the DFI).
@@ -202,7 +202,7 @@ makeAppInfo ve dfcs =
             let cT = constrT (take cAr $ types t) (Tg (TDF dfDT (residualT cAr t)))
             in  (c, (cT, Just cAr))
           Nothing -> ierr "typeDFC: don't know where to find type"
-  in  (M.unions [dfcTs, appTsVE, clArgsVE], appFrmsVE, clSigs, appFSigs)
+  in  (unions [dfcTs, appTsVE, clArgsVE], appFrmsVE, clSigs, appFSigs)
 
 -- | From a DFC definition, creates the closure dispatcher name, the type 
 --   information of its formals, and the dispatcher's information.
@@ -241,9 +241,9 @@ genAllAppSigs ve defs =
       genAppSigsE lvs (ConF _ el) = genAppSigsL lvs el
       genAppSigsE lvs (ConstrF _ el) = genAppSigsL lvs el
       genAppSigsE lvs (CaseF _ e _ pats) =
-        M.unions $ (genAppSigsE lvs e) : (L.map (genAppSigsP lvs) pats)
+        unions $ (genAppSigsE lvs e) : (L.map (genAppSigsP lvs) pats)
       genAppSigsE lvs (LetF _ ldefs e) =
-        M.unions $ (genAppSigsE lvs e) : (L.map (genAppSigsD lvs) ldefs)
+        unions $ (genAppSigsE lvs e) : (L.map (genAppSigsD lvs) ldefs)
       genAppSigsE lvs (LamF _ _ e) = genAppSigsE lvs e
       genAppSigsE lvs (FF f el _)  =        
         let fName = nameOfV f
@@ -258,8 +258,8 @@ genAllAppSigs ve defs =
             else
               genAppSigsL lvs el
       genAppSigsP lvs (PatB (SPat _ bvs, _) e) = genAppSigsE (bvs++lvs) e
-      genAppSigsL lvs el = M.unions $ L.map (genAppSigsE lvs) el
-  in  M.unions $ L.map (genAppSigsD []) defs
+      genAppSigsL lvs el = unions $ L.map (genAppSigsE lvs) el
+  in  unions $ L.map (genAppSigsD []) defs
 
 -- | Defunctionalizes a definition by replacing partial applications with
 --   closure constructors and inserting apply_N() calls for applications of
@@ -273,9 +273,9 @@ defuncD _ _ _ def@(DefF _ _ (ConstrF c el)) =
       else
         ierr $ "defuncD: malformed constructor function for "++(qName c)
 defuncD ndf ve vfs (DefF f vs e) =
-  let frmNames = frmsToNames vs
+  let frmNames    = frmsToNames vs
       lvs :: LVars
-      lvs      = M.filterWithKey (\v _ ->v `elem` frmNames) ve
+      lvs         = filterWithKey (\v _ ->v `elem` frmNames) ve
       (e', info') = defuncE ndf ve vfs lvs e
   in  (DefF f vs e', info')
 
@@ -432,7 +432,7 @@ lowT t@(Tf _ _) = Tg (TDF dfDT t)
 defuncEnv :: [QName] -> TEnv -> TEnv
 defuncEnv funcs ve =
   let dfEnvT v t = if v `elem` funcs then defuncT t else lowT t
-  in  M.mapWithKey (\v (t,ar)->(dfEnvT v t,ar)) ve
+  in  mapWithKey (\v (t,ar)->(dfEnvT v t,ar)) ve
 
 -- * Defunctionalization auxiliaries.
 

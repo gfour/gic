@@ -9,7 +9,9 @@ module SLIC.Front.TypeInfer (isValidFL, makeTEnv, readTypeSigs,
 
 import Prelude hiding (lookup)
 import Data.List (lookup, nub, sort)
-import qualified Data.Map as Map
+import Data.Map (Map, elems, empty, filterWithKey, fromList,
+       insert, keys, mapWithKey, toList, union, unions)
+import qualified Data.Map as M (lookup, map)
 import Data.Maybe (mapMaybe)
 import SLIC.AuxFun (ierr, errM, trace2)
 import SLIC.Constants (bMod)
@@ -91,7 +93,7 @@ onlyIntLists t =
   error $ "Built-in type inference does not support list "++(pprint t "")
 
 t2stEnv :: TEnv -> STEnv
-t2stEnv env = Map.map (\(t, _)->t2st t) env
+t2stEnv env = M.map (\(t, _)->t2st t) env
 
 -- | Returns the type variables of a type.
 tvsOf :: SType -> [TVar]
@@ -124,8 +126,8 @@ freeST (STfunc t1 t2) =
         l2 = freeST t2
     in  l1 ++ filter (\v -> notElem v l1) l2
 
-type STEnv = Map.Map QName SType
-type STSub = Map.Map STVar SType
+type STEnv = Map QName SType
+type STSub = Map STVar SType
 type STMstate = (Int, STEnv, STSub)
 
 showSTEnv :: STEnv -> String
@@ -134,10 +136,10 @@ showSTEnv gamma =
        aux ((vname, t) : l) =
           pprint vname . (" :: " ++) . pprint t . ("\n" ++) .
           aux l
-   in  aux (Map.toList gamma) ""
+   in  aux (toList gamma) ""
 
 unbind :: QName -> STEnv -> STEnv
-unbind v = Map.filterWithKey (\v' _ -> v /= v')
+unbind v = filterWithKey (\v' _ -> v /= v')
 
 type STD a = IO a
 
@@ -180,7 +182,7 @@ liftST m = STM (\st -> return (st, m))
 
 extractST :: STM a -> IO a
 extractST (STM x) =
-  let st0 = (1, Map.empty, Map.empty)
+  let st0 = (1, empty, empty)
       std = x st0 >>= \(_, m) ->
         case m of
           Just v  -> return v
@@ -220,7 +222,7 @@ unify vn st st' =
                                  pprint t "" ++ "\n")
             else
                 getSubST >>= \sigma ->
-                case (Map.lookup v sigma, Map.lookup v' sigma) of
+                case (M.lookup v sigma, M.lookup v' sigma) of
                     (Just tr, Just tr') ->
                       unifyTV vn tr tr'
                     (Just tr, Nothing) ->
@@ -230,15 +232,15 @@ unify vn st st' =
                     (Nothing, Nothing) ->
                         debugST "set" (show v ++
                                        " := " ++ pprint t' "" ++ "\n") >>
-                        setSubST (Map.insert v t' sigma)
+                        setSubST (insert v t' sigma)
         unify_ (STvar v) t =
             getSubST >>= \sigma ->
-            case Map.lookup v sigma of
+            case M.lookup v sigma of
                 Just t' ->
                   unifyTV vn t' t
                 Nothing ->
                   debugST "set" (show v++" := "++pprint t ""++"\n") >>
-                  setSubST (Map.insert v t sigma)
+                  setSubST (insert v t sigma)
         unify_ t0 tv@(STvar _) =
           unifyTV vn tv t0
         unify_ (STfunc t1 t2) (STfunc t1' t2') =
@@ -287,7 +289,7 @@ unifyL tl tl' =
 finalize :: SType -> STM SType
 finalize t@(STvar v) =
     getSubST >>= \sigma ->
-    case Map.lookup v sigma of
+    case M.lookup v sigma of
         Just t' -> finalize t'
         Nothing -> return t
 finalize (STfunc t1 t2) =
@@ -302,7 +304,7 @@ generalize t =
         aux t0 (v : vl) =
             getSubST >>= \sigma ->
             debugST "ground" (show v ++ "\n") >>
-            setSubST (Map.insert v (STground gInt) sigma) >>
+            setSubST (insert v (STground gInt) sigma) >>
             aux t0 vl
     in  finalize t >>= \t' ->
         aux t' (freeST t') >>
@@ -312,17 +314,17 @@ generalize t =
 generalizeEnv :: STEnv -> STM STEnv
 generalizeEnv ts =
   let generalizeEnv_aux [] =
-        return Map.empty
+        return empty
       generalizeEnv_aux ((v, t) : vtl) =
         generalize t >>= \t' ->
         generalizeEnv_aux vtl >>= \vtl' ->
-        return $ Map.insert v t' vtl'
-  in  generalizeEnv_aux (Map.toList ts)
+        return $ insert v t' vtl'
+  in  generalizeEnv_aux (toList ts)
 
 -- auxiliary function, used by both normal vars and bound vars
 inferV :: QName -> STM SType
 inferV v = getEnvST >>= \gamma ->
-  case Map.lookup v gamma of
+  case M.lookup v gamma of
     Just t  ->
       return t
     Nothing -> 
@@ -376,7 +378,7 @@ inferE cs an e =
         inferE_ (FF func el _) =
           let v = nameOfV func               
           in  getEnvST >>= \gamma ->
-              case Map.lookup v (Map.unions [builtinSTEnv, an, gamma]) of
+              case M.lookup v (unions [builtinSTEnv, an, gamma]) of
                 Just t ->
                   freshST >>= \t' ->
                   debugST "new" (pprint t' "" ++ "\n") >>
@@ -468,22 +470,22 @@ inferPat cs an (PatB (SPat c@(QN cm cn) bs, _) e) =
   getEnvST >>= \gamma ->
   let (newEnv, tConstr) =
         case findTypesOf c cs of
-          Just (vTypes, dt) -> (Map.fromList $ zip bs vTypes, dt)
+          Just (vTypes, dt) -> (fromList $ zip bs vTypes, dt)
           Nothing     ->
-            case Map.lookup c gamma of
+            case M.lookup c gamma of
               Just st -> 
                 let ts       = stTypes st
                     stParams = init ts
                     stRes    = last ts
-                in  (Map.fromList $ zip bs stParams, stRes)
+                in  (fromList $ zip bs stParams, stRes)
               Nothing ->
                 if cm==bMod then
                   case reads cn :: [(Int, String)] of
-                    [(_, "")] -> (Map.empty, STground gInt)
+                    [(_, "")] -> (empty, STground gInt)
                     _         -> ierr $ "Unknown built-in: "++(pprint c "")
                 else
                   error $ "The type of constructor "++(qName c)++" does not appear in local data definitions or imported names in:\n"++(showSTEnv gamma)
-  in  setEnvST (Map.union newEnv gamma) >>
+  in  setEnvST (union newEnv gamma) >>
       inferE cs an e >>= \t ->
       return (t, tConstr)
   
@@ -499,14 +501,14 @@ inferDL cs an dl =
     let prepare [] =
             getEnvST >>= \gamma ->
             -- inlude the types of the built-in functions
-            setEnvST (Map.union (builtinFuncTypes cs) gamma) >>
+            setEnvST (union (builtinFuncTypes cs) gamma) >>
             return []
         prepare (DefF v _ _ : defs) =
             freshST >>= \t ->
             debugST "new" (pprint t "" ++ "\n") >>
             getEnvST >>= \gamma ->
             debugST "var+" (show v ++ " : " ++ pprint t "" ++ "\n") >>
-            setEnvST (Map.insert v t gamma) >>
+            setEnvST (insert v t gamma) >>
             prepare defs >>= \l ->
             return (t : l)
         process [] [] =
@@ -522,7 +524,7 @@ inferDL cs an dl =
                     debugST "new" (pprint t0 "" ++ "\n") >>
                     getEnvST >>= \gamma ->
                     debugST "var+" (show v ++ " : " ++ pprint t0 "" ++ "\n") >>
-                    setEnvST (Map.insert v t0 gamma) >>
+                    setEnvST (insert v t0 gamma) >>
                     aux_formals vars >>= \(tf, tr') ->
                     return (STfunc t0 tf, tr')
                 aux_unformals [] =
@@ -553,19 +555,19 @@ mhTypeInfer m (Prog cs dl) an dfiEnv =
           (c, constrST (map (\(DT t _ _)->t2st t) dts) (STground (T dt)))
         dcT _ (DConstr c _ (Just _)) =
           error$"Built-in type inference cannot handle GADT constructr "++(qName c)
-        csEnv = Map.fromList $ concatMap (\(Data dt _ dcs)-> map (dcT dt) dcs) cs
+        csEnv = fromList $ concatMap (\(Data dt _ dcs)-> map (dcT dt) dcs) cs
         -- after type inference, find again arities of external names from the DFIs
         findAr qn =
-          case Map.lookup qn dfiEnv of
+          case M.lookup qn dfiEnv of
             Just (_, ar) -> ar
             Nothing -> Nothing
     in  extractST (
-          setEnvST (Map.union csEnv dfiSEnv) >>
+          setEnvST (union csEnv dfiSEnv) >>
           inferDL cs' an dl >>
           getEnvST >>= \gamma ->
           generalizeEnv gamma >>= \gamma' ->
           debugST (qName $ mainDefQName m) ("\n" ++ showSTEnv gamma' ++ "\n") >>
-          return (Map.mapWithKey (\qn t->(mhRealType t, findAr qn)) gamma')
+          return (mapWithKey (\qn t->(mhRealType t, findAr qn)) gamma')
         )
 
 constrST :: [SType] -> SType -> SType
@@ -606,12 +608,12 @@ closeEnv p xl =
             in  top rest ((v, (t, ar)) : rho) (yl ++ zl)
         par [] rho = rho
         par ((v, (t, ar)) : rest) rho = par rest ((v, (t, ar)) : rho)
-    in  Map.fromList $ top (Map.toList xl) [] []
+    in  fromList $ top (toList xl) [] []
 
 -- | Calculates the environment.
 makeTEnv :: MName -> ProgF -> STAnnot -> TEnv -> IO TEnv
 makeTEnv m p an env =
-  mhTypeInfer m p an (Map.union env builtinTEnv) >>= \env' ->
+  mhTypeInfer m p an (union env builtinTEnv) >>= \env' ->
   return (closeEnv p env')
 
 -- | Given a constructor, returns the types of its components and its data type.
@@ -658,7 +660,7 @@ prettyPrintersFor ds =
   let prettyPrinterFor dt =
         [ (pprDT dt "", STfunc (STground (T dt)) (STground gInt)),
           (pprDT dt "_arg", STground (T dt)) ]
-  in  Map.fromList (concatMap (\(Data dt _ _) -> prettyPrinterFor dt) ds)
+  in  fromList (concatMap (\(Data dt _ _) -> prettyPrinterFor dt) ds)
         
 -- * Built-in type information
 
@@ -668,7 +670,7 @@ builtinSTEnv = t2stEnv builtinTEnv
 
 -- | Types of the built-in variables and functions of the implementation.
 builtinFuncTypes :: [Data] -> STEnv
-builtinFuncTypes ds = Map.union builtinSTEnv (prettyPrintersFor ds)
+builtinFuncTypes ds = union builtinSTEnv (prettyPrintersFor ds)
 
 calcImportsTEnv :: [IDecl] -> TEnv
 calcImportsTEnv imports =
@@ -679,24 +681,25 @@ calcImportsTEnv imports =
             case impT imp of
               Just t  -> Just (n, (t, impA imp))
               Nothing -> ierr "type checking found untyped imports"
-  in  Map.fromList $ mapMaybe mkImpType $
-      concatMap Map.toList $ Prelude.map ideclINames imports
+  in  fromList $ mapMaybe mkImpType $
+      concatMap toList $ Prelude.map ideclINames imports
 
 -- | Runs type inference on a module, returning the typing environment.
 --   The module imports must have all types filled in.
 typeInferMod :: Bool -> ModF -> IO TEnv
 typeInferMod useAnnot (Mod (m, _) _ imports p@(Prog dts defs) tAnnot (TcInfo [] [])) =
   let importsTEnv  = calcImportsTEnv imports
-      initTEnv = Map.union importsTEnv (genProjSelTEnv dts)
-      importedFNames = Map.keys initTEnv
+      initTEnv = union importsTEnv (genProjSelTEnv dts)
+      importedFNames = keys initTEnv
       extractFS (Just (fs, _)) = fs
       extractFS (Nothing) = ierr "imported function signatures are empty"      
-      funcSigs :: Map.Map QName [QName]
-      funcSigs = Map.filterWithKey onlyIFuns $ Map.unions $ map (extractFS.ideclInfo) imports
+      funcSigs :: Map QName [QName]
+      funcSigs =
+        filterWithKey onlyIFuns $ unions $ map (extractFS.ideclInfo) imports
       onlyIFuns f _ = f `elem` importedFNames
       typesOfFrms :: QName -> [QName] -> TEnvL
       typesOfFrms f vs =
-        case Map.lookup f initTEnv of
+        case M.lookup f initTEnv of
           Just (fT, Just fArity) ->
             let paramTypes = take fArity (takeParams fT)
             in  if length vs == fArity then
@@ -707,14 +710,14 @@ typeInferMod useAnnot (Mod (m, _) _ imports p@(Prog dts defs) tAnnot (TcInfo [] 
             ierr $ "arity not filled in for imported name "++(qName f)
           Nothing ->
             ierr $ "No type found for imported function "++(qName f)
-      frmTypes = Map.mapWithKey typesOfFrms funcSigs
-      frmsEnv  = Map.fromList $ concat $ Map.elems frmTypes 
+      frmTypes = mapWithKey typesOfFrms funcSigs
+      frmsEnv  = fromList $ concat $ elems frmTypes 
       -- final environment, no arities
-      fEnv = refuncEnv $ Map.union initTEnv frmsEnv
+      fEnv = refuncEnv $ union initTEnv frmsEnv
       -- type annotations
-      stAnnot = if useAnnot then (t2stEnv tAnnot) else Map.empty
+      stAnnot = if useAnnot then (t2stEnv tAnnot) else empty
   in  do env0 <- makeTEnv m p stAnnot fEnv
-         let env1 = updEnvWithArs env0 (Map.fromList $ map defSig defs)
+         let env1 = updEnvWithArs env0 (fromList $ map defSig defs)
          return env1
 typeInferMod _ modF =   
   case modTCs modF of
@@ -731,7 +734,7 @@ refuncEnv ve =
       refuncT t@(Tg _)         = t
       refuncT   (Tf a b)       = Tf (refuncT a) (refuncT b)
       refuncT   (Ta a b)       = Ta (refuncT a) (refuncT b)      
-  in  Map.map rfEnvT ve
+  in  M.map rfEnvT ve
       
 -- | Given a list of function signatures, updates the environment for the arities
 --   of these functions.
@@ -739,10 +742,10 @@ updEnvWithArs :: TEnv -> FuncSigs -> TEnv
 updEnvWithArs env sigs =
   let updateArity _ info@(_, (Just _)) = info
       updateArity f (t, Nothing) =
-        case Map.lookup f sigs of
+        case M.lookup f sigs of
           Just fs -> (t, Just (length fs))
           Nothing -> (t, Nothing)
-  in  Map.mapWithKey updateArity env
+  in  mapWithKey updateArity env
 
 -- * Used by the GHC-API-based type checker
 
@@ -752,9 +755,9 @@ readTypeSigs modF =
   let fm = modNameF modF
       imports = modImports modF
       Prog dts defs = modProg modF
-      codeTEnv = Map.union (modTAnnot modF) (mkConstrTEnv dts)
+      codeTEnv = union (modTAnnot modF) (mkConstrTEnv dts)
       importsTEnv  = calcImportsTEnv imports      
-      tEnv = Map.unions [codeTEnv, importsTEnv, builtinTEnv]
+      tEnv = unions [codeTEnv, importsTEnv, builtinTEnv]
       -- check that all definitions agree with the typing environment
       defTEnv :: DefF -> TEnv
       defTEnv (DefF f fs _) =
@@ -762,11 +765,11 @@ readTypeSigs modF =
             frmsTEnv t =
               let tTypes = takeParams t
               in  if length tTypes == frmsLen then
-                    Map.fromList $
+                    fromList $
                     map (\(Frm fr _, ft)->(fr, (ft, Nothing))) $ zip fs tTypes
                   else errM fm $ (lName f)++" has type "++(pprint t "")++
                        ", but definitions has "++(show frmsLen)++" formals"
-        in  case Map.lookup f tEnv of
+        in  case M.lookup f tEnv of
               Nothing ->
                 errM fm $ "No type signature found for function "++(qName f)++
                           " in:\n"++(pprintE tEnv "")
@@ -778,11 +781,11 @@ readTypeSigs modF =
                      ", "++(show ar)++" but it has "++(show frmsLen)++
                      " formals: "++(pprint fs "")
                      
-  in  return $ Map.unions (tEnv:(map defTEnv defs))
+  in  return $ unions (tEnv:(map defTEnv defs))
   
 mkConstrTEnv :: [Data] -> TEnv
 mkConstrTEnv dts =
   let dcT dt (DConstr c comps rt) =
         let dt' = case rt of Nothing -> Tg (T dt) ; Just rt' -> rt'
         in  (c, (constrT (map (\(DT t _ _)->t) comps) dt', Just $ length comps))
-  in  Map.fromList $ concatMap (\(Data dt _ dcs)-> map (dcT dt) dcs) dts
+  in  fromList $ concatMap (\(Data dt _ dcs)-> map (dcT dt) dcs) dts

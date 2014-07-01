@@ -7,8 +7,8 @@ module SLIC.SyntaxFL where
 
 import Prelude hiding (lookup)
 import Data.Char (ord, toUpper)
-import qualified Data.Map as M (elems, empty, filter, filterWithKey,
-       fromList, keys, lookup, map, unionWithKey, unions)
+import Data.Map (elems, filterWithKey, keys, unionWithKey, unions)
+import qualified Data.Map as M (empty, filter, fromList, lookup, map)
 import Data.Maybe (fromJust)
 import qualified Data.Set as S (empty, fromList)
 import SLIC.AuxFun (comment, ierr, showStrings, spaces, toLowerFirst)
@@ -187,7 +187,7 @@ instance PPrint a => PPrint (DefFL a) where
 
 -- | Built-in operators.
 cBuiltinOps :: [String]
-cBuiltinOps = M.elems cOps
+cBuiltinOps = elems cOps
 
 -- | Built-in functions and constructors of GHC.
 cBuiltinFuncsGHC :: [QName]
@@ -195,7 +195,7 @@ cBuiltinFuncsGHC = [ QN bMod "I#", QN bMod "unpackCString#" ]
                    
 -- | The built-in functions that are implemented directly by the back-end.
 cBuiltinFuncsC :: [QName]
-cBuiltinFuncsC = M.keys builtinFuncSigs
+cBuiltinFuncsC = keys builtinFuncSigs
 
 -- | Built-in functions and constructors (such as unboxed integers).
 cBuiltinFuncs :: [QName]
@@ -231,7 +231,7 @@ namesToFrms vs strictness = map (\v->Frm v strictness) vs
 -- | Merges the imported functions tables of many imports to a single table.
 mergeImportFuns :: [IDecl] -> ImportedNames
 mergeImportFuns imps =  
-  let aux = M.unionWithKey 
+  let aux = unionWithKey 
             (\ k a1 a2 -> if a1==a2 then a1 else error $ "multiple imports same function name "++(show k)++" for functions "++(show [a1, a2])++". Possible cause: two modules import different functions with the same name.")
   in  foldl aux M.empty (map ideclINames imps)
 
@@ -329,7 +329,7 @@ restrictVEnvToProg ve (Prog dts defs) =
   let vNames (DefF f frms _) = [f]++(frmsToNames frms)          
       cNames (Data _ _ dcs) = map dcName dcs
       allNames = concatMap cNames dts ++ concatMap vNames defs  
-  in  M.filterWithKey (\f _ -> f `elem` allNames) ve
+  in  filterWithKey (\f _ -> f `elem` allNames) ve
 
 -- * Variable usage analyses
 
@@ -403,17 +403,17 @@ reachableCAFs m =
         localCAFs =
             map defVarName $ filter (\(DefF _ fs _)->length fs==0) defs
         extCAFs = 
-            M.keys $
+            keys $
             M.filter (\ii->case impCAF ii of Nothing -> False ; Just _ -> True) $
-            M.unions $ map ideclINames $ modImports m
+            unions $ map ideclINames $ modImports m
     in  localCAFs ++ extCAFs
 
 -- | Gathers strictness information for all reachable functions in a module.
 reachableStricts :: ModF -> Stricts
 reachableStricts m =
     let extStricts = M.map (\iinfo->fromJustSet $ impStricts iinfo) $
-                     M.unions $ map ideclINames $ modImports m
-    in  M.unions [gatherStrictVars (modProg m), extStricts]
+                     unions $ map ideclINames $ modImports m
+    in  unions [gatherStrictVars (modProg m), extStricts]
 
 -- | Gathers arity information for all reachable functions in a module.
 reachableArities :: ModF -> Arities
@@ -421,16 +421,16 @@ reachableArities m =
   let localArities = M.fromList $ map ((\(f, fs)->(f, length fs)).defSig) $
                      progDefs $ modProg m
       extArities   = M.map (\iinfo->fromJust $ impA iinfo) $
-                     M.unions $ map ideclINames $ modImports m
-  in  M.unions [localArities, extArities, builtinArities]
+                     unions $ map ideclINames $ modImports m
+  in  unions [localArities, extArities, builtinArities]
 
 -- | Gathers pattern matching information for all reachable functions in a module.
 reachablePmDepths :: ModF -> PMDepths
 reachablePmDepths m =
   let localPmDepths = countPMDepths $ progDefs $ modProg m
       extPmDepths   = M.map (\ii->fromJust $ impD ii) $
-                      M.unions $ map ideclINames $ modImports m
-  in  M.unions [localPmDepths, extPmDepths, builtinPmDepths]
+                      unions $ map ideclINames $ modImports m
+  in  unions [localPmDepths, extPmDepths, builtinPmDepths]
 
 fromJustSet :: Maybe StrictInds -> StrictInds
 fromJustSet Nothing = S.empty

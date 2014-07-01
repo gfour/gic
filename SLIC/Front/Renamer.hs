@@ -7,8 +7,8 @@
 
 module SLIC.Front.Renamer (renInvNames, uniqueNames) where
 
-import qualified Data.Map as M (Map, empty, fromList, lookup, map, mapKeys,
-                                mapWithKey, toList, unions)
+import Data.Map (Map, empty, fromList, mapKeys, mapWithKey, toList, unions)
+import qualified Data.Map as M (lookup, map)
 import SLIC.AuxFun (ierr, mergeM)
 import SLIC.Constants (bMod)
 import SLIC.Front.Typeclass
@@ -19,7 +19,7 @@ import SLIC.Types
 -- * Renaming information
 
 -- | A map of renaming pairs for unique variable name generation.
-type Renamings = M.Map QName QName
+type Renamings = Map QName QName
 
 -- | Renaming information is two mappings, those of module-scope renamings
 --   (e.g. rename an imported function with its fully qualified name), or
@@ -50,12 +50,12 @@ gatherFuncMap modF =
       funcRenamer m' (QN Nothing v) = QN (Just m') v
       funcRenamer m' (QN (Just m'') v) =
         if m'==m then QN (Just m') v else ierr $ "Renaming from module "++m''++" to "++m'
-  in  mergeM (M.fromList localFuncsMap) (mergeImportFunsRens imports)
+  in  mergeM (fromList localFuncsMap) (mergeImportFunsRens imports)
 
 mergeImportFunsRens :: [IDecl] -> Renamings
 mergeImportFunsRens imports =
-  M.fromList $ map (\(v, _) -> (v, v)) $ M.toList $ 
-  M.unions (map ideclINames imports)
+  fromList $ map (\(v, _) -> (v, v)) $ toList $ 
+  unions (map ideclINames imports)
   
 -- * Renaming functions
 
@@ -135,13 +135,13 @@ uniqueNames modf@(Mod mInfo@(m, _) es is (Prog cs defs) an tcs) =
   let defs' = enumLetLam defs
       -- as initial renamings, use the function renamings based on the module name
       -- or the imports
-      fRens = RenModLoc (gatherFuncMap modf) M.empty
-      es' = M.mapWithKey (renameFormals m) es
+      fRens = RenModLoc (gatherFuncMap modf) empty
+      es' = mapWithKey (renameFormals m) es
       renIDecl idecl =
         case ideclInfo idecl of
           Just (sigs, cids) ->
             let mn = ideclMName idecl
-                info' = Just (M.mapWithKey (renameFormals mn) sigs, cids)
+                info' = Just (mapWithKey (renameFormals mn) sigs, cids)
             in  idecl{ideclInfo=info'}
           Nothing -> idecl
       is' = map renIDecl is
@@ -158,7 +158,7 @@ uniqueNamesD m ren (DefF f fs expr) =
         origFrmNames = frmsToNames fs
         renamedFrms = renameFormals m f origFrmNames
         -- generate renamings for the formal variables
-        newLocalRens = M.fromList (zip origFrmNames renamedFrms)
+        newLocalRens = fromList (zip origFrmNames renamedFrms)
         localRens' = mergeM (localRen ren) newLocalRens
         -- TODO: delete: add the new renamings, checking for possible clashes
         -- renamings    = mergeM ren newRenamings
@@ -208,13 +208,13 @@ uniqueNamesE m f ren (LetF d defs e) =
       defs0 = map (\(DefF f0 fs e0)->DefF (renB f d f0) fs e0) defs
       -- add the binding renamings to the local ones
       localRens' = mergeM (localRen ren) 
-                   (M.fromList (map (\(DefF f0 _ _)->(f0, QN (Just m) $ lName $ renB f d f0)) defs))
+                   (fromList (map (\(DefF f0 _ _)->(f0, QN (Just m) $ lName $ renB f d f0)) defs))
       ren'  = RenModLoc (moduleRen ren) localRens'
       defs' = map (uniqueNamesD m ren') defs0
   in  LetF d defs' (uniqueNamesE m f ren' e)
 uniqueNamesE m f ren (LamF d v e) =
   let v' = renV m f v
-      localRens' = mergeM (localRen ren) (M.fromList [(v, v')])
+      localRens' = mergeM (localRen ren) (fromList [(v, v')])
   in  LamF d v' (uniqueNamesE m f (RenModLoc (moduleRen ren) localRens') e)
 
 -- | Helper function for constructor renaming.
@@ -255,11 +255,11 @@ renInvNames (idecls, dts, defs, tcInsts) =
 
 renInvImps :: [IDecl] -> [IDecl]
 renInvImps idecls =
-  let renIns ins = M.mapKeys prepQN ins
+  let renIns ins = mapKeys prepQN ins
       renInfo Nothing = Nothing
       renInfo (Just (fsigs, cids)) =
-        Just (M.mapKeys prepQN (M.map (map prepQN) fsigs),
-              M.mapKeys prepQN cids)
+        Just (mapKeys prepQN (M.map (map prepQN) fsigs),
+              mapKeys prepQN cids)
   in  map (\(IDecl mn ins ii)->IDecl (prepStr mn) (renIns ins) (renInfo ii)) idecls
 
 -- | Renames invalid characters in names in data declarations.

@@ -3,10 +3,10 @@
 
 module SLIC.SyntaxAux where
 
-import Prelude hiding (lookup, null)
 import Data.List (intersperse)
-import qualified Data.Map as Map (Map, filter, filterWithKey, fromList,
-                                  keys, lookup, member, null, toList, unions)
+import Data.Map (Map, filterWithKey, fromList,
+                                keys, member, unions)
+import qualified Data.Map as M (filter, lookup, null, toList)
 import Data.Maybe (isJust)
 import qualified Data.Set as S (Set, empty, toList)
 import Data.Tree (Tree(..), drawForest, drawTree)
@@ -81,7 +81,7 @@ calcCIDs ds =
   let gatherDT (Data _ _ dtcs) = map (\(DConstr c cs _) -> (c, length cs)) dtcs
       constrs = concatMap gatherDT ds
       aux ((c, ar), cid) = (c, (ar, cid))
-  in  Map.fromList $ map aux $ zip constrs [1..(length constrs)]
+  in  fromList $ map aux $ zip constrs [1..(length constrs)]
 
 -- * Pattern annotation
 
@@ -176,7 +176,7 @@ data IInfo =
   deriving (Eq, Show)
 
 -- | A mapping from imported names to information for compilation.
-type ImportedNames = Map.Map QName IInfo
+type ImportedNames = Map QName IInfo
 
 -- | Pretty printer for compilation information of imported names.
 pprintINames :: ImportedNames -> ShowS
@@ -188,7 +188,7 @@ pprintINames impNames =
       -- showsCAF (Just idx)   = ("[CAF #"++).shows idx.("]"++)
       -- showsNesting Nothing  = id
       -- showsNesting (Just n) = ("[nesting="++).shows n.("]"++)
-  in  foldDot id $ intersperse (", "++) $ map pprintIN $ Map.toList impNames
+  in  foldDot id $ intersperse (", "++) $ map pprintIN $ M.toList impNames
 
 -- | An import declaration.
 data IDecl =
@@ -200,7 +200,7 @@ data IDecl =
 -- | Used to filter out built-in modules, leaving only user-defined module names.
 filterRealMods :: [IDecl] -> [MName]
 filterRealMods idecls = map ideclMName $ 
-  filter (\(IDecl mn _ _)->not $ Map.member mn builtinModules) idecls
+  filter (\(IDecl mn _ _)->not $ member mn builtinModules) idecls
 
 instance PPrint IDecl where
   pprintPrec _ (IDecl mn impNames info) =
@@ -212,7 +212,7 @@ instance PPrint IDecl where
 
 -- | Returns all imported names declared in a list of \'import\' declarations.
 mergeINames :: [IDecl] -> ImportedNames
-mergeINames idms = Map.unions $ map (\(IDecl _ ins _)->ins) idms
+mergeINames idms = unions $ map (\(IDecl _ ins _)->ins) idms
 
 -- * Built-in \'import\' declarations
 
@@ -224,26 +224,26 @@ importControlParallel = genBuiltinIDecl mControlParallelN
 genBuiltinIDecl :: MName -> IDecl
 genBuiltinIDecl mn =
   let filtModNames bf _ = (lName bf)==mn
-      modSigs    = Map.filterWithKey filtModNames builtinFuncSigs
-      modTEnv    = Map.filterWithKey filtModNames builtinTEnv
-      modCIDs    = Map.filterWithKey filtModNames builtinCIDs
-      modConstrs = Map.keys modCIDs
-      modFuncs   = filter (\qn->qn `notElem` modConstrs) $ Map.keys modSigs
+      modSigs    = filterWithKey filtModNames builtinFuncSigs
+      modTEnv    = filterWithKey filtModNames builtinTEnv
+      modCIDs    = filterWithKey filtModNames builtinCIDs
+      modConstrs = keys modCIDs
+      modFuncs   = filter (\qn->qn `notElem` modConstrs) $ keys modSigs
       names      = (map (mkImp NFunc) modConstrs)++
                    (map (mkImp NConstr) modFuncs)
       mkImp ni n =
         let (nT, Just nAr) = findInfo n modTEnv
-            cid = case Map.lookup n builtinCIDs of
+            cid = case M.lookup n builtinCIDs of
                     Just (_, cId) -> Just cId
                     Nothing       -> Nothing
-            pmDepth = Map.lookup n builtinPmDepths
+            pmDepth = M.lookup n builtinPmDepths
         in  (n, IInfo (Just nT) (Just nAr) ni cid pmDepth (Just S.empty))
-  in  IDecl mn (Map.fromList names) (Just (modSigs, modCIDs))
+  in  IDecl mn (fromList names) (Just (modSigs, modCIDs))
 
 -- | Built-in (pseudo-)modules.
-builtinModules :: Map.Map MName IDecl
-builtinModules = Map.fromList [ (mControlParallelN, importControlParallel) 
-                              , (tcMod, error "!")]
+builtinModules :: Map MName IDecl
+builtinModules = fromList [ (mControlParallelN, importControlParallel) 
+                          , (tcMod, error "!")]
 
 -- * Modules
 
@@ -255,8 +255,8 @@ type Exports = FuncSigs
 
 -- | Pretty printer for export declarations.
 pprintExports :: Exports -> ShowS
-pprintExports exports = if Map.null exports then id else lparen.showStrings ", " (map qName $ Map.keys exports).rparen
---   if null exports then id else lparen.showStrings ", " (map (\(f, fs)->pprint f (show fs)) $ Map.toList exports).rparen
+pprintExports exports = if M.null exports then id else lparen.showStrings ", " (map qName $ keys exports).rparen
+--   if null exports then id else lparen.showStrings ", " (map (\(f, fs)->pprint f (show fs)) $ M.toList exports).rparen
 
 -- | Explicit type annotations given by the user (or inserted by the compiler
 --   for automatically generated functions).
@@ -279,7 +279,7 @@ instance (PPrint a) => PPrint (Mod a) where
     foldDot pprint imports.nl.
     pprint p.nl.
     pprint tcs.nl.
-    (if Map.null env then id else ("-- Type signatures:"++).nl.pprintE env)
+    (if M.null env then id else ("-- Type signatures:"++).nl.pprintE env)
 
 -- | Applies a function to the program part of a module (using the
 --   module name).
@@ -300,8 +300,8 @@ data COp = CPlus     | CMinus    | CMult    | CDivide  | CMod     | CDiv
          deriving (Eq, Ord, Read, Show)
 
 -- | The mapping between the built-in operators and their string representation.
-cOps :: Map.Map COp String
-cOps = Map.fromList
+cOps :: Map COp String
+cOps = fromList
        [ (CPlus, "+"), (CMinus, "-"), (CMult, "*"), (CDivide, "/")
        , (CMod, "mod"), (CDiv, "div")
        , (CAnd, "&&"), (COr, "||"), (CEqu, "=="), (CNEq, "/=")
@@ -315,7 +315,7 @@ cOpsBool = [CEqu, CNEq, CGt, CLt, CLe, CGe, CAnd, COr]
               
 instance PPrint COp where
   pprintPrec _ c =
-    case Map.lookup c cOps of
+    case M.lookup c cOps of
       Just s  -> (s++)
       Nothing ->
         ierr $ "String representation of constant "++(show c)++" not found."
@@ -325,7 +325,7 @@ instance PPrint COp where
 --   the first one found is returned.
 cOpForStr :: String -> COp
 cOpForStr s =
-  case Map.toList (Map.filter (\s'->s==s') cOps) of
+  case M.toList (M.filter (\s'->s==s') cOps) of
     []       -> ierr $ "No built-in operator for "++s
     (c, _):_ -> c
 

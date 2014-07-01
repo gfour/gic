@@ -5,8 +5,8 @@ module SLIC.Types where
 
 import Prelude hiding (lookup, null)
 import Data.List (intersperse)
-import qualified Data.Map as M (Map, filterWithKey, fromList, lookup, 
-                                map, null, toList)
+import Data.Map (Map, filterWithKey)
+import qualified Data.Map as M (fromList, lookup, map, null, toList)
 import qualified Data.Sequence as Sequence (elemIndexR, fromList)
 import qualified Data.Set as S (Set, toList)
 import SLIC.AuxFun (comment, foldDot, ierr, showStrings, toLowerFirst)
@@ -108,7 +108,7 @@ type CstrName = QName
 type Arity = Int
 
 -- | A table from variables to arities.
-type Arities = M.Map QName Arity
+type Arities = Map QName Arity
 
 -- | Data type names.
 type DTName = QName
@@ -174,7 +174,7 @@ type SlotIdx = Int
 type StrictInds = S.Set SlotIdx
 
 -- | The list of strict formals of every function.
-type Stricts = M.Map QName StrictInds
+type Stricts = Map QName StrictInds
 
 -- | Prints the extra 'strict formals' field of a function definition.
 pprintStricts :: Stricts -> ShowS
@@ -184,7 +184,7 @@ pprintStricts stricts =
   in  foldDot aux $ M.toList stricts
 
 -- | A map containing the call-by-name formals of each function.
-type CBNVars = M.Map QName [QName]
+type CBNVars = Map QName [QName]
 
 pprintCBNVars :: CBNVars -> ShowS
 pprintCBNVars cbns =
@@ -199,7 +199,7 @@ type VUsage = (CBNVars, Stricts)
 
 -- | The mapping of variable definitions to their maximum pattern
 --   matching depth.
-type PMDepths = M.Map QName PMDepth
+type PMDepths = Map QName PMDepth
 
 -- | Pretty printer for pattern matching depth tables.
 pprintPD :: PMDepths -> ShowS
@@ -232,7 +232,7 @@ type ProgInfo = (FuncSigs, VUsage, PMDepths)
 type CID = Int
 
 -- | The table of the IDs assigned to constructors during compilation.
-type CIDs = M.Map CstrName (Arity, CID)
+type CIDs = Map CstrName (Arity, CID)
 
 -- | Pretty printer for compiled constructor tables.
 pprintCIDs :: CIDs -> ShowS
@@ -250,7 +250,7 @@ type FPath = String
 type FSig = (QName, [QName])
   
 -- | Function signatures: function (formals...)
-type FuncSigs = M.Map QName [QName]
+type FuncSigs = Map QName [QName]
 
 -- | Returns the formals of a name. Fails if no signature is found.
 frmsOf :: QName -> FuncSigs -> [QName]
@@ -410,7 +410,7 @@ bTupleSizes = [2..maxTupleSize]
 type EInfo  = (Type, Maybe Arity)
 
 -- | A typing environment parameterized by key (e.g. variables, names).
-type Env a = M.Map a EInfo
+type Env a = Map a EInfo
 
 -- | Pretty printer for environments.
 pprintE :: (PPrint a) => Env a -> ShowS
@@ -692,7 +692,7 @@ mkTupleTg n = Tg (T (dtTuple n))
 builtinConstrs :: Arities
 builtinConstrs =
   let constrs = [bf_Cons, bf_Nil, bf_Unit]
-  in  M.filterWithKey (\c _-> c `elem` constrs) builtinArities
+  in  filterWithKey (\c _-> c `elem` constrs) builtinArities
 
 -- | Function signatures of built-in functions (needed for the intensional 
 --   transformation).

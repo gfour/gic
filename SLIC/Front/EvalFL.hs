@@ -8,7 +8,7 @@
 
 module SLIC.Front.EvalFL (evalFL) where
 
-import qualified Data.Map (lookup)
+import qualified Data.Map as M (lookup)
 import Data.Maybe (fromJust)
 import Data.Sequence (elemIndexR, fromList)
 import SLIC.AuxFun (ierr)
@@ -147,7 +147,7 @@ transFL p =
       transE _  (SFL.ConF (SA.CN SA.CFalse) []) = LitB False
       transE vs (SFL.ConF (SA.CN cn) el) = 
         let el' = map (transE vs) el
-        in  case Data.Map.lookup cn SA.cOps of
+        in  case M.lookup cn SA.cOps of
               Just cStr -> BApp cStr el'
               Nothing   -> error $ "missing bop "++(T.pprint cn "")
       transE vs (SFL.ConstrF qn el) = CApp (T.lName qn) (map (transE vs) el)

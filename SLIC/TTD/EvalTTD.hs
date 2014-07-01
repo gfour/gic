@@ -3,7 +3,9 @@
 
 module SLIC.TTD.EvalTTD (evalTTD) where
 
-import qualified Data.Map as M
+import Data.Map (Map, adjust, delete, empty, fromList, insert,
+                 insertWithKey, keys, size, toList)
+import qualified Data.Map as M (filter, lookup, null)
 import SLIC.AuxFun (ierr)
 import SLIC.Constants (comma, modNoPath)
 import SLIC.DFI (DFI, getMainDepth)
@@ -67,7 +69,7 @@ type BlockedOp = (InstrID, Color)
 -- | The join table records all results from children spawned in fork-join style.
 --   It is used to activate instructions waiting for more than one other
 --   instruction to finish.
-type JoinTable = M.Map InstrID (M.Map BlockedOp (M.Map Branch ValueT))
+type JoinTable = Map InstrID (Map BlockedOp (Map Branch ValueT))
 
 -- | Evaluates a dataflow program. Takes the ID of the top instruction of the
 --   \"result\" definition, and the actual program.
@@ -77,7 +79,7 @@ evalTTD dfi nWorkers resultID p =
       mainDepth = getMainDepth [dfi]
       color0 = ([((modNoPath, 0), dummyNested mainDepth)], [])
       initMsg = Msg (-1) resultID color0 Demand
-      joinTable = M.fromList (zip (M.keys entriesTable) (repeat M.empty))
+      joinTable = fromList (zip (keys entriesTable) (repeat empty))
       (resVal, cycles) = runLoop nWorkers 1 entriesTable joinTable [initMsg]
   in  do -- putStrLn "Running..."
          putStrLn ("Result = "++(pprint resVal "")++
@@ -235,13 +237,13 @@ addJoins ((JD iID (token, (iID', _, _):dchain) br val):jds) jt =
       let clr' = (token, dchain)
           blockedOp = (iID', clr')
           iM' =
-            M.insert blockedOp (
+            insert blockedOp (
               case M.lookup blockedOp iM of
                 -- No join for this color found, create it.
-                Nothing -> M.fromList [(br, val)]
-                Just jM -> M.insertWithKey check br val jM) iM
+                Nothing -> fromList [(br, val)]
+                Just jM -> insertWithKey check br val jM) iM
           check br' _ _ = ierr $ "Duplicate branch in join: "++(show br')
-      in  addJoins jds (M.insert iID iM' jt)
+      in  addJoins jds (insert iID iM' jt)
     Nothing -> ierr $ "addJoins found no slot for iID="++(show iID)
 addJoins _ _ = ierr "addJoins: found malformed join data"
 
@@ -255,7 +257,7 @@ reduceJoins 0 _ jt msgAccum =
   -- trace2 ("reduceJoins returns: "++(pprintList (", "++) msgAccum "")) $ 
   (msgAccum, jt)
 reduceJoins jCounter entriesTable jt msgAccum =
-  case extractNextJoin (M.keys entriesTable) jt of
+  case extractNextJoin (keys entriesTable) jt of
     Nothing -> -- trace2 "No joins to reduce." $
                reduceJoins 0 entriesTable jt msgAccum
     Just (iID, blockedOp@(iID', clr), valL, valR) ->
@@ -279,12 +281,12 @@ extractNextJoin [] _ = Nothing
 extractNextJoin (iID:iIDs) jt =
   case M.lookup iID jt of
     Just cm ->
-      let mJoins = M.filter (\m->(M.size m)==2) cm
+      let mJoins = M.filter (\m->(size m)==2) cm
       in  if M.null mJoins then
             extractNextJoin iIDs jt     -- Nothing found, check next instruction.
           else
-            let (bOp, bjs):_ = M.toList mJoins
-                [(br0, val0), (br1, val1)] = M.toList bjs
+            let (bOp, bjs):_ = toList mJoins
+                [(br0, val0), (br1, val1)] = toList bjs
             in  case (br0, br1) of
                   (Branch 0, Branch 1) -> Just (iID, bOp, val0, val1)
                   (Branch 1, Branch 0) -> Just (iID, bOp, val1, val0)
@@ -299,23 +301,23 @@ removeJoin iID blockedOp jt =
         case M.lookup blockedOp bm of
           Nothing -> ierr $ "Could not find complete join to delete: "++
                      (show (iID, blockedOp))
-          Just jm -> if M.size jm /= 2 then
+          Just jm -> if size jm /= 2 then
                        ierr $ "Cannot delete non-complete join: "++
                        (show (iID, blockedOp))
                      else
-                       M.delete blockedOp bm
-  in  M.adjust delCheck iID jt
+                       delete blockedOp bm
+  in  adjust delCheck iID jt
 
 {-
 pprintJoinT :: JoinTable -> ShowS
 pprintJoinT jt = 
-  let pprintCMap (iID, cm) = shows iID.(":"++).nl.foldDot pprintBMap (M.toList cm)
-      pprintBMap (clr, bvs) | M.size bvs <=2 =
-        shows clr.(": "++).foldDot pprintBVal (M.toList bvs).nl
+  let pprintCMap (iID, cm) = shows iID.(":"++).nl.foldDot pprintBMap (toList cm)
+      pprintBMap (clr, bvs) | size bvs <=2 =
+        shows clr.(": "++).foldDot pprintBVal (toList bvs).nl
                             | otherwise =
         ierr "printBMap: more than two elements in join"
       pprintBVal (br, val) = shows br.("="++).pprint val.(" "++)
-  in  foldDot pprintCMap (M.toList $ M.filter (not . M.null) jt)
+  in  foldDot pprintCMap (toList $ M.filter (not . M.null) jt)
 -}
 
 -- * Invariant checkers
