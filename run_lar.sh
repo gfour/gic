@@ -17,6 +17,10 @@ if [ "$CC" = "" ]; then
     CC=gcc
 fi
 
+CFLAGS="-O3 -I . -ggdb3"
+# CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
+# e.g. add -DUSE_TAGS if compiling with -tag
+
 GC=0
 
 if [ "$GC" = "1" ]; then
@@ -27,9 +31,10 @@ else
     USE_GC=""
 fi
 
-CFLAGS="-O3 -I . -ggdb3"
-# CFLAGS2 are used but undefined: extra flags to be filled in from the command-line
-# e.g. add -DUSE_TAGS if compiling with -tag
+# if using GCC and the gold linker exists, do link-time optimization
+if [ `echo "$CC" | tail -c 4 | head -c 3` = "gcc" ]; then
+    hash gold 2>/dev/null && { CFLAGS="${CFLAGS} -fwhole-program -fuse-ld=gold -flto"; }    
+fi
 
 ./gic -semigc $GICFLAGS $* > /dev/null
 
