@@ -204,14 +204,20 @@ processArgs cmdArgs =
                 case optInput opts of
                   Nothing -> aux args opts{optInput = Just [arg]}
                   Just files  -> aux args opts{optInput = Just (arg:files)} 
-        sanitizeOpts opts =
-          if optTCO opts && optSharing opts then
-            putStrLn ("Disabling sharing analysis, not compatible with TCO.") >>
+        sanitizeOpts opts
+          | optTCO opts && optSharing opts =
+              printW "disabling sharing analysis, not compatible with TCO" >>
             sanitizeOpts (opts{optSharing=False})
-          else
-            return opts
+          | optNullDf opts && ((optCMode opts == CompileModule)||(optLink opts)) =
+              printW "disabling nullary defunctionalization, not compatible with separate compilation" >>
+              sanitizeOpts (opts{optNullDf=False})
+          | otherwise = return opts
     in  do opts <- aux cmdArgs defaultOptions
            sanitizeOpts opts
+
+-- | Prints a warning.
+printW :: String -> IO ()
+printW w = putStrLn $ "warning: "++w
 
 -- | Entry point, reads from a file (or stdin if no file given) and calls 
 --   the main part of the compiler.
