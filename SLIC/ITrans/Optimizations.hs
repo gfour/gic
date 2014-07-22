@@ -15,10 +15,11 @@
 -- 
 
 module SLIC.ITrans.Optimizations (canOptEnums, optEnumsKernel,
-                                  findCBNVars, optimize) where
+                                  markCBNVars, optimize) where
 
-import Data.List as List (map, nub)
-import Data.Map (Map, empty, fromList, map, toList, unionWith, unionsWith)
+import Data.List (nub)
+import Data.Map (Map, empty, fromList, toList, unionsWith, unionWith)
+import qualified Data.Map as M (map)
 import SLIC.AuxFun (ierr)
 import SLIC.Types
 import SLIC.ITrans.Syntax
@@ -84,13 +85,13 @@ gatherUsed v defs used =
 optEnumsKernel :: ([Data], TEnv) -> ([Data], TEnv)
 optEnumsKernel (dt, env) =
     let enums     = filter isEnum dt        
-        enumNames = List.map (\(Data d _ _) -> d) enums
-        env'      = Data.Map.map (\(t, ar) -> (ifEnumThenInt enumNames t, ar)) env
-        enumDC (DConstr c dts rt) = DConstr c (List.map enumDT dts) (fmap enumT rt)
+        enumNames = map (\(Data d _ _) -> d) enums
+        env'      = M.map (\(t, ar) -> (ifEnumThenInt enumNames t, ar)) env
+        enumDC (DConstr c dts rt) = DConstr c (map enumDT dts) (fmap enumT rt)
         enumDT (DT t s sel) = DT (enumT t) s sel
         enumT t   = ifEnumThenInt enumNames t
         dt'       =
-          List.map (\(Data d as dcs) -> Data d as (List.map enumDC dcs)) dt
+          map (\(Data d as dcs) -> Data d as (map enumDC dcs)) dt
     in  (dt', env')
 
 -- | Test if the enumeration optimization and whole program compilation are set.
@@ -117,15 +118,25 @@ ifEnumThenInt ds typ =
 -- * Sharing analysis
 
 -- | Analyzes a FL program to find which formals of each function do not need 
---   to be stored in thunks. Returns all the bound variables used <2 times in
---   pattern matching throughout the program. Exception: if formal scrutinees
---   are direcly used as nesting by the code generator (see 'optStruct' in
---   'SLIC.State'), then these are assumed to require thunks.
-findCBNVars :: Options -> ModF -> CBNVars
-findCBNVars opts modF =
-  let Prog _ defs = modProg modF
+--   to be stored in thunks. This is done with a sharing analysis that counts
+--   how many times a formal variable is used; if it is used <2 times and it
+--   is lazy, then it is marked as call-by-name. This analysis also marks
+--   all bound variables used <2 times in pattern matching throughout the
+--   program. Exception: if formal scrutinees are direcly used as nesting by
+--   the code generator (see 'optStruct' in 'SLIC.State'), then these are
+--   assumed to require thunks.
+markCBNVars :: Options -> ModF -> (ModF, CBNVars)
+markCBNVars opts modF =
+  let Prog dts defs = modProg modF
       scrOpt = optScrut opts
       cbnConstrParams = findCBNComps scrOpt defs
+      markCBNVarsD :: DefF -> (DefF, (QName, [QName]))
+      markCBNVarsD defF@(DefF f frms e) =
+        let cbnInfo@(_, cbns) = findCBNVarsD defF
+            transFrm frm@(Frm vf Lazy) =
+              if vf `elem` cbns then (Frm vf ByName) else frm
+            transFrm frm = frm
+        in  (DefF f (map transFrm frms) e, cbnInfo)
       findCBNVarsD :: DefF -> (QName, [QName])
       findCBNVarsD (DefF f frms (ConstrF _ _))
         | optSharing opts =
@@ -135,11 +146,12 @@ findCBNVars opts modF =
       findCBNVarsD (DefF f frms e)
         | optSharing opts = 
         let si = (scrOpt, frmsToNames frms)
-            frmUses = List.map (\(Frm v _) -> (v, countVarUses si (V v) e)) frms
+            frmUses = map (\(Frm v _) -> (v, countVarUses si (V v) e)) frms
             cbnFrms = filter (\(_, i) -> i<2) frmUses
-        in  (f, List.map fst cbnFrms)
+        in  (f, map fst cbnFrms)
         | otherwise = (f, [])
-  in  fromList (List.map findCBNVarsD defs)
+      (defs', cbns') = unzip $ map markCBNVarsD defs
+  in  (modF{modProg=(Prog dts defs')}, fromList cbns') -- (map findCBNVarsD defs)
 
 -- | Find the call-by-name components of the constructors. These are the
 --   bound variables that are always used <2 times in the pattern branches 
@@ -147,8 +159,8 @@ findCBNVars opts modF =
 findCBNComps :: ScrutOpt -> [DefF] -> [QName]
 findCBNComps scrOpt defs =
   let aux (DefF _ frms e) = findCBNbvs (scrOpt, frmsToNames frms) e
-      bvUses = toList (unionsWith max (List.map aux defs))
-  in  List.map fst (filter (\(_,i)->i<2) bvUses)
+      bvUses = toList (unionsWith max (map aux defs))
+  in  map fst (filter (\(_,i)->i<2) bvUses)
 
 -- | Analyzes an FL expression to find the maximum number of uses for
 --   bound variables in pattern matching clauses.
@@ -158,7 +170,7 @@ findCBNbvs _ (ConstrF _ _) = empty
 findCBNbvs si@(scrOpt, frms) (CaseF loc eC _ pats) =
   let findBVUses (PatB (SPat _ bs, _) e) = 
         let bvUses  =
-              fromList $ zip bs $ List.map (\v->countVarUses si (BV v loc) e) bs
+              fromList $ zip bs $ map (\v->countVarUses si (BV v loc) e) bs
             bvInner = findCBNbvs si e
         in  unionWith max bvUses bvInner
       scrutUses =
@@ -166,18 +178,18 @@ findCBNbvs si@(scrOpt, frms) (CaseF loc eC _ pats) =
           XF (V v) | scrOpt && (v `elem` frms) -> fromList [(v, 2)]
           _                                    -> findCBNbvs si eC
   in  -- "case" is strict in its scrutinee
-      unionWith (+) scrutUses $ unionsWith max (List.map findBVUses pats)
+      unionWith (+) scrutUses $ unionsWith max (map findBVUses pats)
 findCBNbvs si (ConF (CN c) el) = 
   case c of
     -- "if" is strict in its first argument only
     CIf -> unionWith (+) (findCBNbvs si (el!!0)) $
            unionWith max (findCBNbvs si (el!!1)) (findCBNbvs si (el!!2))
-    _   -> unionsWith max (List.map (findCBNbvs si) el)
+    _   -> unionsWith max (map (findCBNbvs si) el)
 findCBNbvs _ (ConF (LitInt _) es) =
   case es of
     [] -> empty
     _  -> ierr "findCBNbvs: found literal application to expressions"
-findCBNbvs si (FF _ el _) = unionsWith max (List.map (findCBNbvs si) el)
+findCBNbvs si (FF _ el _) = unionsWith max (map (findCBNbvs si) el)
 findCBNbvs _ (LetF {}) = ierr "findCBNbvs: encountered let-binding"
 findCBNbvs _ (LamF {}) = ierr "findCBNbvs: encountered lambda"
 

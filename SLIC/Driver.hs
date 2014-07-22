@@ -128,18 +128,18 @@ processFL opts dfis inputModule =
      let tcInfo = mergeTcInfos [builtinTcInfo, modTCs p0BVars]
      let p0Tc = inlineTcMethods tcInfo env p0BVars
 
+     -- do variable sharing analysis
+     let (p0FinalCBN, cbnVars) = markCBNVars opts p0Tc
+     -- _ <- putStrLn (pprintCBNVars cbnVars "")
+     let stricts = gatherStricts p0FinalCBN
+     -- let mergedVarUsage = (cbnVars, stricts)
+
      -- spot tail-calls
-     let p0TCO = doOnlyIf (optTCO opts) (spotTCalls opts) p0Tc
+     let p0TCO = doOnlyIf (optTCO opts) (spotTCalls opts) p0FinalCBN
 
      -- final preprocessed and defunctionalized source to be used
      let p0Final = p0TCO
      -- _ <- printLn p0Final
-      
-     -- do variable sharing analysis
-     let cbnVars = findCBNVars opts p0Final
-     -- _ <- putStrLn (pprintCBNVars cbnVars "")
-     let stricts = gatherStricts p0Final
-     -- let mergedVarUsage = (cbnVars, stricts)
           
      if not ok then
        do putStrLn "Invalid input program."
