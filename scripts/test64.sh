@@ -3,6 +3,25 @@
 # Test script for the greedy tests.
 # 
 
+set -e
+
+# Flags that enable parts of the benchmarking suite. Set with 1, clear with 0.
+COMPILE_RUN=1                # compile & run the benchmarks
+MEASURE_CACHE_COUNTERS=0     # measure properties using the hardware counters
+MEASURE_CACHEGRIND=0         # measure properties using the Cachegrind tool
+COMPARE_GHC=1                # compare runtime with GHC
+
+if [ "$COMPILE_RUN" == "0" ] && [ "$MEASURE_CACHE_COUNTERS" == "0" ] && [ "$MEASURE_CACHEGRIND" == "0" ] && [ "$COMPARE_GHC" == "0" ] 
+then
+  echo All flags are set to 0, please edit the script to set at least one.
+  exit
+fi
+
+control_c() {
+  exit 1
+}
+trap control_c SIGINT
+
 function testRun {
   ./run_lar.sh $1
   # Run using the local LTO-enabled Clang build.
@@ -10,19 +29,21 @@ function testRun {
 }
 
 function testCache {
-    echo $1 vs $2
+    echo $1 vs $2 vs $3
     local CFILE=$1.cache.txt
     echo > $CFILE
     echo $1 >> $CFILE
     valgrind --tool=cachegrind --main-stacksize=262144000 ./$1 >> $CFILE 2>&1
     echo $2 >> $CFILE
     valgrind --tool=cachegrind --main-stacksize=262144000 ./$2 >> $CFILE 2>&1
+    echo $3 >> $CFILE
+    valgrind --tool=cachegrind --main-stacksize=262144000 ./$3 >> $CFILE 2>&1
 }
 
 function measureCache {
-echo Measuring cache of $1...
-./scripts/perf-greedy.sh ./$1_full
-./scripts/perf-greedy.sh ./$1_compact
+echo Measuring property $1 of $2...
+./scripts/perf-greedy.sh $1 $2_full
+./scripts/perf-greedy.sh $1 $2_compact
 }
 
 # Takes three arguments: a string of flags, a string suffix for the generated
@@ -30,7 +51,7 @@ echo Measuring cache of $1...
 function runBenchmarks {
 echo Benchmarks [flags: \"$1\", suffix: $2, mem_factor: $3]
 echo Using:
-echo gic $GICFLAGS
+echo gic $GICFLAGS $1
 echo C compiler: $CC
 let mem=28000000*$3
 export GICFLAGS="-gic-tc -mem $mem $1 $FASTOP"
@@ -93,75 +114,90 @@ cp a.out gic_ntak$2
 }
 
 echo Compiling+running with GIC...
-if [ "$CC" == "" ]
+if [ "$COMPILE_RUN" == "0" ]
 then
-  export CC=gcc
+  echo NOTE: benchmark compilation/running is disabled.
+else
+  echo Compiling+running with GIC...
+  if [ "$CC" == "" ]
+  then
+    export CC=gcc
+  fi
+
+  ulimit -s 262144
+
+  # FASTOP="-fop"
+  export CFLAGS2="-Wno-#warnings -Wno-unused-value"
+  # export CFLAGS2="-DSSTACK"
+
+  echo Using CFLAGS2: $CFLAGS2
+  runBenchmarks "" "_full" 4
+  runBenchmarks "-compact" "_compact" 1
 fi
 
-ulimit -s 262144
-
-# FASTOP="-fop"
-export CFLAGS2="-Wno-#warnings -Wno-unused-value"
-# export CFLAGS2="-DSSTACK"
-
-echo Using CFLAGS2: $CFLAGS2
-runBenchmarks "" "_full" 4
-runBenchmarks "-compact" "_compact" 1
-
-echo Measuring cache using perf:
-
-measureCache "gic_ack"
-measureCache "gic_collatz"
-measureCache "gic_digits_of_e1"
-measureCache "gic_fib"
-measureCache "gic_ntak"
-measureCache "gic_primes"
-measureCache "gic_church"
-measureCache "gic_queens"
-measureCache "gic_queens_num"
-measureCache "gic_quick_sort"
-measureCache "gic_tree_sort"
-measureCache "gic_reverse"
-
-exit
-
-
-if [ "$GHC" == "" ]
+if [ "$MEASURE_CACHE_COUNTERS" == "0" ]
 then
-  export GHC=ghc
+  echo NOTE: Cache measurements using pref are disabled.
+else
+  echo Measuring cache using perf:
+  for property in "L1-dcache-loads" "L1-dcache-load-misses" "L1-dcache-stores" "L1-dcache-store-misses" "L1-dcache-prefetches" "L1-icache-loads" "L1-icache-load-misses" "LLC-loads" "LLC-load-misses" "LLC-stores" "LLC-store-misses" "dTLB-loads" "dTLB-load-misses" "dTLB-stores" "dTLB-store-misses" "iTLB-loads" "iTLB-load-misses" "branch-loads" "branch-load-misses" "cpu-cycles" "instructions" "cache-references" "cache-misses" "branch-instructions" "branch-misses" "bus-cycles" "ref-cycles"
+  do
+    for bench in "ack" "collatz" "digits_of_e1" "fib" "ntak" "primes" "church" "queens" "queens_num" "quick_sort" "tree_sort" "reverse"
+    do
+      echo Testing $bench, property $property
+      measureCache $property ./gic_$bench
+    done
+  done
 fi
-echo Compiling with GHC:
-$GHC --version
 
-$GHC -fforce-recomp -O3 Examples/NewBench/ack.hs -o Ack
-$GHC -fforce-recomp -O3 Examples/Data/collatz.hs -o Collatz
-$GHC -fforce-recomp -O3 Examples/Data/digits_of_e1.hs -o Digits_of_e1
-$GHC -fforce-recomp -O3 Examples/NewBench/fib.hs -o Fib
-$GHC -fforce-recomp -O3 Examples/NewBench/ntak.hs -o Ntak
-$GHC -fforce-recomp -O3 Examples/NewBench/primes.hs -o Primes
-$GHC -fforce-recomp -O3 Examples/NewBench/church.hs -o Church
-$GHC -fforce-recomp -O3 Examples/NewBench/queens.hs -o Queens
-$GHC -fforce-recomp -O3 Examples/NewBench/queens-num.hs -o Queens_num
-$GHC -fforce-recomp -O3 Examples/NewBench/quick-sort.hs -o Quick_sort
-$GHC -fforce-recomp -O3 Examples/NewBench/tree-sort.hs -o Tree_sort
-$GHC -fforce-recomp -O3 Examples/Data/reverse.hs -o Reverse
-echo Running...
-for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Queens_num Quick_sort Reverse Tree_sort
-do
+if [ "$COMPARE_GHC" == "0" ]
+then
+  echo NOTE: GHC comparison is disabled.
+else
+  if [ "$GHC" == "" ]
+  then
+    export GHC=ghc
+  fi
+  echo Compiling with GHC:
+  $GHC --version
+
+  export GHCFLAGS="-fforce-recomp -O3 -XBangPatterns"
+
+  $GHC $GHCFLAGS Examples/NewBench/ack.hs -o Ack
+  $GHC $GHCFLAGS Examples/Data/collatz.hs -o Collatz
+  $GHC $GHCFLAGS Examples/Data/digits_of_e1.hs -o Digits_of_e1
+  $GHC $GHCFLAGS Examples/NewBench/fib.hs -o Fib
+  $GHC $GHCFLAGS Examples/NewBench/ntak.hs -o Ntak
+  $GHC $GHCFLAGS Examples/NewBench/primes.hs -o Primes
+  $GHC $GHCFLAGS Examples/NewBench/church.hs -o Church
+  $GHC $GHCFLAGS Examples/NewBench/queens.hs -o Queens
+  $GHC $GHCFLAGS Examples/NewBench/queens-num.hs -o Queens_num
+  $GHC $GHCFLAGS Examples/NewBench/quick-sort.hs -o Quick_sort
+  $GHC $GHCFLAGS Examples/NewBench/tree-sort.hs -o Tree_sort
+  $GHC $GHCFLAGS Examples/Data/reverse.hs -o Reverse
+  echo Running...
+  for p in Ack Collatz Digits_of_e1 Fib Ntak Primes Church Queens Queens_num Quick_sort Reverse Tree_sort
+  do
     echo -n "$p: "
     TIME="\t%E" time ./$p
-done
+  done
+fi
 
-echo Testing cache behavior with Cachegrind:
-testCache Ack gic_ack
-testCache Collatz gic_collatz
-testCache Digits_of_e1 gic_digits_of_e1
-testCache Fib gic_fib
-testCache Ntak gic_ntak
-testCache Primes gic_primes
-testCache Church gic_church
-testCache Queens gic_queens
-testCache Queens_num gic_queens_num
-testCache Quick_sort gic_quick_sort
-testCache Tree_sort gic_tree_sort
-testCache Reverse gic_reverse
+if [ "$MEASURE_CACHEGRIND" == "0" ]
+then
+  echo NOTE: Cachegrind measurements are disabled.
+else
+  echo Testing cache behavior with Cachegrind:
+  testCache Ack gic_ack_full gic_ack_compact
+  testCache Collatz gic_collatz_full gic_collatz_compact
+  testCache Digits_of_e1 gic_digits_of_e1_full gic_digits_of_e1_compact
+  testCache Fib gic_fib_full gic_fib_compact
+  testCache Ntak gic_ntak_full gic_ntak_compact
+  testCache Primes gic_primes_full gic_primes_compact
+  testCache Church gic_church_full gic_church_compact
+  testCache Queens gic_queens_full gic_queens_compact
+  testCache Queens_num gic_queens_num_full gic_queens_num_compact
+  testCache Quick_sort gic_quick_sort_full gic_quick_sort_compact
+  testCache Tree_sort gic_tree_sort_full gic_tree_sort_compact
+  testCache Reverse gic_reverse_full gic_reverse_compact
+fi
