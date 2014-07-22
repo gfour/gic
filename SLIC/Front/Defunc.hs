@@ -580,21 +580,22 @@ genAppPMDepths scrutOpt defs =
 --   dispatchers mentioned in the original code, in order to also create
 --   dummy ones for non-inhabited closure types (called by dead code).
 mkApplyFuns :: DfFlags -> DfConstrs -> ExtAppFuns -> [DefF]
-mkApplyFuns (ndf, strictness, scrOpt, _, _) dfcs extApps =
-  let -- If doing nullary defunctionalization, keep only 0-arg closures.
+mkApplyFuns (ndf, s, scrOpt, _, _) dfcs extApps =
+  let -- if doing nullary defunctionalization, keep only 0-arg closures
       dfcs' = if ndf then S.filter (\dfc->(dfcA dfc)==0) dfcs else dfcs
       usedArities = clArities dfcs'
-      -- Calculate the parameters given to the closure.
+      -- calculate the parameters given to the closure
       nParams ar = map (genCla ar) [0..(ar-1)]
       appBody ar params pats =
-        let -- Calculate the function formals.
+        let -- calculate the function formals
             frmNames = (genCl ar):params
-            frms     = map (\v->Frm v strictness) frmNames
+            mkFrm v  = Frm v (defaultEvOrder s)
+            frms     = map mkFrm frmNames
             appFunc  = genNApp ar
             cn       = cNested scrOpt 0 appFunc
         in  DefF appFunc frms
             (CaseF cn (XF $ V $ genCl ar) underscoreVar pats)
-      -- Create dispatchers for inhabited closure residual types.
+      -- create dispatchers for inhabited closure residual types
       aux 0  = 
         ierr "mkApplyFuns: cannot create a dispatcher for 0 parameters"
       aux ar =
@@ -667,7 +668,7 @@ mkClosureGADT (ndf, s, _, _, _) dfcs =
                 (pprint dfc "")
       mkGCConstr (DFC c ar _ (_, t)) =
         let ts = types t
-            comps = map (\t0->DT t0 s Nothing) $ take ar ts
+            comps = map (\t0->DT t0 (defaultEvOrder s) Nothing) $ take ar ts
             retT  =
               case drop ar ts of
                 [retT'] -> retT'     -- result is ground

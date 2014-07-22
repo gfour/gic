@@ -26,7 +26,7 @@ insertUnique k a m =
 
 -- | Take a map from varnames to varname sets, a defined name and
 --   an FL expression and add the free vars of the expression
---   to the set associated with the given defined name
+--   to the set associated with the given defined name.
 fvExprF :: VarGrh -> QName -> ExprF -> VarGrh
 fvExprF vg vn exprF =
   let augmentWith s              = Map.insertWith Set.union vn s vg
@@ -52,7 +52,7 @@ fvExprF vg vn exprF =
 
 -- | Take a map from varnames to varname sets, a defined name and
 --   an FL pattern and add the free vars of the pattern
---   to the set associated with the given defined name
+--   to the set associated with the given defined name.
 fvPatF :: VarGrh -> QName -> PatF -> VarGrh
 fvPatF vg vn (PatB (SPat _ vnameL, _) exprF) =
   Map.adjust (\s1 -> Set.difference s1 $ Set.fromList vnameL) 
@@ -60,7 +60,7 @@ fvPatF vg vn (PatB (SPat _ vnameL, _) exprF) =
 
 -- | Take a map from varnames to varname sets and a definition
 --   and augment the map so that it associates the defined name
---   with the set of the names of the free variables appearing in its body
+--   with the set of the names of the free variables appearing in its body.
 fvDefF :: VarGrh -> QName -> DefF -> VarGrh
 fvDefF vg vn (DefF vname frmL exprF) =
   let vg' = Map.adjust 
@@ -70,7 +70,7 @@ fvDefF vg vn (DefF vname frmL exprF) =
                     (lkUpSure vname vg') vg'
 
 -- | Take an FL program and return a map that associates the defined
---   names with the free variables appearing in their definitions
+--   names with the free variables appearing in their definitions.
 fvProgF :: ProgF -> VarGrh
 fvProgF (Prog _ defFL) = 
   Map.delete pFV $
@@ -81,8 +81,8 @@ fvProgF (Prog _ defFL) =
 pFV :: QName
 pFV = QN Nothing "*" -- special name representing the set of the program's free vars
 
--- | a-rename an FL expression using the given map associating
---   names with names. Constructor and constant names are preserved
+-- | Alpha-rename an FL expression using the given map associating
+--   names with names. Constructor and constant names are preserved.
 aRenameExprF :: Renamings -> ExprF -> ExprF
 aRenameExprF ren exprF =
   case exprF of
@@ -105,16 +105,16 @@ aRenameExprF ren exprF =
       let defFL' = List.map (aRenameDefF ren) defFL
       in  LetF depth defFL' $ aRenameExprF ren exprF'
 
--- | a-rename an FL pattern using the given map associating
---   names with names. Constructor and constant names are preserved
+-- | Alpha-rename an FL pattern using the given map associating
+--   names with names. Constructor and constant names are preserved.
 aRenamePatF :: Renamings -> PatF -> PatF
 aRenamePatF ren (PatB (SPat cstrName vnameL, pI) exprF) = 
   PatB (SPat cstrName 
         (List.map (\vn -> Map.findWithDefault vn vn ren) vnameL), pI) $
        aRenameExprF ren exprF
 
--- | a-rename an FL definition using the given map associating
---   names with names. Constructor and constant names are preserved
+-- | Alpha-rename an FL definition using the given map associating
+--   names with names. Constructor and constant names are preserved.
 aRenameDefF :: Renamings -> DefF -> DefF
 aRenameDefF ren (DefF vname frmL exprF) =
   DefF (Map.findWithDefault vname vname ren)
@@ -125,8 +125,8 @@ aRenameDefF ren (DefF vname frmL exprF) =
 
 -- | Take an expression and a map associating function names with
 --   the extra parameters to be applied on them first and amend all
---   function applications
---   ** all names are supposed to be unique at this point **
+--   function applications.
+--   ** All names are supposed to be unique at this point. **
 preApplyExprF :: VarGrh -> ExprF -> ExprF
 preApplyExprF vg exprF =
   case exprF of
@@ -156,24 +156,23 @@ preApplyExprF vg exprF =
 
 -- | Take a definition and a map associating function names with
 --   the extra parameters to be applied on them first and amend all
---   function applications
---   ** all names are supposed to be unique at this point **
+--   function applications.
+--   ** All names are supposed to be unique at this point. **
 preApplyDefF :: VarGrh -> DefF -> DefF
 preApplyDefF vg (DefF vname frmL exprF) = 
   DefF vname frmL $ preApplyExprF vg exprF
 
 -- | Take a definition and a map associating function names with
 --   the extra parameters to be applied on them first and amend all
---   function applications
---   ** all names are supposed to be unique at this point **
+--   function applications.
+--   ** All names are supposed to be unique at this point. **
 preApplyProgF :: VarGrh -> ProgF -> ProgF
 preApplyProgF vg (Prog dataL defFL) = 
   Prog dataL $ List.map (preApplyDefF vg) defFL
 
-
 -- | Take a definition and a list of extra formals, add the
 --   extra formals to the definition and a-rename (the formals
---   and the bound variables in the definition body
+--   and the bound variables in the definition body.
 abstractDefWithFormals :: DefF -> [Frm] -> DefF
 abstractDefWithFormals (DefF vname frmL exprF) frmL' =
   let frmNameL'       = frmsToNames frmL'
@@ -182,15 +181,15 @@ abstractDefWithFormals (DefF vname frmL exprF) frmL' =
       ren             = Map.fromList $ List.zip frmNameL' renFrmNameL'
   in aRenameDefF ren $ DefF vname (frmL'++frmL) exprF 
 
--- | Add extra formals to FL definitions recursively
+-- | Add extra formals (assumed lazy) to FL definitions recursively.
 abstractDefsDefF :: VarGrh -> DefF  -> DefF
 abstractDefsDefF vg (DefF vname frmL exprF) = 
-  let frmL' = List.map (\vn -> Frm vn False) $ Set.elems $
-                                  lkUpSure vname vg
+  let mkFrm vn = Frm vn (defaultEvOrder False)
+      frmL'    = List.map mkFrm $ Set.elems $ lkUpSure vname vg
   in  abstractDefWithFormals 
         (DefF vname frmL $ abstractDefsExprF vg exprF) frmL'
 
--- | Add extra formals to FL definitions recursively
+-- | Add extra formals to FL definitions recursively.
 abstractDefsExprF :: VarGrh -> ExprF -> ExprF
 abstractDefsExprF vg exprF =
   case exprF of
@@ -211,7 +210,7 @@ abstractDefsExprF vg exprF =
       let defFL' = List.map (abstractDefsDefF vg) defFL
       in LetF depth defFL' $ abstractDefsExprF vg exprF'
   
--- | Add extra formals to FL definitions recursively
+-- | Add extra formals to FL definitions recursively.
 abstractDefsProgF :: VarGrh -> ProgF -> ProgF
 abstractDefsProgF vg (Prog dataL defFL) =
   Prog dataL $ List.map (abstractDefsDefF vg) defFL
@@ -219,7 +218,7 @@ abstractDefsProgF vg (Prog dataL defFL) =
 -- | Take an expression and return the a tuple containing 1) all the
 --   definitions that are nested in the original expression and 2) an
 --   expression which is the original one with all nested definitions
---   removed
+--   removed.
 liftDefsExprF :: ExprF -> ([DefF], ExprF)
 liftDefsExprF exprF = 
   case exprF of
@@ -250,15 +249,15 @@ liftDefsExprF exprF =
 
 -- | Take a definition and return the a list of definitions which
 --   contains all nested definition and the original one with
---   all nested definitions removed
+--   all nested definitions removed.
 liftDefsDefF :: DefF -> [DefF]
 liftDefsDefF (DefF vname frmL exprF) =
   let (defFL, exprF') = liftDefsExprF exprF
   in  (DefF vname frmL exprF'):defFL
 
--- | Take an FL program and lift all definitions at top level
---   ** all definitions are supposed to be combinators 
---      i.e. they should contain no free variables at this point **
+-- | Take an FL program and lift all definitions at top level.
+--   ** All definitions are supposed to be combinators 
+--      i.e. they should contain no free variables at this point. **
 liftDefsProgF :: ProgF -> ProgF
 liftDefsProgF (Prog dataL defFL) =
   --let liftDefsDefF (DefF vname frmL exprF) =
@@ -270,9 +269,9 @@ liftDefsProgF (Prog dataL defFL) =
 -- | Take a map associating defined names with free variable names
 --   and a set of defined names and return an equation system
 --   between defined names and variables to abstracted out of
---   definition bodies (as described by Johnsson)
+--   definition bodies (as described by Johnsson).
 --
---   * note that normally: defnameS == Set.fromList $ Map.keys vg
+--   * Note that normally: defnameS == Set.fromList $ Map.keys vg
 mkEquationsJ :: VarGrh -> Set QName -> EqnSys QName (EqE QName QName)
 mkEquationsJ vg defnameS =
   let --knowns vn knownS = Set.map EqV $ Set.intersection knownS $ Map.
@@ -288,7 +287,7 @@ mkEquationsJ vg defnameS =
 -- | Take an FL program and returned a corresponding lambda-lifted
 --   FL program containing no abstractions and, more generally,
 --   no local definitions. Lambda-lifting is performed in accordance
---   with Johnsson
+--   with Johnsson.
 lambdaLiftProgF :: ProgF -> [QName] -> ProgF
 lambdaLiftProgF p llExcluded =
   let defFV = Map.map 

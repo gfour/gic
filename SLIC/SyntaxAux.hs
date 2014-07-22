@@ -18,13 +18,13 @@ import SLIC.Types
 
 -- | Data type names in constructor declarations.
 data DT =
-    DT Type Strictness (Maybe QName) -- ^ data type name with a strictness 
-                                     --   annotation and an optional selector
+    DT Type EvOrder (Maybe QName) -- ^ data type name with an evaluation
+                                  -- order annotation and an optional selector
     deriving (Eq, Read, Show)
 
 instance PPrint DT where
   pprintPrec _ (DT dt s sel) =
-    (if s then ("!"++) else id).
+    pprint s.
     (case sel of Nothing -> id ; Just qn -> pprint qn.(" :: "++)).
     pprint dt
 

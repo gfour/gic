@@ -90,7 +90,8 @@ transBind dfs bind =
       body e = e
       transBind' (b, e) =
         let bQN = stringToQName $ showPPr dfs b
-        in  DefF bQN (namesToFrms (frms b e) False) (transExpr dfs (body e))
+            fs  = (namesToFrms (frms b e) (defaultEvOrder False))
+        in  DefF bQN fs (transExpr dfs (body e))
   in  case bind of
         NonRec b e -> [transBind' (b, e)]
         Rec binds -> map transBind' binds
@@ -236,12 +237,14 @@ transTyCon dfs tyCon =
       as = map (\tv->showPPr dfs (varName tv)) $ tyConTyVars tyCon
       dataConToDC con =
         let (_, _, typeArgs, _) = dataConSig con
-            stricts= map isBanged (dataConStrictMarks con)
+            evOrderInfo = map bang2eo (dataConStrictMarks con)
+            bang2eo x = defaultEvOrder $ isBanged x
             -- dtName = showPPr dfs resultType
             dCName = stringToQName $ showPPr dfs $ dataConName con
             dCArgs =
-              map (\(fs, s)->DT fs s Nothing) $ zip (map (transT dfs) typeArgs) stricts
-        in  if or stricts then 
+              let mkDT (fs, s) = DT fs s Nothing
+              in  map mkDT $ zip (map (transT dfs) typeArgs) evOrderInfo
+        in  if ByValue `elem` evOrderInfo then 
               ierr $ "TODO: found strict components for data type: " ++ (qName dCName)
             else DConstr dCName dCArgs Nothing
   in  Data dtName as dcons

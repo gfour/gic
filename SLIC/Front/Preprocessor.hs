@@ -395,13 +395,13 @@ markStrict s p@(Prog dts defs) =
     if not s then
       p
     else
-      let markStrictDT (DT d _ sel) = DT d True sel
+      let markStrictDT (DT d _ sel) = DT d ByValue sel
           markStrictDC (DConstr c dcts rt) =
             DConstr c (map markStrictDT dcts) rt
           markStrictData (Data dtName as dcs) =
             Data dtName as (map markStrictDC dcs)
           markStrictDef (DefF f frms e) = DefF f (map markStrictFrm frms) e
-          markStrictFrm (Frm f _) = Frm f True
+          markStrictFrm (Frm f _) = Frm f ByValue
       in  Prog (map markStrictData dts) (map markStrictDef defs)
 
 -- * Name qualifying scanner

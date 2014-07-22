@@ -114,8 +114,23 @@ type Arities = Map QName Arity
 type DTName = QName
 
 -- | The flag that indicates strictness. Used by the -strict command-line
---   parameter and for strictness annotations ("!").
+--   parameter.
 type Strictness = Bool
+
+-- | The evaluation order of a formal parameter: call-by-value,
+--   call-by-name, or lazy (call-by-need).
+data EvOrder = ByValue | ByName | Lazy
+     deriving (Eq, Read, Show)
+
+instance PPrint EvOrder where
+  pprint ByValue = ("!"++)
+  pprint _       = id
+
+-- | The default evaluation order, according to the default strictness
+--   setting of the generated program.
+defaultEvOrder :: Strictness -> EvOrder 
+defaultEvOrder True  = ByValue
+defaultEvOrder False = Lazy
 
 -- | The index used by the intensional operators
 --   (modular intensional transformation).

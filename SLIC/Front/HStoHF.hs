@@ -260,7 +260,7 @@ transl_gadt_c :: MNameF -> S.GadtDecl -> DConstr
 transl_gadt_c fm (S.GadtDecl _ hsn hst) =
   let t = transl_type fm hst
       ts = types t
-      comps = map (\t0->DT t0 False Nothing) (init ts)
+      comps = map (\t0->DT t0 (defaultEvOrder False) Nothing) (init ts)
       rt = last ts
   in  DConstr (QN Nothing (getName hsn)) comps (Just rt)
 
@@ -274,8 +274,8 @@ transl_comp fm (ns, bt) =
           (_:_) ->
             errM fm $ "Too many selectors defined for component :: "++(show bt)
   in  case bt of
-        S.BangedTy   typ -> DT (transl_type fm typ) True  sel
-        S.UnBangedTy typ -> DT (transl_type fm typ) False sel
+        S.BangedTy   typ -> DT (transl_type fm typ) (defaultEvOrder True ) sel
+        S.UnBangedTy typ -> DT (transl_type fm typ) (defaultEvOrder False) sel
         S.UnpackedTy _   -> errM fm "Unpack types are not supported."
 
 -- | Constructor component data type extraction.
@@ -324,8 +324,9 @@ transl_def opts fm (S.PatBind _ pat _ rhs _) st =
       _ -> errM fm $ "Unsupported pattern definition"++(show pat)
 transl_def opts fm (S.FunBind [S.Match _ hsName pats _ rhs _]) st =
     let defQName = QN Nothing (getName hsName)
-        getFrm pv@(S.PVar _)   = Frm (pv2v fm pv) (optStrict opts)
-        getFrm (S.PBangPat pv) = Frm (pv2v fm pv) True
+        getFrm pv@(S.PVar _)   =
+          Frm (pv2v fm pv) (defaultEvOrder $ optStrict opts)
+        getFrm (S.PBangPat pv) = Frm (pv2v fm pv) (defaultEvOrder True)
         getFrm (S.PParen pp)   = getFrm pp
         getFrm f = errM fm $ "Haskell-to-FL: unsupported formal in pattern, "++(show f)
         formals = map getFrm pats
@@ -495,7 +496,7 @@ transl_e _ fm x _ =
 
 mkLambdaLet :: Options -> QName -> [QName] -> ExprFH -> ExprFH -> ExprFH
 mkLambdaLet opts lamName fs eBind e =
-  let frms = map (\v->Frm v (optStrict opts)) fs
+  let frms = map (\v->Frm v (defaultEvOrder $ optStrict opts)) fs
   in  LetF Nothing [DefF lamName frms eBind] e
 
 transl_fbind :: Options -> MNameF -> [S.Match] -> TState -> TInfo DefFH
@@ -503,7 +504,8 @@ transl_fbind opts fm matches st =
   let S.Match _ f ps _ _ _ = matches !! 0    -- calculate formals
       fQ = getQNameN f
       newFrms = map (\i ->procLName (\x->x++"$"++(show i)) fQ) [0..length ps-1]
-      mkFrm qn = Frm qn False      -- assumed non-strict as in transl_def
+      -- assumed non-strict as in transl_def
+      mkFrm qn = Frm qn (defaultEvOrder False)
       mkExp qn = XF (V qn)
       mkMatch (S.Match _ _ pats _ (S.UnGuardedRhs eR) _) st0 =
         let (st1, eR') = transl_e opts fm eR st0

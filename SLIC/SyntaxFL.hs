@@ -52,11 +52,11 @@ data ExprFL a =
 
 -- | Function formal variables.
 data Frm =
-    Frm QName Strictness -- ^ formal variable with a strictness annotation
+    Frm QName EvOrder -- ^ formal variable with evaluation order annotation
     deriving (Eq, Read, Show)
 
 instance PPrint Frm where
-    pprint (Frm f s) = (if s then ("!"++) else id).pprint f
+    pprint (Frm f s) = pprint s.pprint f
 
 -- | Gets the name of a formal.
 fstFrm :: Frm -> QName
@@ -224,9 +224,9 @@ cArgsC (QN  Nothing _) _  = ierr "cArgsC cannot process unqualified constructor"
 frmsToNames :: [Frm] -> [QName]
 frmsToNames frms = map fstFrm frms
 
--- | Converts a list of variable names to formals (with default strictness).
-namesToFrms :: [QName] -> Bool -> [Frm]
-namesToFrms vs strictness = map (\v->Frm v strictness) vs
+-- | Converts a list of variable names to formals (with default evaluation order).
+namesToFrms :: [QName] -> EvOrder -> [Frm]
+namesToFrms vs eo = map (\v->Frm v eo) vs
 
 -- | Merges the imported functions tables of many imports to a single table.
 mergeImportFuns :: [IDecl] -> ImportedNames
@@ -388,7 +388,7 @@ gatherStrictVars p =
   let defs = progDefs p
       aux (DefF f fs _) =
         let enumFs = zip fs [0..]
-        in  (f, S.fromList $ map snd $ filter (\(Frm _ s, _)->s) enumFs)
+        in  (f, S.fromList $ map snd $ filter (\(Frm _ s, _)->s==ByValue) enumFs)
   in  M.fromList $ map aux defs
 
 -- | Version of 'gatherStrictVars' for FL modules.

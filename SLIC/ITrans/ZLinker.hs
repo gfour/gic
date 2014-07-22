@@ -38,9 +38,10 @@ bProgZ :: Strictness -> ProgZ
 bProgZ s =
   let Just (t_cons_0, _) = Data.Map.lookup bf_cons_0 builtinTEnv
       Just (t_cons_1, _) = Data.Map.lookup bf_cons_1 builtinTEnv
+      eo = defaultEvOrder s
   in  Prog [ Data dtList [v_a]
              [ DConstr bf_Cons 
-               [DT t_cons_0 s Nothing, DT t_cons_1 s Nothing] Nothing
+               [DT t_cons_0 eo Nothing, DT t_cons_1 eo Nothing] Nothing
              , DConstr bf_Nil  [] Nothing ]
            , Data dtUnit [] [ DConstr bf_Unit [] Nothing ]
            ]
