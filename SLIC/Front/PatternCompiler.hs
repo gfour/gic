@@ -2,9 +2,7 @@
 --   expressions), to simple patterns (one head constructor and a list of
 --   pattern-bound formals).
 -- 
---   Based on the pattern compiler described in "Efficient Compilation of
---   Pattern-Matching", Philip Wadler, Chapter 5, in "The Implementation
---   of Functional Programming Languages", Simon L. Peyton Jones, 1987.
+--   Currently a placeholder, see the implementation of 'patCompMatches'.
 -- 
 
 module SLIC.Front.PatternCompiler (patComp, patCompMatches) where
