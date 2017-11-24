@@ -4,11 +4,10 @@
 {-# LANGUAGE CPP #-}
 module SLIC.Front.GHCBackEnd (coreGHC, transfCore) where
 
-import BasicTypes (isBanged)
 import CorePrep (corePrepPgm)
 import CoreSyn (Alt, Bind(..), CoreBind, CoreBndr, CoreExpr, CoreProgram, 
                 AltCon(..), Expr(..))
-import DataCon (dataConName)
+import DataCon (dataConName, isBanged)
 import FastString (unpackFS)
 import GHC 
 import Id (idName)
@@ -110,7 +109,7 @@ transExpr dfs (Var vId) =
 transExpr _ (Lit literal) = 
   let mInt i = ConF (LitInt i) []
   in  case literal of
-        MachStr str    -> mkStrList $ unpackFS str
+        MachStr str    -> mkStrList $ show str
         MachInt i      -> mInt $ fromInteger i
         MachInt64 i    -> mInt $ fromInteger i
         MachWord i     -> mInt $ fromInteger i
@@ -363,3 +362,4 @@ coreGHC dflags file _ _ =
 #endif       
        dflagsFinal <- getSessionDynFlags
        return (dflagsFinal, corePrep)
+

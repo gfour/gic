@@ -96,12 +96,12 @@ function testLAR {
   echo -n $1, GHCi\ \ \ \ \ \ :\ 
   echo "result" | ghci ${GHCI_FLAGS} $1
 
-  echo -n $1, LAR, libgc:\ 
-  ./run_libgc.sh $1
+  # echo -n $1, LAR, libgc:\ 
+  # ./run_libgc.sh $1
   # echo -n $1, LAR, semi:\ 
   # ./run_lar.sh -mem 1280000000 $1
-  # echo -n $1, LAR, compact-semi:\ 
-  # CFLAGS2="-w" ./run_lar.sh -mem 2280000000 -compact $1
+  echo -n $1, LAR, compact-semi:\ 
+  CFLAGS2="-w" ./run_lar.sh -mem 2280000000 -tco -compact $1
 }
 
 # Use the single-threaded runtime.

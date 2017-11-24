@@ -28,20 +28,17 @@ import SLIC.Types (FileName, FPath, MName, PPrint(..), TEnv)
 import GHC (DynFlags(..), GhcLink(..), GhcMode(..), TypecheckedModule(..),
             defaultErrorHandler, getSessionDynFlags, runGhc, setSessionDynFlags)
 import GHC.Paths (libdir)
-#if __GLASGOW_HASKELL__ > 704        
-import DynFlags (ExtensionFlag(..), defaultFatalMessager, defaultFlushOut, xopt_set)
-#else
-import DynFlags (ExtensionFlag(..), defaultLogAction, xopt_set)
-#endif /* __GLASGOW_HASKELL__ version check */
+import DynFlags (defaultFatalMessager, defaultFlushOut, xopt_set)
+import qualified GHC.LanguageExtensions.Type as GHCExtType
 import Outputable (Outputable, ppr)
 import SLIC.Front.GHCFrontEnd (getVTypes, tcGHC)
-import SLIC.Front.GHCBackEnd (coreGHC, transfCore)
+-- import SLIC.Front.GHCBackEnd (coreGHC, transfCore)
 #endif /* USE_GHC */
 
 import Data.List (isPrefixOf, map)
 import Language.Haskell.Exts.Parser as Parser
 import Language.Haskell.Exts.Extension
-import Language.Haskell.Exts.Syntax
+import Language.Haskell.Exts.SrcLoc
 import System.Environment
 
 -- | Prints a usage message.
@@ -280,11 +277,7 @@ runThroughGHC :: [MName] -> FPath -> [MName] -> Options -> IO TEnv
 #ifdef USE_GHC
 runThroughGHC mNames fPath mg opts =
   let wrapper func =
-#if __GLASGOW_HASKELL__ > 704        
         defaultErrorHandler defaultFatalMessager defaultFlushOut $ do      
-#else
-        defaultErrorHandler defaultLogAction $ do
-#endif
           runGhc (Just libdir) $ do
             dflags <- getSessionDynFlags
             let dflags1 =
@@ -292,8 +285,9 @@ runThroughGHC mNames fPath mg opts =
                     CompileModule -> dflags{ghcMode=OneShot}{ghcLink=NoLink}
                     Whole         -> dflags -- {ghcMode=OneShot}{hscTarget=HscNothing}{ghcLink=NoLink}{verbosity=4}{outputHi=Nothing}
             let dflags2 = foldl xopt_set dflags1
-                          [Opt_Cpp, Opt_ImplicitPrelude, Opt_MagicHash,
-                           Opt_GADTs, Opt_GADTSyntax]
+                          [GHCExtType.Cpp, GHCExtType.ImplicitPrelude,
+                           GHCExtType.MagicHash, GHCExtType.GADTs,
+                           GHCExtType.GADTSyntax]
             _ <- setSessionDynFlags dflags2
             func dflags2 fPath mNames mg
   in  case optGHC opts of
@@ -307,10 +301,11 @@ runThroughGHC mNames fPath mg opts =
              -- force the result (and therefore type checking)
              return tEnv
         GHCCore ->
-          do (dflags', cMod) <- wrapper coreGHC
-             binds <- cMod
-             transfCore opts dflags' binds []
-             ierr "TODO: No typing reader integrated yet for GHCCore."
+          error "the GHC back-end is currently disabled"
+        --   do (dflags', cMod) <- wrapper coreGHC
+        --      binds <- cMod
+        --      transfCore opts dflags' binds []
+        --      ierr "TODO: No typing reader integrated yet for GHCCore."
 
 instance Outputable TypecheckedModule where
   ppr tmod = ppr $ tm_typechecked_source tmod
@@ -333,6 +328,7 @@ parseFL opts f text =
                             ]
                         , ignoreLanguagePragmas = False
                         , ignoreLinePragmas = False
+                        , ignoreFunctionArity = True
                         , fixities = Nothing
                         }
   in  case Parser.parseModuleWithMode pMode text of

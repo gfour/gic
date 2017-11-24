@@ -29,10 +29,10 @@ getVTypes dflags prog =
         in  concatMap vtBind binds
       vtBind fb@(FunBind {}) =
         let (f_qn, f_t) = vtId $ unLoc $ fun_id fb
-            mGroup@(MatchGroup lMatches _) = fun_matches fb
-            f_ar = case lMatches of
+            mGroup@(MG {}) = fun_matches fb
+            f_ar = case unLoc (mg_alts mGroup) of
                      [lMatch] ->
-                       let Match lPats _ _ = unLoc lMatch
+                       let Match _ lPats _ _ = unLoc lMatch
                        in  length lPats
                      _ -> error "vtBind: only one match is allowed"
             fI   = (f_qn, (f_t, Just f_ar))            
@@ -41,12 +41,14 @@ getVTypes dflags prog =
       vtBind vb@(VarBind {}) = 
         let (v_qn, v_t) = vtId $ var_id vb
         in  (v_qn, (v_t, Nothing)) : (vtExprU $ var_rhs vb)
-      vtMatch (Match mPats _ gs) = (concatMap (vtPat.unLoc) mPats)++(vtGRHSs gs)
-      vtMatches (MatchGroup lMatches t) = concatMap (vtMatch.unLoc) lMatches
+      vtMatch (Match _ mPats _ gs) = (concatMap (vtPat.unLoc) mPats)++(vtGRHSs gs)
+      vtMatches mg@(MG {}) =
+        let lMatches = unLoc $ mg_alts mg
+        in  concatMap (vtMatch.unLoc) lMatches
       vtGRHSs gs =
         case grhssGRHSs gs of
           []  ->
-            case grhssLocalBinds gs of
+            case unLoc (grhssLocalBinds gs) of
               HsValBinds _ -> error "vtGRHSs: HsValBinds are not supported."
               HsIPBinds  _ -> error "vtGRHSs: HsIPBinds are not supported."
               EmptyLocalBinds ->
@@ -70,12 +72,14 @@ getVTypes dflags prog =
       vtExpr (ExplicitTuple args _) = 
         let vtArg (Present e) = vtExprU e
             vtArg (Missing _) = [] 
-        in  concatMap vtArg args
+        in  concatMap (vtArg.unLoc) args
       vtExpr (HsCase e matches)     = (vtExprU e)++(vtMatches matches)
       vtExpr (HsIf _ cond eT eF)    = (vtExprU cond)++(vtExprU eT)++(vtExprU eF)
-      vtExpr (HsLet (HsValBinds vBinds) e) = (vtVBinds vBinds)++(vtExpr $ unLoc e)
+      vtExpr (HsLet lvBinds e) =
+        let HsValBinds vBinds = unLoc lvBinds
+        in  (vtVBinds vBinds)++(vtExpr $ unLoc e)
       vtExpr (HsDo {})              = error "vtExpr: found HsDo"
-      vtExpr (ExplicitList _ el)    = concatMap vtExprU el
+      vtExpr (ExplicitList _ _ el)  = concatMap vtExprU el
       vtExpr (ExplicitPArr {})      = error "vtExpr: found ExplicitPArr"
       vtExpr (RecordCon {})         = error "vtExpr: found RecordCon"
       vtExpr (RecordUpd {})         = error "vtExpr: found RecordUpd"
@@ -86,9 +90,9 @@ getVTypes dflags prog =
       vtExpr (HsSCC {})             = error "vtExpr: found HsSCC"
       vtExpr (HsCoreAnn {})         = error "vtExpr: found HsCoreAnn"
       vtExpr (HsBracket {})         = error "vtExpr: found HsBracket"
-      vtExpr (HsBracketOut {})      = error "vtExpr: found HsBracket"
+      vtExpr (HsRnBracketOut {})    = error "vtExpr: found HsRnBracket"
+      vtExpr (HsTcBracketOut {})    = error "vtExpr: found HsTcBracket"
       vtExpr (HsSpliceE {})         = error "vtExpr: found HsSpliceE"
-      vtExpr (HsQuasiQuoteE {})     = error "vtExpr: found HsQuasiQuoteE"
       vtExpr (HsProc {})            = error "vtExpr: found HsProc"
       vtExpr (HsArrApp {})          = error "vtExpr: found HsArrApp"
       vtExpr (HsArrForm {})         = error "vtExpr: found HsArrForm"
@@ -99,7 +103,6 @@ getVTypes dflags prog =
       vtExpr (EAsPat {})            = error "vtExpr: found EAsPat"
       vtExpr (EViewPat {})          = error "vtExpr: found EViewPat"
       vtExpr (ELazyPat e)           = vtExprU e
-      vtExpr (HsType {})            = error "vtExpr: found HsType"
       vtExpr (HsWrap _ e)           = vtExpr e
       vtExpr e                      =
         error $ "vtExpr: unsupported expression: "++(showPPr dflags e) -- ++" of type "++(show $ typeOf1 e)
@@ -108,9 +111,9 @@ getVTypes dflags prog =
       vtVBinds (ValBindsOut vBindsOut _) = 
         concatMap (\(_, lBinds) -> vtBinds lBinds) vBindsOut
       vtPat (VarPat vId) =
-        let (vId_qn, vId_t) = vtId vId
+        let (vId_qn, vId_t) = vtId $ unLoc vId
         in  [(vId_qn, (vId_t, Nothing))]
-      vtPat (ListPat lPats _)       = concatMap (vtPat.unLoc) lPats
+      vtPat (ListPat lPats _ _)     = concatMap (vtPat.unLoc) lPats
       vtPat (TuplePat lPats _ _)    = concatMap (vtPat.unLoc) lPats
       vtPat (LitPat _)              = []
       vtPat (ConPatOut {})          = []
@@ -173,7 +176,7 @@ tcGHC _ file mNames mg =
      dflags <- getSessionDynFlags
      -- TODO: is this needed?
      let inclPaths' = (includePaths dflags)++[fPath]
-     _ <- setSessionDynFlags dflags{includePaths=inclPaths'}{hscOutName="/dev/null"}
+     _ <- setSessionDynFlags dflags{includePaths=inclPaths'}{hscTarget=HscNothing}
      let ctxtMods = map (\x -> IIDecl $ (simpleImportDecl . mkModuleName) x)
                     ((\\) mg [mn])
      setContext ctxtMods

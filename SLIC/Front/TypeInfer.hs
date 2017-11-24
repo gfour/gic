@@ -8,6 +8,7 @@ module SLIC.Front.TypeInfer (isValidFL, makeTEnv, readTypeSigs,
                              typeInferMod) where
 
 import Prelude hiding (lookup)
+import Control.Monad (liftM, ap)
 import Data.List (lookup, nub, sort)
 import Data.Map (Map, elems, empty, filterWithKey, fromList,
        insert, keys, mapWithKey, toList, union, unions)
@@ -150,6 +151,13 @@ stdPrint :: String -> STD ()
 stdPrint = putStr
 
 newtype STM a = STM (STMstate -> STD (STMstate, Maybe a))
+
+-- Needed due to Applicative Monad Proposal.
+instance Applicative STM where
+  pure = return
+  (<*>) = ap
+instance Functor STM where
+  fmap = liftM
 
 instance Monad STM where
     return v    = STM (\st -> return (st, return v))
