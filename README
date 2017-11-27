@@ -18,9 +18,9 @@ Requirements
 
 To build the compiler, you need:
 
-* GHC 7.6
+* GHC 8.0.2
 * ghc-paths
-* haskell-src-exts 1.14.0 (Language.Haskell.Exts.Syntax and Language.Haskell.Exts.Parser)
+* haskell-src-exts 1.18.2
 * For the C back-end:
     * GCC (with OpenMP support if the parallel runtime is enabled)
     * The Boehm-Demers-Weiser garbage collector from:
@@ -35,11 +35,14 @@ To build the compiler, you need:
 * Optional: the GHC profiling libs (if HPROFILE is set in the Makefile),
   to support stack traces in the compiler executable.
 
-Building the compiler
----------------------
+Building the compiler (stack)
+-----------------------------
 
-* Change the macros `GC_INCLUDE` and `GC_LIB` in `run_libgc.sh` to point to the
-  location of the Boehm-Demers-Weiser garbage collector.
+    stack setup
+    stack build
+
+Building the compiler (make)
+----------------------------
 
 * To disable type checking with the GHC API, comment out the `USE_GHC` flag in
   the Makefile.
@@ -53,6 +56,10 @@ Building the compiler
 
 Using the compiler
 ------------------
+
+To use the Boehm-Demers-Weiser garbage collector change macros
+`GC_INCLUDE` and `GC_LIB` in `run_libgc.sh` to point to the location
+of the collector.
 
 To compile and run an example `Main.hs`, run:
 

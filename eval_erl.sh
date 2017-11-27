@@ -1,5 +1,9 @@
 #!/bin/bash
-(./gic -erl ${1} > main.erl) &&
+
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
+(${GIC} -erl ${1} > main.erl) &&
 (cat erlang/distr_eduction.erl >> main.erl) &&
 (erlc main.erl erlang/warehouse2.erl) &&
 # echo ${1} transformed to main.erl

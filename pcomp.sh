@@ -13,15 +13,18 @@ GC="-semigc"
 CFLAGS="-I . -I ./c"
 # CFLAGS="-DGC -I . -I ./c"
 
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
 function compileLink {
     for module in $1 $2
     do
 	echo Compiling module: ${module} --
-	./gic $TC -cmod -debug ${GC} ${module}.hs
+	${GIC} ${TC} -cmod -debug ${GC} ${module}.hs
 	gcc -c ${CFLAGS} ${module}.c -o ${module}.o
     done
     echo Creating linker...
-    ./gic ${GC} -link $1 $2
+    ${GIC} ${GC} -link $1 $2
     echo Adding GC...
     cat c/gc.c >> main-link.c
     echo Linking with gcc...

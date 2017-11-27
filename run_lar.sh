@@ -11,6 +11,8 @@
 
 set -e
 
+source find-gic.sh
+
 # USE_GMP=
 USE_GMP="-DHAS_GMP -lgmp"
 if [ "$CC" = "" ]; then
@@ -36,7 +38,7 @@ if [ `echo "$CC" | tail -c 4 | head -c 3` = "gcc" ]; then
     hash gold 2>/dev/null && { CFLAGS="${CFLAGS} -fwhole-program -fuse-ld=gold -flto"; }    
 fi
 
-./gic -semigc $GICFLAGS $* > /dev/null
+${GIC} -semigc $GICFLAGS $* > /dev/null
 
 cat c/gc.c >> main.c
 

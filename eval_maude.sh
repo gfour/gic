@@ -14,8 +14,11 @@ then
     usage
 else
 
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
 cp maude/eduction.maude test.maude
-./gic -cm $2 -wh $3  >> test.maude
+${GIC} -cm $2 -wh $3  >> test.maude
 if [ "$1" = "search" ]; then
     echo "(search init =>! C:Configuration .)" >> test.maude
     echo Starting search in Maude...

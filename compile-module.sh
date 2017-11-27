@@ -26,5 +26,8 @@ OPT="-falign-functions"
 
 set -e
 
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
 echo Compiling $1.g.o...
-./gic $TC $STACKTRACE -cmod $1.hs && gcc $OPT $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall
+${GIC} $TC $STACKTRACE -cmod $1.hs && gcc $OPT $GC_INCLUDE -I . -c $1.c -o $1.g.o -ggdb3 -Wall

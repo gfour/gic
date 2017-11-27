@@ -1,8 +1,12 @@
 #!/bin/bash
+
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
 for f in Examples/Num/fib.hs Examples/Num/cbn.hs Examples/Num/ack.hs Examples/Num/queens.hs
 do
     echo "------ Testing $f..."
-    (./gic -autopar -cerl -wh 20 $f > main.erl) && (erlc main.erl erlang/warehouse.erl > /dev/null)
+    (${GIC} -autopar -cerl -wh 20 $f > main.erl) && (erlc main.erl erlang/warehouse.erl > /dev/null)
     echo "------- gic "
     (echo "main:init()." | erl +P 1677216 main.beam | grep result)
     echo "------- GHCi "

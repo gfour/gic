@@ -16,6 +16,9 @@ OPT="-falign-functions"
 
 set -e
 
+source find-gic.sh
+echo "Using GIC=${GIC}"
+
 # generates a .hi file for the module (used by the GHC type checker)
 function generateHI {
 MOD=`basename $1`
@@ -43,7 +46,7 @@ if [ "$TC" = "-ghc-tc" ]; then
     rm -f `basename $1`.hi `basename $2`.hi
 fi
 
-./gic -link $1 $2
+${GIC} -link $1 $2
 echo Linking with gcc...
 gcc $GC_INCLUDE -I . dfmod.c main-link.c "$1.g.o" "$2.g.o" $GC_LIB -o a.out -ggdb3 -Wall $OPT
 echo -n LAR\ \ result:\  

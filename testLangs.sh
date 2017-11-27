@@ -13,6 +13,8 @@
 GHCI_FLAGS="-v0 -w -XGADTs"
 
 export GICFLAGS="-gic-tc"
+source find-gic.sh
+echo "Using GIC=${GIC}"
 
 ############# Test tags
 
@@ -48,7 +50,7 @@ echo -- TTD emulator --
 for file in Examples/Num/exmh1.hs Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/example2.hs
 do
   echo -n ${file}, TTD emulator:\ 
-  ./gic ${GICFLAGS} -ettd -workers 100 ${file}
+  ${GIC} ${GICFLAGS} -ettd -workers 100 ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
@@ -59,7 +61,7 @@ echo -- Call-by-name eduction --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/records.hs Examples/Data/unit.hs
 do
   echo -n ${file}, call-by-name eduction:\ 
-  ./gic ${GICFLAGS} -ecbn ${file}
+  ${GIC} ${GICFLAGS} -ecbn ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
@@ -70,7 +72,7 @@ echo -- Non-strict FL interpreter --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/records.hs Examples/Data/unit.hs Examples/Data/addsx.hs
 do
   echo -n ${file}, non-strict FL interpreter:\ 
-  ./gic ${GICFLAGS} -fl ${file}
+  ${GIC} ${GICFLAGS} -fl ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done
@@ -81,7 +83,7 @@ echo -- Lazy eduction --
 for file in Examples/Num/memoize.hs Examples/Data/example1.hs Examples/Data/addsx.hs Examples/Data/biglist.hs Examples/Data/nested.hs Examples/Data/records.hs Examples/Data/unit.hs
 do
   echo -n ${file}, lazy eduction:\ 
-  ./gic ${GICFLAGS} -e ${file}
+  ${GIC} ${GICFLAGS} -e ${file}
   echo -n ${file}, GHCi:\ 
   echo "result" | ghci ${GHCI_FLAGS} ${file}
 done

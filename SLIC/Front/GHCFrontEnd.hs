@@ -1,7 +1,7 @@
 -- | Uses GHC as a front-end to do type checking.
 -- 
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, RankNTypes #-}
 module SLIC.Front.GHCFrontEnd (getVTypes, showPPr, showSDoc', tcGHC, transT) where
 
 import Bag (bagToList)
