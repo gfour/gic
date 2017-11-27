@@ -63,7 +63,56 @@ executable gic
   
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.9 && <4.10, ghc-paths >=0.1 && <0.2, ghc-boot >=8.0 && <8.1, haskell-src-exts >=1.18.2 && <1.20, containers >=0.5 && <0.6, ghc >=8.0.2
-  
+
+  other-modules:       SLIC.AuxFun
+                     , SLIC.CompManager
+                     , SLIC.Constants
+                     , SLIC.DFI
+                     , SLIC.Distr.EvalErl
+                     , SLIC.Driver
+                     , SLIC.Front.CAF
+                     , SLIC.Front.Defunc
+                     , SLIC.Front.EvalFL
+                     , SLIC.Front.GHCFrontEnd
+                     , SLIC.Front.HStoHF
+                     , SLIC.Front.LLifter.Equations
+                     , SLIC.Front.LLifter.Lifter
+                     , SLIC.Front.PatternCompiler
+                     , SLIC.Front.Preprocessor
+                     , SLIC.Front.Renamer
+                     , SLIC.Front.TailCalls
+                     , SLIC.Front.TypeInfer
+                     , SLIC.Front.Typeclass
+                     , SLIC.ITrans.Eval
+                     , SLIC.ITrans.EvalEduction
+                     , SLIC.ITrans.HFtoHI
+                     , SLIC.ITrans.HItoZI
+                     , SLIC.ITrans.ITrans
+                     , SLIC.ITrans.Optimizations
+                     , SLIC.ITrans.Syntax
+                     , SLIC.ITrans.ZLinker
+                     , SLIC.LAR.LAR
+                     , SLIC.LAR.LARAux
+                     , SLIC.LAR.LARBuiltins
+                     , SLIC.LAR.LARDebug
+                     , SLIC.LAR.LARGraph
+                     , SLIC.LAR.LARLinker
+                     , SLIC.LAR.OptimizationsLAR
+                     , SLIC.LAR.SMacrosAux
+                     , SLIC.LAR.SyntaxLAR
+                     , SLIC.LAR.ZItoLAR
+                     , SLIC.Maude.ZItoMaude
+                     , SLIC.State
+                     , SLIC.SyntaxAux
+                     , SLIC.SyntaxFL
+                     , SLIC.TTD.DFG
+                     , SLIC.TTD.EvalTTD
+                     , SLIC.TTD.SyntaxTTD
+                     , SLIC.TTD.TTD
+                     , SLIC.TTD.ZItoTTD
+                     , SLIC.Tags
+                     , SLIC.Types
+
   -- Directories containing source files.
   -- hs-source-dirs:      
   
