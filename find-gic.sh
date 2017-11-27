@@ -5,7 +5,7 @@ MAKE_GIC="./gic"
 
 if [ ! -e "${GIC}" ]; then
     if [ -x "$(command -v stack)" ]; then
-	GIC=`stack path --system-ghc --local-install-root`/bin/gic
+	GIC=`stack path --local-install-root`/bin/gic
     else
 	if [ -e "${CABAL_GIC}" ]; then
 	    GIC="${CABAL_GIC}"
