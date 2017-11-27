@@ -138,41 +138,39 @@ tcDecls fm decls =
 -- | Translate type class instance methods to FL instance definitions (to
 --   be desugared to plain FL definitions at a later stage).
 tcInstDecls :: Options -> MNameF -> [S.Decl SSI] -> TState -> TInfo [TcInstFH]
--- tcInstDecls _ _ _ _ = error "TODO: tcInstDecls"
-tcInstDecls opts fm ((S.InstDecl _ _ (S.IRule _ Nothing Nothing instHead) (Just iDecls)) : ds) st =
-  error "TODO: tcInstDecls"
-  {-
-  case instHead of
-    
-    S.TyApp _ (S.TyCon _ (S.UnQual _ (S.Ident _ clNameStr))) (S.TyVar _ (S.Ident _ typ)) ->
-      error $ "instance " ++ (show clNameStr) ++ " for " ++ typ
--}
-{-
+tcInstDecls _ _ [] st = (st, [])
+tcInstDecls opts fm (d : ds) st =
+  case d of
+    S.InstDecl _ Nothing iRule (Just iDecls) ->
+        let elimParens (S.IParen _ ir) = ir
+            elimParens ir = ir
+        in  case elimParens iRule of
+              S.IRule _ Nothing Nothing instHead ->
+                -- Only single-type instances are supported for now.
+                case instHead of
+                  S.IHApp _ (S.IHCon _ clName) iType ->
+                    tcInstDecls_proc opts fm clName iType iDecls ds st
+                  _ -> errM fm $ "Instance head not supported: "++(show instHead)
+              _ -> errM fm $ "Instance declaration rule not supported: "++(show d)
+    S.InstDecl {} -> errM fm $ "instance declaration not supported: "++(show d)
+    _ -> tcInstDecls opts fm ds st
 
---  ctxt clName iTypes iDecls) : ds) st =
--- tcInstDecls opts fm ((S.InstDecl _ ctxt clName iTypes iDecls) : ds) st =
+-- The processor of a single class instance.
+tcInstDecls_proc :: Options -> MNameF -> S.QName SSI -> S.Type SSI ->
+                    [S.InstDecl SSI] -> [S.Decl SSI] -> TState -> TInfo [TcInstFH]
+tcInstDecls_proc opts fm clName iType iDecls ds st =
   let clNameStr = lName $ getQName clName
-      isInsDecl (S.InsDecl _) = True
+      isInsDecl (S.InsDecl {}) = True
       isInsDecl _ = False      
       clInstDecls decls st0 =
         if all isInsDecl decls then
-          funDecls opts fm (map (\(S.InsDecl d)->d) decls) st0
+          funDecls opts fm (map (\(S.InsDecl _ d)->d) decls) st0
         else
           errM fm "clInstDecls: found special instance declaration."
-  in  case ctxt of
-      [] ->
-        case iTypes of
-          [] -> errM fm $ "class instance "++clNameStr++" has no types"
-          (_:_:_) -> errM fm "class instance has > 1 types"
-          [iType] ->
-            let (st1, tcInstMethods) = clInstDecls iDecls st
-                tcInst = TcInst clNameStr (transl_type fm iType) tcInstMethods
-                (st2, tcInsts) = tcInstDecls opts fm ds st1
-            in  (st2, tcInst:tcInsts)
-      _  -> errM fm "class instance contexts are not supported yet"
--}
-tcInstDecls _ _ [] st = (st, [])
-tcInstDecls opts fm (_:ds) st = tcInstDecls opts fm ds st
+      (st1, tcInstMethods) = clInstDecls iDecls st
+      tcInst = TcInst clNameStr (transl_type fm iType) tcInstMethods
+      (st2, tcInsts) = tcInstDecls opts fm ds st1
+  in  (st2, tcInst:tcInsts)
 
 typeSigs :: MNameF -> [S.Decl SSI] -> TEnvL
 typeSigs _ [] = []
@@ -292,15 +290,14 @@ transl_c fm (S.QualConDecl _ _ _ cDecl) =
           in  trans_cd cName components
 
 transl_gadt_c :: MNameF -> S.GadtDecl SSI -> DConstr
-transl_gadt_c _ _ = error "TODO: transl_gadt_c"
-{-
-transl_gadt_c fm (S.GadtDecl _ hsn hst) =
+transl_gadt_c fm (S.GadtDecl _ hsn Nothing hst) =
   let t = transl_type fm hst
       ts = types t
       comps = map (\t0->DT t0 (defaultEvOrder False) Nothing) (init ts)
       rt = last ts
   in  DConstr (QN Nothing (getName hsn)) comps (Just rt)
--}
+transl_gadt_c fm g =
+  errM fm $ "transl_gadt_c: fields in GADTs are not supported yet: "++(show g)
 
 -- | Constructor component types translation.
 transl_comp :: MNameF -> SDT -> DT

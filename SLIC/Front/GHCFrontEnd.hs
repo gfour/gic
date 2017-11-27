@@ -26,6 +26,7 @@ getVTypes dflags prog =
             -- TODO: these contain the dictionaries, use with type classes
             -- ev_vars = abs_ev_vars ab
             -- dicts = map (show.occNameString.nameOccName.varName) ev_vars
+            -- (Also see the AbsBindsSig case.)
         in  concatMap vtBind binds
       vtBind fb@(FunBind {}) =
         let (f_qn, f_t) = vtId $ unLoc $ fun_id fb
@@ -41,6 +42,8 @@ getVTypes dflags prog =
       vtBind vb@(VarBind {}) = 
         let (v_qn, v_t) = vtId $ var_id vb
         in  (v_qn, (v_t, Nothing)) : (vtExprU $ var_rhs vb)
+      vtBind (PatSynBind {}) = ierr "vtBind: found PatSynBind"
+      vtBind absig@(AbsBindsSig {}) = vtBind $ unLoc $ abs_sig_bind absig
       vtMatch (Match _ mPats _ gs) = (concatMap (vtPat.unLoc) mPats)++(vtGRHSs gs)
       vtMatches mg@(MG {}) =
         let lMatches = unLoc $ mg_alts mg
