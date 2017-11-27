@@ -114,16 +114,16 @@ instance PPrint DefZ where
 searchDefZ :: QName -> ProgZ -> Maybe DefZ
 searchDefZ _  (Prog _ []) = Nothing
 searchDefZ vn1 (Prog cs (def@(DefZ vn2 _):restdefs)) 
-   | vn1 == vn2		= Just def
-   | otherwise 		= searchDefZ vn1 (Prog cs restdefs)
+   | vn1 == vn2         = Just def
+   | otherwise          = searchDefZ vn1 (Prog cs restdefs)
 searchDefZ vn1  (Prog cs (_:restdefs)) = searchDefZ vn1 (Prog cs restdefs)
 
 -- | Searches for an /actuals()/ declaration in ZOIL.
 searchDefCaseZ :: QName -> ProgZ -> Maybe DefZ
 searchDefCaseZ _  (Prog _ []) = Nothing
 searchDefCaseZ vn1 (Prog cs (def@(ActualsZ vn2 _ _):restdefs)) 
-   | vn1 == vn2		= Just def
-   | otherwise 		= searchDefCaseZ vn1 (Prog cs restdefs)
+   | vn1 == vn2         = Just def
+   | otherwise          = searchDefCaseZ vn1 (Prog cs restdefs)
 searchDefCaseZ vn1  (Prog cs (_:restdefs)) = 
   searchDefCaseZ vn1 (Prog cs restdefs)
 

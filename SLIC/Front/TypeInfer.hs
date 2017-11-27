@@ -344,35 +344,35 @@ inferE cs an e =
     let inferE_ (XF (V v)) = inferV v
         inferE_ (XF (BV bv _)) = inferV bv
         inferE_ (ConF (CN c) el) =
-	    let theta CIf     = freshST >>= \t ->
+            let theta CIf     = freshST >>= \t ->
                                 debugST "new" (pprint t "" ++ "\n") >>
-		                return (t, [STground gBool, t, t])
-		theta CPlus   = return (STground gInt, [STground gInt, STground gInt])
-		theta CMinus  = return (STground gInt, [STground gInt, STground gInt])
-		theta CMult   = return (STground gInt, [STground gInt, STground gInt])
-		theta CDivide = return (STground gInt, [STground gInt, STground gInt])
-		theta CDiv    = return (STground gInt, [STground gInt, STground gInt])
-		theta CMod    = return (STground gInt, [STground gInt, STground gInt])
-		theta CEqu    = freshST >>= \t ->
+                                return (t, [STground gBool, t, t])
+                theta CPlus   = return (STground gInt, [STground gInt, STground gInt])
+                theta CMinus  = return (STground gInt, [STground gInt, STground gInt])
+                theta CMult   = return (STground gInt, [STground gInt, STground gInt])
+                theta CDivide = return (STground gInt, [STground gInt, STground gInt])
+                theta CDiv    = return (STground gInt, [STground gInt, STground gInt])
+                theta CMod    = return (STground gInt, [STground gInt, STground gInt])
+                theta CEqu    = freshST >>= \t ->
                                 debugST "new" (pprint t "" ++ "\n") >>
-		                return (STground gBool, [t, t])
-		theta CNEq    = freshST >>= \t ->
+                                return (STground gBool, [t, t])
+                theta CNEq    = freshST >>= \t ->
                                 debugST "new" (pprint t "" ++ "\n") >>
-		                return (STground gBool, [t, t])
-		theta CLt     = return (STground gBool, [STground gInt, STground gInt])
-		theta CGt     = return (STground gBool, [STground gInt, STground gInt])
-		theta CLe     = return (STground gBool, [STground gInt, STground gInt])
-		theta CGe     = return (STground gBool, [STground gInt, STground gInt])
-		theta CAnd    = return (STground gBool, [STground gBool, STground gBool])
-		theta COr     = return (STground gBool, [STground gBool, STground gBool])
+                                return (STground gBool, [t, t])
+                theta CLt     = return (STground gBool, [STground gInt, STground gInt])
+                theta CGt     = return (STground gBool, [STground gInt, STground gInt])
+                theta CLe     = return (STground gBool, [STground gInt, STground gInt])
+                theta CGe     = return (STground gBool, [STground gInt, STground gInt])
+                theta CAnd    = return (STground gBool, [STground gBool, STground gBool])
+                theta COr     = return (STground gBool, [STground gBool, STground gBool])
                 theta CNeg    = return (STground gInt, [STground gInt])
-		theta CTrue   = return (STground gBool, [])
-		theta CFalse  = return (STground gBool, [])
+                theta CTrue   = return (STground gBool, [])
+                theta CFalse  = return (STground gBool, [])
                 theta CMulI   = return (STground gInteger, [STground gInteger, STground gInteger])
-	    in  theta c >>= \(t, tl) ->
-	        inferEL cs an el >>= \tl' ->
-	        unifyL tl tl' >>
-		return t
+            in  theta c >>= \(t, tl) ->
+                inferEL cs an el >>= \tl' ->
+                unifyL tl tl' >>
+                return t
         inferE_ (ConF (LitInt _) []) = return (STground gInt)
         -- special: "error" has type a->b
         -- inferE_ (FF (V v) el) | v==bf_error =                    
@@ -400,11 +400,11 @@ inferE cs an e =
         inferE_ cexp@(CaseF _ e0 _ pats) =
             let matchType = freshST >>= \t ->
                             debugST "new" (pprint t "" ++ "\n") >>
-		            return t
+                            return t
             in  matchType >>= \tl ->
                 inferE cs an e0 >>= \t' ->
                 -- infer the types of all branches and the data type examined
-	        inferPats cs an pats >>= \patsT ->
+                inferPats cs an pats >>= \patsT ->
                 (case patsT of
                   Nothing ->
                     error $ "cannot check the type of empty case expression: "++
@@ -548,7 +548,7 @@ inferDL cs an dl =
                 unifyTV "te_tr'" te tr' >>
                 aux_unformals vl >>
                 process defs tl
-	process _ _ =
+        process _ _ =
           ierr "process(): the parameters have different sizes"
     in  prepare dl >>= \tl ->
         process dl tl
@@ -588,9 +588,9 @@ getArgType :: Type -> Int -> Type
 getArgType tt n =
     let aux (t : _) 1 = t
         aux (_ : rest) m = aux rest (m-1)
-	aux [] _ = error $ "getArgType\n" ++
+        aux [] _ = error $ "getArgType\n" ++
                            "   type " ++ pprint tt "" ++ " has no " ++
-		  	   show n ++ " argument"
+                           show n ++ " argument"
         tl :: [Type]
         tl = takeParams tt
     in  aux tl n

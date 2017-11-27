@@ -290,7 +290,7 @@ isValidFL m xl =
       chk (LetF {}) _ = ierr "chk: let-binding found"
       chk (LamF {}) _ = ierr "chk: lambda found"
       chkL [] flag = flag
-      chkL (e : el) flag =	    
+      chkL (e : el) flag =
         let flag' = chk e flag
         in  chkL el flag'
       chkDTs [] = True
