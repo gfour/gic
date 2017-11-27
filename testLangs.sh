@@ -16,12 +16,19 @@ export GICFLAGS="-gic-tc"
 source find-gic.sh
 echo "Using GIC=${GIC}"
 
+if [ -x "$(command -v stack)" ]; then
+    GHCI=`stack path --compiler-bin`/ghci
+else
+    GHCI="ghci"
+fi
+echo "Using GHCI=${GHCI}"
+
 ############# Test tags
 
 echo Testing -tag...
 TAG_EXAMPLE=Examples/Data/example2.hs
 CFLAGS2="-DUSE_TAGS" ./run_lar.sh -tag ${TAG_EXAMPLE}
-echo "result" | ghci ${GHCI_FLAGS} ${TAG_EXAMPLE}
+echo "result" | ${GHCI} ${GHCI_FLAGS} ${TAG_EXAMPLE}
 unset CFLAGS2
 
 ############# Test -enum type transformation
@@ -29,7 +36,7 @@ unset CFLAGS2
 echo Testing -enum...
 TAG_EXAMPLE=Examples/Data/example2.hs
 CC=gcc ./run_lar.sh -enum ${TAG_EXAMPLE}
-echo "result" | ghci ${GHCI_FLAGS} ${TAG_EXAMPLE}
+echo "result" | ${GHCI} ${GHCI_FLAGS} ${TAG_EXAMPLE}
 
 ############# Test arbitrary precision integers
 
@@ -41,7 +48,7 @@ CC=gcc ./run_lar.sh -gic-tc-nsig ${INTEGER_EXAMPLE}
 echo -n ${INTEGER_EXAMPLE}, GHCi: 
 # replace custom multiplication operator with * for GHC
 cat ${INTEGER_EXAMPLE} | sed -e "s/\`mulI\`/*/" > ${INTEGER_EXAMPLE2}
-echo "result"  | ghci ${GHCI_FLAGS} ${INTEGER_EXAMPLE2}
+echo "result"  | ${GHCI} ${GHCI_FLAGS} ${INTEGER_EXAMPLE2}
 rm ${INTEGER_EXAMPLE2}
 
 ############# Tests the TTD emulator
@@ -52,7 +59,7 @@ do
   echo -n ${file}, TTD emulator:\ 
   ${GIC} ${GICFLAGS} -ettd -workers 100 ${file}
   echo -n ${file}, GHCi:\ 
-  echo "result" | ghci ${GHCI_FLAGS} ${file}
+  echo "result" | ${GHCI} ${GHCI_FLAGS} ${file}
 done
 
 ############# Tests the call-by-name eduction interpreter
@@ -63,7 +70,7 @@ do
   echo -n ${file}, call-by-name eduction:\ 
   ${GIC} ${GICFLAGS} -ecbn ${file}
   echo -n ${file}, GHCi:\ 
-  echo "result" | ghci ${GHCI_FLAGS} ${file}
+  echo "result" | ${GHCI} ${GHCI_FLAGS} ${file}
 done
 
 ############# Tests the non-strict FL interpreter
@@ -74,7 +81,7 @@ do
   echo -n ${file}, non-strict FL interpreter:\ 
   ${GIC} ${GICFLAGS} -fl ${file}
   echo -n ${file}, GHCi:\ 
-  echo "result" | ghci ${GHCI_FLAGS} ${file}
+  echo "result" | ${GHCI} ${GHCI_FLAGS} ${file}
 done
 
 ############# Tests the lazy eduction interpreter
@@ -85,7 +92,7 @@ do
   echo -n ${file}, lazy eduction:\ 
   ${GIC} ${GICFLAGS} -e ${file}
   echo -n ${file}, GHCi:\ 
-  echo "result" | ghci ${GHCI_FLAGS} ${file}
+  echo "result" | ${GHCI} ${GHCI_FLAGS} ${file}
 done
 
 ############# Compares the results from the LAR back-end against those from GHCi
@@ -96,7 +103,7 @@ function testLAR {
   #echo Testing file ${file}...
 
   echo -n $1, GHCi\ \ \ \ \ \ :\ 
-  echo "result" | ghci ${GHCI_FLAGS} $1
+  echo "result" | ${GHCI} ${GHCI_FLAGS} $1
 
   # echo -n $1, LAR, libgc:\ 
   # ./run_libgc.sh $1
