@@ -126,7 +126,7 @@ tcDecls fm decls =
         in  case tvs of
               [tv] -> Just $ TcDecl tcn tv (map mkCDecl cdecls)
               _    -> errM fm "Class type list length not 1 (feature not supported yet)."
-      tcDecl (S.ClassDecl _ (Just _) _ _ _) =
+      tcDecl (S.ClassDecl _ (Just {}) _ _ _) =
         errM fm "Class contexts are not supported yet"
       -- tcDecl (S.ClassDecl _ [] _ [S.KindedVar _ _] _ _) =
       --   errM fm "Kinded variables in class declarations are not supported."
@@ -354,16 +354,16 @@ transl_type fm typ =
 transl_def :: Options -> MNameF -> S.Decl SSI -> TState -> TInfo DefFH
 transl_def opts fm (S.PatBind _ pat rhs _) st =
     case pat of
-      S.PVar _ _ ->
+      S.PVar {} ->
           case rhs of
-            S.GuardedRhss _ _ ->
+            S.GuardedRhss {} ->
               errM fm  "Guarded RHS in function/pattern definition is not supported."
             S.UnGuardedRhs _ hsExpr ->
               mkDefF opts fm pat hsExpr st
       _ -> errM fm $ "Unsupported pattern definition"++(show pat)
 transl_def opts fm (S.FunBind _ [S.Match _ hsName pats rhs _]) st =
     let defQName = QN Nothing (getName hsName)
-        getFrm pv@(S.PVar _ _)   =
+        getFrm pv@(S.PVar {})   =
           Frm (pv2v fm pv) (defaultEvOrder $ optStrict opts)
         getFrm (S.PBangPat _ pv) = Frm (pv2v fm pv) (defaultEvOrder True)
         getFrm (S.PParen _ pp)   = getFrm pp

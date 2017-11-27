@@ -60,21 +60,21 @@ getVTypes dflags prog =
             let gs' = map unLoc grhs
             in  concatMap vtGRHS gs'
       vtGRHS (GRHS [] e) = vtExpr $ unLoc e
-      vtGRHS (GRHS _ _) = error "vtGRHSs: full guard is not supported."
-      vtExpr (HsVar _)              = []
-      vtExpr (HsIPVar _)            = error "vtExpr: HsIPVar is not supported"
-      vtExpr (HsOverLit _)          = []
-      vtExpr (HsLit _)              = []
+      vtGRHS (GRHS {})   = error "vtGRHSs: full guard is not supported."
+      vtExpr (HsVar {})             = []
+      vtExpr (HsIPVar {})           = error "vtExpr: HsIPVar is not supported"
+      vtExpr (HsOverLit {})         = []
+      vtExpr (HsLit {})             = []
       vtExpr (HsLam matches)        = vtMatches matches
       vtExpr (HsApp f x)            = (vtExprU f)++(vtExprU x)
       vtExpr (OpApp op a _ b)       = (vtExprU op)++(vtExprU a)++(vtExprU b)
       vtExpr (NegApp e _)           = vtExprU e
       vtExpr (HsPar e)              = vtExprU e
-      vtExpr (SectionL _ _)         = error "vtExpr: found SectionL"
-      vtExpr (SectionR _ _)         = error "vtExpr: found SectionR"
+      vtExpr (SectionL {})          = error "vtExpr: found SectionL"
+      vtExpr (SectionR {})          = error "vtExpr: found SectionR"
       vtExpr (ExplicitTuple args _) = 
-        let vtArg (Present e) = vtExprU e
-            vtArg (Missing _) = [] 
+        let vtArg (Present e)  = vtExprU e
+            vtArg (Missing {}) = []
         in  concatMap (vtArg.unLoc) args
       vtExpr (HsCase e matches)     = (vtExprU e)++(vtMatches matches)
       vtExpr (HsIf _ cond eT eF)    = (vtExprU cond)++(vtExprU eT)++(vtExprU eF)
@@ -118,7 +118,7 @@ getVTypes dflags prog =
         in  [(vId_qn, (vId_t, Nothing))]
       vtPat (ListPat lPats _ _)     = concatMap (vtPat.unLoc) lPats
       vtPat (TuplePat lPats _ _)    = concatMap (vtPat.unLoc) lPats
-      vtPat (LitPat _)              = []
+      vtPat (LitPat {})             = []
       vtPat (ConPatOut {})          = []
       vtPat (CoPat _ p _)           = vtPat p
       vtPat p = error $ "vtPat: found pattern: "++(showPPr dflags p)
@@ -137,9 +137,9 @@ transGHC_T (Tg (T (QN (Just "GHC.Types") "Bool"))) = tBool
 transGHC_T (Tg (T (QN (Just "GHC.Types") "IO ()"))) = tUnit
 transGHC_T (Tg (T (QN (Just "GHC.Types") s))) =
   error $ "built-in GHC type missing from GIC: ["++s++"]"
-transGHC_T (Tg (TDF _ _)) = ierr "transGHC_T: defunctionalized type found."
-transGHC_T tg@(Tg _) = tg
-transGHC_T tv@(Tv _) = tv
+transGHC_T (Tg (TDF {})) = ierr "transGHC_T: defunctionalized type found."
+transGHC_T tg@(Tg {}) = tg
+transGHC_T tv@(Tv {}) = tv
 transGHC_T (Tf a b) = Tf (transGHC_T a) (transGHC_T b)
 transGHC_T (Ta a b) = Ta (transGHC_T a) (transGHC_T b)
 
